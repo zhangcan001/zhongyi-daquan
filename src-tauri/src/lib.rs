@@ -36,7 +36,13 @@ pub fn run() {
             commands::ai_commands::test_ai_connection,
             commands::ai_commands::run_ai_task,
             commands::ai_commands::get_ai_task_status,
-            commands::ai_commands::cancel_ai_task
+            commands::ai_commands::cancel_ai_task,
+            commands::search_commands::search_knowledge,
+            commands::search_commands::list_knowledge_cache,
+            commands::search_commands::rebuild_search_index,
+            commands::search_commands::generate_search_performance_test_data,
+            commands::search_commands::smoke_test_searches,
+            commands::performance_commands::list_performance_logs
         ])
         .run(tauri::generate_context!())
         .expect("failed to run tauri application");

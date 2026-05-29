@@ -4,4 +4,6 @@ pub mod ai_provider_service;
 pub mod ai_safety_service;
 pub mod app_service;
 pub mod knowledge_service;
+pub mod performance_service;
 pub mod prompt_template_service;
+pub mod search_index_service;

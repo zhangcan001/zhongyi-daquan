@@ -18,6 +18,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "ai_reserved_schema",
         sql: include_str!("../../migrations/002_ai_reserved_schema.sql"),
     },
+    Migration {
+        version: 3,
+        name: "thread_d_search_performance",
+        sql: include_str!("../../migrations/003_thread_d_search_performance.sql"),
+    },
 ];
 
 pub fn run(connection: &Connection) -> AppResult<()> {

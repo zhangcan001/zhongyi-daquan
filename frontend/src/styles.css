@@ -18,7 +18,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -68,6 +69,36 @@ h2 {
   color: #315b27;
 }
 
+.main-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.main-tabs button,
+.section-heading button,
+.detail-actions button,
+.grid-actions button,
+.pager button {
+  min-height: 38px;
+  border: 1px solid #9baaa0;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #25342c;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.main-tabs button.active,
+.section-heading button:first-of-type,
+.detail-actions button:first-of-type,
+.grid-actions button:last-of-type {
+  border-color: #2f6d4f;
+  background: #2f6d4f;
+  color: #ffffff;
+}
+
 .status-pill.muted {
   border-color: #b8c0b4;
   background: #f3f5f1;
@@ -113,6 +144,21 @@ h2 {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.summary-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 16px;
+  color: #66736c;
+}
+
+.summary-strip span {
+  border: 1px solid #d8dfd4;
+  border-radius: 6px;
+  background: #ffffff;
+  padding: 8px 10px;
 }
 
 .section-heading p {
@@ -206,13 +252,219 @@ dd {
   font-weight: 700;
 }
 
+.workspace-split {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.35fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.list-pane,
+.detail-pane {
+  border: 1px solid #d8dfd4;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 18px;
+}
+
+.filter-row,
+.grid-actions,
+.detail-actions,
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.filter-row {
+  margin: 16px 0;
+}
+
+.filter-row input,
+.filter-row select,
+.form-grid input,
+.form-grid select,
+.form-grid textarea,
+.wide-field textarea,
+.grid-actions select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid #aebbac;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #ffffff;
+  color: #1f2933;
+}
+
+.filter-row input {
+  flex: 1 1 190px;
+}
+
+.filter-row select {
+  flex: 0 1 140px;
+}
+
+.knowledge-list {
+  display: grid;
+  gap: 8px;
+  min-height: 240px;
+}
+
+.knowledge-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 58px;
+  border: 1px solid #dde4da;
+  border-radius: 6px;
+  background: #f9fbf8;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.knowledge-row.active {
+  border-color: #2f6d4f;
+  background: #edf7f1;
+}
+
+.knowledge-row span {
+  display: grid;
+  gap: 4px;
+}
+
+.knowledge-row small,
+.row-meta,
+.empty-text,
+.grid-footer,
+.safety-note,
+.form-grid small {
+  color: #66736c;
+}
+
+.row-meta {
+  justify-items: end;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.pager {
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.form-grid label,
+.wide-field {
+  display: grid;
+  gap: 7px;
+  font-weight: 700;
+}
+
+.wide-field {
+  margin-top: 12px;
+}
+
+.wide-field textarea,
+.form-grid textarea {
+  min-height: 86px;
+  resize: vertical;
+}
+
+.span-2 {
+  grid-column: 1 / -1;
+}
+
+h3 {
+  margin: 20px 0 12px;
+  font-size: 17px;
+}
+
+.detail-actions {
+  margin-top: 16px;
+}
+
+.grid-entry-shell {
+  height: 460px;
+  margin-top: 16px;
+  overflow: auto;
+  border: 1px solid #d8dfd4;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.grid-entry-table {
+  display: grid;
+  min-width: max-content;
+}
+
+.grid-head,
+.grid-cell {
+  min-height: 40px;
+  border-right: 1px solid #e2e8df;
+  border-bottom: 1px solid #e2e8df;
+  background: #ffffff;
+}
+
+.grid-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  background: #eef4ef;
+  padding: 0 10px;
+  font-weight: 700;
+}
+
+.grid-cell input,
+.grid-cell select {
+  width: 100%;
+  height: 39px;
+  border: 0;
+  background: transparent;
+  padding: 0 9px;
+}
+
+.grid-cell:focus-within {
+  outline: 2px solid #2f6d4f;
+  outline-offset: -2px;
+}
+
+.error-cell {
+  background: #fff1ed;
+}
+
+.error-cell input,
+.error-cell select {
+  color: #9b2f1f;
+}
+
+.grid-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.safety-note {
+  margin: 8px 0 0;
+}
+
 .error-text {
   color: #a33826;
 }
 
 @media (max-width: 760px) {
   .topbar,
-  .workspace-grid {
+  .workspace-grid,
+  .workspace-split {
     display: block;
   }
 
@@ -223,5 +475,13 @@ dd {
 
   .panel + .panel {
     margin-top: 16px;
+  }
+
+  .list-pane + .detail-pane {
+    margin-top: 16px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
   }
 }

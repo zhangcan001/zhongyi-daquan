@@ -49,6 +49,9 @@ export function TaskCenterPanel() {
     try {
       const report = await invoke<T>(command, args);
       setMessage(formatReport(report));
+      if (command === "create_backup" && isBackupReport(report)) {
+        setRestoreDir(report.backupDir);
+      }
       if (command === "restore_backup") {
         setRestoreReport(report as RestoreReport);
       }

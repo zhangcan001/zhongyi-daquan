@@ -10,6 +10,7 @@ const sampleJson = JSON.stringify(
   null,
   2,
 );
+const sampleCsv = "code,name,type,meridians,tags\r\n st36 , 足三里 ,穴位,胃经,常用;保健\r\nbad code,,穴位,未知经,\r\n";
 
 const knowledgeTypes = ["中药", "方剂", "经络", "穴位", "证型", "病症"];
 
@@ -136,7 +137,15 @@ export function ImportStagingPanel() {
         </label>
         <label>
           格式
-          <select value={importType} onChange={(event) => setImportType(event.target.value as "json" | "csv")}>
+          <select
+            value={importType}
+            onChange={(event) => {
+              const nextType = event.target.value as "json" | "csv";
+              setImportType(nextType);
+              setFileName(nextType === "json" ? "manual-import.json" : "manual-import.csv");
+              setContent(nextType === "json" ? sampleJson : sampleCsv);
+            }}
+          >
             <option value="json">JSON</option>
             <option value="csv">CSV</option>
           </select>
@@ -186,6 +195,26 @@ export function ImportStagingPanel() {
 
       <div className="import-actions">
         <button type="button" onClick={importToStaging}>导入暂存区</button>
+        <button
+          type="button"
+          onClick={() => {
+            setImportType("json");
+            setFileName("manual-import.json");
+            setContent(sampleJson);
+          }}
+        >
+          载入 JSON 示例
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setImportType("csv");
+            setFileName("manual-import.csv");
+            setContent(sampleCsv);
+          }}
+        >
+          载入 CSV 示例
+        </button>
         <button type="button" onClick={saveTemplate}>保存映射模板</button>
         <button type="button" disabled={!batchId} onClick={() => runClean("normalize_all")}>标准化清洗</button>
         <button type="button" disabled={!batchId} onClick={undoClean}>撤销清洗</button>

@@ -5,7 +5,9 @@ use crate::models::data_pipeline::{
     ImportBatchSummary, ImportParsedPreview, StagingIssue, StagingPage, StagingRowView,
 };
 use crate::repositories::{import_repository, validation_repository};
-use crate::services::{field_mapping_service, normalize_service, validation_service};
+use crate::services::{
+    field_mapping_service, normalize_service, search_index_service, validation_service,
+};
 use chrono::Utc;
 use rusqlite::{params, OptionalExtension};
 use serde_json::{Map, Value};
@@ -250,7 +252,6 @@ pub fn confirm_import(database: &Database, batch_id: i64) -> AppResult<ConfirmIm
                 [row_id],
             )?;
             imported_count += 1;
-            // TODO: 线程 D 合并后，在这里调用 search_index_service 批量更新搜索索引。
         }
         transaction.execute(
             "UPDATE data_import_batches SET status = 'imported' WHERE id = ?1",
@@ -261,6 +262,7 @@ pub fn confirm_import(database: &Database, batch_id: i64) -> AppResult<ConfirmIm
     })?;
 
     import_repository::update_batch_counts(database, batch_id, "imported")?;
+    search_index_service::rebuild_search_index(database)?;
     Ok(ConfirmImportResult {
         batch_id,
         imported_count,

@@ -1,6 +1,8 @@
 import type { AppStatus } from "../modules/app/types";
 import { AiSettingsPanel } from "./AiSettingsPanel";
 import { ImportStagingPanel } from "./ImportStagingPanel";
+import { RelationReviewPanel } from "./RelationReviewPanel";
+import { SearchPanel } from "./SearchPanel";
 import { TaskCenterPanel } from "./TaskCenterPanel";
 
 type AppView = "dashboard" | "knowledge" | "grid";
@@ -53,11 +55,7 @@ export function DashboardPage({ status, error, activeView, onNavigate }: Dashboa
       {activeView === "dashboard" ? (
         <>
           <section className="workspace-grid">
-            <div className="panel search-panel">
-              <label htmlFor="global-search">全局搜索</label>
-              <input id="global-search" placeholder="搜索足三里、ST36、黄芪、补中益气汤、胃经" disabled />
-              <span>搜索已接入 FTS5 与 search_terms，后续线程会继续打磨前端搜索入口。</span>
-            </div>
+            <SearchPanel />
 
             <div className="panel">
               <h2>应用状态</h2>
@@ -96,6 +94,7 @@ export function DashboardPage({ status, error, activeView, onNavigate }: Dashboa
           </section>
 
           <ImportStagingPanel />
+          <RelationReviewPanel />
           <TaskCenterPanel />
           <AiSettingsPanel />
         </>

@@ -15,6 +15,8 @@ pub enum AppError {
     DatabaseLock(String),
     #[error("参数错误: {0}")]
     InvalidInput(String),
+    #[error("数据错误: {0}")]
+    Data(String),
 }
 
 impl Serialize for AppError {

@@ -39,6 +39,29 @@ impl Database {
         f(&guard)
     }
 
+    pub fn replace_database_file(&self, replacement_path: &Path) -> AppResult<()> {
+        let mut guard = self
+            .connection
+            .lock()
+            .map_err(|_| AppError::DatabaseLock("数据库连接锁已损坏".to_string()))?;
+        let old_connection = std::mem::replace(&mut *guard, Connection::open_in_memory()?);
+        drop(old_connection);
+
+        if let Some(parent) = self.path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let _ = fs::remove_file(&self.path);
+        let _ = fs::remove_file(self.path.with_extension("db-wal"));
+        let _ = fs::remove_file(self.path.with_extension("db-shm"));
+        fs::copy(replacement_path, &self.path)?;
+
+        let reopened = Connection::open(&self.path)?;
+        initialize_pragmas(&reopened)?;
+        migrations::run(&reopened)?;
+        *guard = reopened;
+        Ok(())
+    }
+
     pub fn path(&self) -> &Path {
         &self.path
     }

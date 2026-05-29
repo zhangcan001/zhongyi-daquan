@@ -1,6 +1,7 @@
 import type { AppStatus } from "../modules/app/types";
 import { AiSettingsPanel } from "./AiSettingsPanel";
 import { ImportStagingPanel } from "./ImportStagingPanel";
+import { TaskCenterPanel } from "./TaskCenterPanel";
 
 type AppView = "dashboard" | "knowledge" | "grid";
 
@@ -95,6 +96,7 @@ export function DashboardPage({ status, error, activeView, onNavigate }: Dashboa
           </section>
 
           <ImportStagingPanel />
+          <TaskCenterPanel />
           <AiSettingsPanel />
         </>
       ) : null}

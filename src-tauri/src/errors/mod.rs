@@ -11,6 +11,8 @@ pub enum AppError {
     Io(#[from] std::io::Error),
     #[error("{0}")]
     DatabaseLock(String),
+    #[error("参数错误: {0}")]
+    InvalidInput(String),
 }
 
 impl Serialize for AppError {

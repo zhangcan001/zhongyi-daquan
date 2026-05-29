@@ -30,7 +30,13 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::app_commands::health_check,
             commands::app_commands::get_app_status,
-            commands::ai_commands::ai_placeholder
+            commands::ai_commands::ai_placeholder,
+            commands::ai_commands::get_ai_provider_settings,
+            commands::ai_commands::save_ai_provider_settings,
+            commands::ai_commands::test_ai_connection,
+            commands::ai_commands::run_ai_task,
+            commands::ai_commands::get_ai_task_status,
+            commands::ai_commands::cancel_ai_task
         ])
         .run(tauri::generate_context!())
         .expect("failed to run tauri application");

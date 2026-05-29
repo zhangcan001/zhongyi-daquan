@@ -1,15 +1,18 @@
 import type { AppStatus } from "../modules/app/types";
 import { AiSettingsPanel } from "./AiSettingsPanel";
+import { ImportStagingPanel } from "./ImportStagingPanel";
+
+type AppView = "dashboard" | "knowledge" | "grid";
 
 type DashboardPageProps = {
   status: AppStatus | null;
   error: string | null;
-  activeView: "dashboard" | "knowledge" | "grid";
-  onNavigate: (view: "dashboard" | "knowledge" | "grid") => void;
+  activeView: AppView;
+  onNavigate: (view: AppView) => void;
 };
 
 const knowledgeTypes = ["中药", "方剂", "经络", "穴位", "证型", "病症"];
-const entryActions = ["快速新增", "表格录入"];
+const entryActions = ["快速新增", "表格录入", "批量导入", "字段映射", "暂存区", "数据清洗"];
 
 export function DashboardPage({ status, error, activeView, onNavigate }: DashboardPageProps) {
   return (
@@ -52,7 +55,7 @@ export function DashboardPage({ status, error, activeView, onNavigate }: Dashboa
             <div className="panel search-panel">
               <label htmlFor="global-search">全局搜索</label>
               <input id="global-search" placeholder="搜索足三里、ST36、黄芪、补中益气汤、胃经" disabled />
-              <span>搜索将在后续线程接入 FTS5 与 search_terms。</span>
+              <span>搜索已接入 FTS5 与 search_terms，后续线程会继续打磨前端搜索入口。</span>
             </div>
 
             <div className="panel">
@@ -91,6 +94,7 @@ export function DashboardPage({ status, error, activeView, onNavigate }: Dashboa
             </div>
           </section>
 
+          <ImportStagingPanel />
           <AiSettingsPanel />
         </>
       ) : null}

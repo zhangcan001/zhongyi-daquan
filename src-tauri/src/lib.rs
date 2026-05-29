@@ -49,7 +49,18 @@ pub fn run() {
             commands::search_commands::rebuild_search_index,
             commands::search_commands::generate_search_performance_test_data,
             commands::search_commands::smoke_test_searches,
-            commands::performance_commands::list_performance_logs
+            commands::performance_commands::list_performance_logs,
+            commands::import_commands::preview_json_import,
+            commands::import_commands::preview_csv_import,
+            commands::import_commands::import_json_to_staging,
+            commands::import_commands::import_csv_to_staging,
+            commands::import_commands::save_field_mapping_template,
+            commands::import_commands::list_field_mapping_templates,
+            commands::import_commands::get_import_staging_page,
+            commands::import_commands::validate_import_batch,
+            commands::import_commands::confirm_import_batch,
+            commands::clean_commands::apply_import_clean_step,
+            commands::clean_commands::undo_last_import_clean_step,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run tauri application");

@@ -7,11 +7,18 @@ struct Migration {
     sql: &'static str,
 }
 
-const MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    name: "initial_core_schema",
-    sql: include_str!("../../migrations/001_initial_core_schema.sql"),
-}];
+const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        name: "initial_core_schema",
+        sql: include_str!("../../migrations/001_initial_core_schema.sql"),
+    },
+    Migration {
+        version: 2,
+        name: "ai_reserved_schema",
+        sql: include_str!("../../migrations/002_ai_reserved_schema.sql"),
+    },
+];
 
 pub fn run(connection: &Connection) -> AppResult<()> {
     connection.execute_batch(

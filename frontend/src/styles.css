@@ -17,7 +17,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -67,6 +68,12 @@ h2 {
   color: #315b27;
 }
 
+.status-pill.muted {
+  border-color: #b8c0b4;
+  background: #f3f5f1;
+  color: #5d665f;
+}
+
 .workspace-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.6fr);
@@ -99,6 +106,18 @@ h2 {
   border-radius: 6px;
   padding: 0 12px;
   background: #f8faf7;
+}
+
+.section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.section-heading p {
+  margin-bottom: 0;
+  color: #66736c;
 }
 
 .search-panel span,
@@ -134,12 +153,57 @@ dd {
 }
 
 .type-grid button,
-.action-grid button {
+.action-grid button,
+.ai-actions button {
   min-height: 42px;
   border: 1px solid #b9c5b5;
   border-radius: 6px;
   background: #f8faf7;
   color: #33413a;
+}
+
+.ai-settings {
+  margin-top: 16px;
+}
+
+.ai-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.ai-form-grid label {
+  display: grid;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.ai-form-grid input,
+.ai-form-grid select {
+  min-height: 40px;
+  border: 1px solid #aebbac;
+  border-radius: 6px;
+  padding: 0 10px;
+  background: #ffffff;
+  color: #1f2933;
+}
+
+.ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.ai-actions button {
+  padding: 0 14px;
+}
+
+.ai-message {
+  margin: 14px 0 0;
+  color: #54615a;
+  font-weight: 700;
 }
 
 .error-text {

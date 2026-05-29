@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -117,4 +118,92 @@ pub struct DiseaseDetail {
     pub care_advice: Option<String>,
     pub medical_warning: Option<String>,
     pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeListRequest {
+    pub item_type: Option<String>,
+    pub query: Option<String>,
+    pub data_status: Option<String>,
+    pub favorite_only: Option<bool>,
+    pub page: Option<u32>,
+    pub page_size: Option<u32>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeListResponse {
+    pub total: i64,
+    pub page: u32,
+    pub page_size: u32,
+    pub items: Vec<KnowledgeItem>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeInput {
+    pub item_type: String,
+    pub code: Option<String>,
+    pub name: String,
+    pub alias: Option<String>,
+    pub pinyin: Option<String>,
+    pub category: Option<String>,
+    pub summary: Option<String>,
+    pub content: Option<String>,
+    pub source_note: Option<String>,
+    pub tags: Option<String>,
+    pub data_status: String,
+    pub completeness_status: String,
+    pub is_favorite: bool,
+    pub detail: Value,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeDetailResponse {
+    pub item: KnowledgeItem,
+    pub detail: Value,
+    pub versions: Vec<KnowledgeVersion>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeVersion {
+    pub id: i64,
+    pub item_id: i64,
+    pub version_no: i64,
+    pub snapshot_json: String,
+    pub change_summary: Option<String>,
+    pub changed_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FavoriteRequest {
+    pub item_id: i64,
+    pub is_favorite: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GridSaveRequest {
+    pub item_type: String,
+    pub rows: Vec<KnowledgeInput>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GridSaveResponse {
+    pub saved_count: usize,
+    pub item_ids: Vec<i64>,
+    pub errors: Vec<GridSaveError>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GridSaveError {
+    pub row_index: usize,
+    pub field_name: String,
+    pub message: String,
 }

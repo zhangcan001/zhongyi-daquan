@@ -42,7 +42,23 @@ pub fn run() {
             commands::search_commands::rebuild_search_index,
             commands::search_commands::generate_search_performance_test_data,
             commands::search_commands::smoke_test_searches,
-            commands::performance_commands::list_performance_logs
+            commands::job_commands::create_job,
+            commands::job_commands::update_job_progress,
+            commands::job_commands::mark_job_success,
+            commands::job_commands::mark_job_failed,
+            commands::job_commands::list_jobs,
+            commands::job_commands::get_job,
+            commands::backup_commands::create_backup,
+            commands::backup_commands::restore_backup,
+            commands::maintenance_commands::run_rebuild_search_index_job,
+            commands::maintenance_commands::optimize_database,
+            commands::maintenance_commands::clean_temp_imports,
+            commands::maintenance_commands::clean_old_performance_logs,
+            commands::maintenance_commands::export_performance_report,
+            commands::performance_commands::list_performance_logs,
+            commands::performance_commands::record_performance_log,
+            commands::audit_commands::record_audit_log,
+            commands::audit_commands::list_audit_logs
         ])
         .run(tauri::generate_context!())
         .expect("failed to run tauri application");

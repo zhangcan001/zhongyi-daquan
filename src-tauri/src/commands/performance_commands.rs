@@ -1,4 +1,5 @@
 use crate::errors::AppResult;
+use crate::models::runtime::RecordPerformanceLogRequest;
 use crate::models::search::PerformanceLogEntry;
 use crate::services::performance_service;
 use crate::AppState;
@@ -10,4 +11,12 @@ pub fn list_performance_logs(
     limit: Option<u32>,
 ) -> AppResult<Vec<PerformanceLogEntry>> {
     performance_service::list_recent(&state.database, limit)
+}
+
+#[tauri::command]
+pub fn record_performance_log(
+    state: State<'_, AppState>,
+    request: RecordPerformanceLogRequest,
+) -> AppResult<()> {
+    performance_service::record(&state.database, request)
 }

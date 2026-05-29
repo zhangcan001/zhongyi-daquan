@@ -9,10 +9,14 @@ pub enum AppError {
     Sqlite(#[from] rusqlite::Error),
     #[error("文件系统错误: {0}")]
     Io(#[from] std::io::Error),
+    #[error("JSON 错误: {0}")]
+    Json(#[from] serde_json::Error),
     #[error("{0}")]
     DatabaseLock(String),
     #[error("参数错误: {0}")]
     InvalidInput(String),
+    #[error("数据错误: {0}")]
+    Data(String),
 }
 
 impl Serialize for AppError {

@@ -1,5 +1,6 @@
 import type { AppStatus } from "../modules/app/types";
 import { AiSettingsPanel } from "./AiSettingsPanel";
+import { TaskCenterPanel } from "./TaskCenterPanel";
 
 type DashboardPageProps = {
   status: AppStatus | null;
@@ -62,6 +63,8 @@ export function DashboardPage({ status, error }: DashboardPageProps) {
           ))}
         </div>
       </section>
+
+      <TaskCenterPanel />
 
       <AiSettingsPanel />
     </main>

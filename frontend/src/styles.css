@@ -200,6 +200,80 @@ dd {
   padding: 0 14px;
 }
 
+.task-center button {
+  min-height: 40px;
+  border: 1px solid #b9c5b5;
+  border-radius: 6px;
+  background: #f8faf7;
+  color: #33413a;
+  padding: 0 14px;
+}
+
+.maintenance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.restore-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.restore-row input {
+  min-height: 40px;
+  border: 1px solid #aebbac;
+  border-radius: 6px;
+  padding: 0 10px;
+  background: #ffffff;
+}
+
+.task-message {
+  margin: 14px 0 0;
+  color: #54615a;
+  font-weight: 700;
+}
+
+.restore-report {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  color: #54615a;
+}
+
+.job-table-wrap {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+
+.job-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+
+.job-table th,
+.job-table td {
+  border-top: 1px solid #d8dfd4;
+  padding: 10px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.progress-cell {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 42px;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-cell progress {
+  width: 100%;
+}
+
 .ai-message {
   margin: 14px 0 0;
   color: #54615a;
@@ -223,5 +297,9 @@ dd {
 
   .panel + .panel {
     margin-top: 16px;
+  }
+
+  .restore-row {
+    grid-template-columns: 1fr;
   }
 }

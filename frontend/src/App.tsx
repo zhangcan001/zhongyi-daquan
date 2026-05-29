@@ -8,7 +8,7 @@ import { GridEntryPage } from "./pages/GridEntryPage";
 export function App() {
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<"dashboard" | "knowledge" | "grid">("knowledge");
+  const [activeView, setActiveView] = useState<"dashboard" | "knowledge" | "grid">("dashboard");
 
   useEffect(() => {
     invoke<AppStatus>("get_app_status")

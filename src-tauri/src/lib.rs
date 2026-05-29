@@ -61,6 +61,13 @@ pub fn run() {
             commands::import_commands::confirm_import_batch,
             commands::clean_commands::apply_import_clean_step,
             commands::clean_commands::undo_last_import_clean_step,
+            commands::relation_commands::run_duplicate_detection,
+            commands::relation_commands::list_duplicate_candidates,
+            commands::relation_commands::merge_duplicate_candidate,
+            commands::relation_commands::generate_relation_suggestions,
+            commands::relation_commands::list_relation_suggestions,
+            commands::relation_commands::accept_relation_suggestion,
+            commands::relation_commands::reject_relation_suggestion
         ])
         .run(tauri::generate_context!())
         .expect("failed to run tauri application");

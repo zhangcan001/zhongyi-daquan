@@ -5,4 +5,5 @@ pub mod entry_commands;
 pub mod import_commands;
 pub mod knowledge_commands;
 pub mod performance_commands;
+pub mod relation_commands;
 pub mod search_commands;

@@ -42,7 +42,14 @@ pub fn run() {
             commands::search_commands::rebuild_search_index,
             commands::search_commands::generate_search_performance_test_data,
             commands::search_commands::smoke_test_searches,
-            commands::performance_commands::list_performance_logs
+            commands::performance_commands::list_performance_logs,
+            commands::relation_commands::run_duplicate_detection,
+            commands::relation_commands::list_duplicate_candidates,
+            commands::relation_commands::merge_duplicate_candidate,
+            commands::relation_commands::generate_relation_suggestions,
+            commands::relation_commands::list_relation_suggestions,
+            commands::relation_commands::accept_relation_suggestion,
+            commands::relation_commands::reject_relation_suggestion
         ])
         .run(tauri::generate_context!())
         .expect("failed to run tauri application");

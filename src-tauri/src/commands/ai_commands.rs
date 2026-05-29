@@ -47,3 +47,37 @@ pub fn get_ai_task_status(task_id: i64) -> AppResult<AiCommandResponse> {
 pub fn cancel_ai_task(task_id: i64) -> AppResult<AiCommandResponse> {
     AiPlaceholderService::cancel_task(task_id)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::ai::{AiTaskRequest, AI_DISABLED_MESSAGE};
+
+    #[test]
+    fn ai_placeholder_commands_return_disabled_status() {
+        let placeholder = ai_placeholder().expect("placeholder response");
+        assert!(!placeholder.enabled);
+        assert_eq!(placeholder.message, AI_DISABLED_MESSAGE);
+
+        let connection = test_ai_connection().expect("test connection placeholder");
+        assert!(!connection.enabled);
+        assert!(connection.message.contains("未启用"));
+
+        let task = run_ai_task(AiTaskRequest {
+            task_type: "normalize".to_string(),
+            input_json: Some("{\"name\":\"黄芪\"}".to_string()),
+            related_batch_id: None,
+            related_row_id: None,
+            related_item_id: None,
+        })
+        .expect("run task placeholder");
+        assert!(!task.enabled);
+        assert!(task.message.contains("未启用"));
+
+        let status = get_ai_task_status(1).expect("task status placeholder");
+        assert!(!status.enabled);
+
+        let cancel = cancel_ai_task(1).expect("cancel placeholder");
+        assert!(!cancel.enabled);
+    }
+}

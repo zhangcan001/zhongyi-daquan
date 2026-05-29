@@ -1,18 +1,26 @@
 # 中医大全
 
-纯本地 Windows 桌面软件骨架，目标版本为 `v0.1-entry-core-performance-ai-ready`。
+《中医大全》是一个纯本地 Windows 桌面软件，目标版本为 `v0.1-entry-core-performance-ai-ready`。当前阶段聚焦中医知识资产管理：录入、导入、映射、清洗、校验、去重、合并、关系建议、搜索、备份恢复和 AI 接口预留。
 
-## 当前状态
+本项目不是问诊软件，不做自动诊断，不做自动开方。全局安全边界是：本软件仅用于中医知识学习、资料整理与本地记录，不构成医疗诊断、治疗建议或处方依据。
 
-- Tauri + React + SQLite 基础项目结构已建立。
-- 前端通过 `@tauri-apps/api` 的 `invoke` 调用 Rust commands。
-- Rust 后端按 `commands -> services -> repositories -> SQLite` 分层。
-- 数据库启动时会创建本地数据目录、执行 PRAGMA，并运行迁移。
-- v0.1 AI 默认关闭，目前只提供占位返回，不真实调用 AI。
+## 项目定位
+
+- 技术栈：Tauri + React + SQLite。
+- 运行形态：Windows 本地桌面应用。
+- 数据位置：用户本机应用数据目录下的 `中医大全数据/`。
+- 调用链路：React 前端通过 Tauri invoke 调用 Rust commands，后端按 `commands -> services -> repositories -> SQLite` 分层。
+- AI 策略：v0.1 只做接口和数据表预留，默认关闭，不真实调用模型。
+
+## 联网边界
+
+- 开发期允许联网安装 Node、Rust、Tauri 依赖，也允许查询构建资料。
+- 产品运行期默认不联网、不登录、不上传、不依赖服务器。
+- v0.1 主流程不接入真实 AI，不发送本地知识库数据。
 
 ## 启动
 
-首次运行前需要本机已有 Node.js、npm、Rust 和 Tauri 构建依赖。开发过程允许联网安装依赖；产品运行期默认不联网，v0.1 不真实调用 AI。
+首次运行前需要安装 Node.js、npm、Rust 和 Tauri 所需系统依赖。
 
 ```powershell
 npm install --prefix frontend
@@ -23,9 +31,39 @@ npm run tauri:dev
 前端单独调试：
 
 ```powershell
-npm install --prefix frontend
-npm run dev
+npm --prefix frontend run dev
 ```
+
+## 测试
+
+前端检查：
+
+```powershell
+npm --prefix frontend run check
+npm --prefix frontend run build
+```
+
+后端检查：
+
+```powershell
+cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+cargo test --manifest-path src-tauri/Cargo.toml
+cargo check --manifest-path src-tauri/Cargo.toml
+```
+
+一键检查：
+
+```powershell
+.\scripts\check_all.ps1
+```
+
+生成线程 H 回归数据并执行性能阈值检查：
+
+```powershell
+.\scripts\generate_regression_data.ps1
+```
+
+默认生成到 `local-data/database/thread_h_regression.db`，包含 10,000 条 `knowledge_items`、50,000 条 `knowledge_relations`、10,000 条 `data_import_rows`、1,000 条 `duplicate_candidates` 和 1,000 条 `relation_suggestions`。
 
 ## 数据目录
 
@@ -43,11 +81,11 @@ npm run dev
 └─ temp/
 ```
 
-## 开发边界
+## 文档
 
-- 产品运行期默认不联网、不登录、不上传。
-- 开发过程允许联网安装依赖、查询构建资料和运行开发工具。
-- 前端不得直接访问 SQLite。
-- 复杂写入后续必须通过 service 使用事务。
-- 大数据任务后续必须进入 `background_jobs`。
-- 搜索后续使用 FTS5 + `search_terms`。
+- [数据库结构](docs/DATABASE_SCHEMA.md)
+- [开发指南](docs/DEV_GUIDE.md)
+- [测试计划](docs/TEST_PLAN.md)
+- [打包说明](docs/PACKAGING.md)
+- [发布检查清单](docs/RELEASE_CHECKLIST.md)
+- [Codex 开发总文档](docs/CODEX_DEV_DOC.md)

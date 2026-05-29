@@ -84,3 +84,107 @@ pub struct ValidationRule {
     pub message: String,
     pub enabled: bool,
 }
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportParsedPreview {
+    pub headers: Vec<String>,
+    pub rows: Vec<serde_json::Value>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateImportRequest {
+    pub file_name: String,
+    pub target_type: String,
+    pub content: String,
+    pub mapping: Option<std::collections::HashMap<String, String>>,
+    pub template_id: Option<i64>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportBatchSummary {
+    pub batch: DataImportBatch,
+    pub total_rows: i64,
+    pub importable_rows: i64,
+    pub warning_rows: i64,
+    pub error_rows: i64,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StagingIssue {
+    pub severity: String,
+    pub issue_code: String,
+    pub field_name: Option<String>,
+    pub message: String,
+    pub suggestion: Option<String>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StagingRowView {
+    pub id: i64,
+    pub row_index: i64,
+    pub raw: serde_json::Value,
+    pub mapped: serde_json::Value,
+    pub normalized: serde_json::Value,
+    pub status: String,
+    pub error_message: Option<String>,
+    pub warning_message: Option<String>,
+    pub issues: Vec<StagingIssue>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StagingPage {
+    pub summary: ImportBatchSummary,
+    pub rows: Vec<StagingRowView>,
+    pub page: i64,
+    pub page_size: i64,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveMappingTemplateRequest {
+    pub name: String,
+    pub target_type: String,
+    pub source_headers: Vec<String>,
+    pub mapping: std::collections::HashMap<String, String>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanStepRequest {
+    pub batch_id: i64,
+    pub step_type: String,
+    pub params: Option<serde_json::Value>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanStepResult {
+    pub step_id: Option<i64>,
+    pub affected_rows: i64,
+    pub summary: ImportBatchSummary,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfirmImportResult {
+    pub batch_id: i64,
+    pub imported_count: i64,
+    pub skipped_count: i64,
+    pub summary: ImportBatchSummary,
+}

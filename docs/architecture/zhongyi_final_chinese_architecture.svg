@@ -1,0 +1,294 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1700" viewBox="0 0 2400 1700">
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#6a5a3c"/>
+  </marker>
+  <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+    <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#000" flood-opacity="0.13"/>
+  </filter>
+  <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+    <stop offset="0%" stop-color="#f8f1e4"/>
+    <stop offset="100%" stop-color="#edf5ed"/>
+  </linearGradient>
+</defs>
+<rect width="2400" height="1700" fill="url(#bg)"/>
+
+<text x="1200.0" y="58" text-anchor="middle" font-size="44" font-weight="900" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">《中医大全》最终版中文架构图</text>
+<text x="1200.0" y="100" text-anchor="middle" font-size="26" font-weight="600" fill="#496655" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">v4-entry-refine-performance-ai-ready：数据录入处理强化 + 查询性能优化 + AI 接口预留</text>
+<rect x="50" y="130" width="2300" height="1500" rx="34" fill="#fffdf8" stroke="#b8a26a" stroke-width="3" stroke-dasharray="10 8"/>
+<text x="90" y="172" text-anchor="start" font-size="25" font-weight="800" fill="#5b4b32" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">纯本地运行：不联网 / 不登录 / 不上传 / 不在线问诊 / 不自动诊断 / 不自动开方 / 数据保存在用户电脑</text>
+<g filter="url(#shadow)">
+<rect x="90" y="210" width="2220" height="190" rx="28" fill="#f8fbf6" stroke="#8aa389" stroke-width="3"/>
+<text x="120" y="256" text-anchor="start" font-size="30" font-weight="850" fill="#315f46" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">一、前端功能层 React UI</text>
+<rect x="135" y="285" width="245" height="70" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="257.5" y="304.36" text-anchor="middle" font-size="17" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">首页工作台</text>
+<text x="257.5" y="326.12" text-anchor="middle" font-size="17" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">搜索 / 收藏 / 最近浏</text>
+<text x="257.5" y="347.88" text-anchor="middle" font-size="17" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">览</text>
+<rect x="410" y="285" width="285" height="70" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="552.5" y="304.36" text-anchor="middle" font-size="17" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">知识库</text>
+<text x="552.5" y="326.12" text-anchor="middle" font-size="17" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">中药/方剂/经络/穴位/证</text>
+<text x="552.5" y="347.88" text-anchor="middle" font-size="17" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">型/病症</text>
+<rect x="725" y="285" width="310" height="70" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="880.0" y="304.36" text-anchor="middle" font-size="17" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">数据录入中心</text>
+<text x="880.0" y="326.12" text-anchor="middle" font-size="17" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">快速新增/表格录入/批量导</text>
+<text x="880.0" y="347.88" text-anchor="middle" font-size="17" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">入</text>
+<rect x="1065" y="285" width="285" height="70" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="1207.5" y="315.24" text-anchor="middle" font-size="17" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">暂存与清洗</text>
+<text x="1207.5" y="337.0" text-anchor="middle" font-size="17" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">校验/修正/去重/合并</text>
+<rect x="1380" y="285" width="285" height="70" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="1522.5" y="315.24" text-anchor="middle" font-size="17" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">关系建议</text>
+<text x="1522.5" y="337.0" text-anchor="middle" font-size="17" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">方剂-中药/穴位-经络</text>
+<rect x="1695" y="285" width="285" height="70" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="1837.5" y="315.24" text-anchor="middle" font-size="17" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">搜索与性能</text>
+<text x="1837.5" y="337.0" text-anchor="middle" font-size="17" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">FTS5/词表/缓存/分页</text>
+<rect x="2010" y="285" width="245" height="70" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="2132.5" y="315.24" text-anchor="middle" font-size="17" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">AI 设置占位</text>
+<text x="2132.5" y="337.0" text-anchor="middle" font-size="17" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">后期接入本地或兼容接口</text>
+</g>
+<g filter="url(#shadow)">
+<rect x="90" y="445" width="2220" height="200" rx="28" fill="#fbfaf5" stroke="#8aa389" stroke-width="3"/>
+<text x="120" y="491" text-anchor="start" font-size="30" font-weight="850" fill="#315f46" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">二、本地调用与业务服务层</text>
+<rect x="135" y="520" width="190" height="65" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="230.0" y="548.02" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">Tauri Invoke</text>
+<text x="230.0" y="568.5" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">前端统一调用</text>
+<rect x="355" y="520" width="190" height="65" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="450.0" y="537.78" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">Rust Command</text>
+<text x="450.0" y="558.26" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">s</text>
+<text x="450.0" y="578.74" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">命令门面层</text>
+<rect x="575" y="520" width="190" height="65" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="670.0" y="548.02" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">Services</text>
+<text x="670.0" y="568.5" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">业务编排层</text>
+<rect x="795" y="520" width="190" height="65" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="890.0" y="548.02" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">Repositories</text>
+<text x="890.0" y="568.5" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">数据访问层</text>
+<rect x="1015" y="520" width="190" height="65" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="1110.0" y="537.78" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">SQLite / FTS</text>
+<text x="1110.0" y="558.26" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">5</text>
+<text x="1110.0" y="578.74" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">本地数据库</text>
+<rect x="1235" y="520" width="230" height="65" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="1350.0" y="548.02" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">本地文件系统</text>
+<text x="1350.0" y="568.5" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">图片/导入/备份/日志</text>
+<rect x="1495" y="520" width="250" height="65" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="1620.0" y="537.78" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">后台任务</text>
+<text x="1620.0" y="558.26" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">导入/清洗/索引/备份/</text>
+<text x="1620.0" y="578.74" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">AI</text>
+<rect x="1775" y="520" width="220" height="65" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="1885.0" y="548.02" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">性能日志</text>
+<text x="1885.0" y="568.5" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">慢查询/耗时/数据量</text>
+<rect x="2025" y="520" width="220" height="65" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="2135.0" y="537.78" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">AI 接口预留</text>
+<text x="2135.0" y="558.26" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">Provider/Pro</text>
+<text x="2135.0" y="578.74" text-anchor="middle" font-size="16" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">mpt/Draft</text>
+<line x1="325" y1="553" x2="355" y2="553" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="545" y1="553" x2="575" y2="553" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="765" y1="553" x2="795" y2="553" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="985" y1="553" x2="1015" y2="553" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="1205" y1="553" x2="1235" y2="553" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="1465" y1="553" x2="1495" y2="553" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="1745" y1="553" x2="1775" y2="553" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="1995" y1="553" x2="2025" y2="553" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+</g>
+<g filter="url(#shadow)">
+<rect x="90" y="690" width="1075" height="360" rx="28" fill="#fff7e6" stroke="#b89449" stroke-width="3"/>
+<text x="120" y="736" text-anchor="start" font-size="30" font-weight="850" fill="#6a5124" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">三、数据录入与处理流水线</text>
+<rect x="130" y="770" width="150" height="62" rx="18" fill="#ffffff" stroke="#b89449" stroke-width="2"/>
+<text x="205.0" y="796.8" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">手动新增</text>
+<text x="205.0" y="816.0" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">表单录入</text>
+<rect x="305" y="770" width="170" height="62" rx="18" fill="#ffffff" stroke="#b89449" stroke-width="2"/>
+<text x="390.0" y="787.2" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">表格录入</text>
+<text x="390.0" y="806.4000000000001" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">Excel 式批量粘</text>
+<text x="390.0" y="825.6" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">贴</text>
+<rect x="500" y="770" width="190" height="62" rx="18" fill="#ffffff" stroke="#b89449" stroke-width="2"/>
+<text x="595.0" y="777.6" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">批量导入</text>
+<text x="595.0" y="796.8000000000001" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">JSON / CSV</text>
+<text x="595.0" y="816.0" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif"> / 预留 Exce</text>
+<text x="595.0" y="835.2" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">l</text>
+<rect x="715" y="770" width="145" height="62" rx="18" fill="#ffffff" stroke="#b89449" stroke-width="2"/>
+<text x="787.5" y="796.8" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">字段映射</text>
+<text x="787.5" y="816.0" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">保存模板</text>
+<rect x="885" y="770" width="220" height="62" rx="18" fill="#ffffff" stroke="#b89449" stroke-width="2"/>
+<text x="995.0" y="787.2" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">标准化处理</text>
+<text x="995.0" y="806.4000000000001" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">拼音/编号/标签/经</text>
+<text x="995.0" y="825.6" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">络</text>
+<rect x="130" y="890" width="150" height="62" rx="18" fill="#ffffff" stroke="#b89449" stroke-width="2"/>
+<text x="205.0" y="916.8" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">暂存区</text>
+<text x="205.0" y="936.0" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">不直接入正式库</text>
+<rect x="305" y="890" width="170" height="62" rx="18" fill="#ffffff" stroke="#b89449" stroke-width="2"/>
+<text x="390.0" y="916.8" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">数据校验</text>
+<text x="390.0" y="936.0" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">错误行/建议</text>
+<rect x="500" y="890" width="190" height="62" rx="18" fill="#ffffff" stroke="#b89449" stroke-width="2"/>
+<text x="595.0" y="916.8" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">重复检测</text>
+<text x="595.0" y="936.0" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">指纹/名称/编号</text>
+<rect x="715" y="890" width="180" height="62" rx="18" fill="#ffffff" stroke="#b89449" stroke-width="2"/>
+<text x="805.0" y="916.8" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">合并确认</text>
+<text x="805.0" y="936.0" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">补空/覆盖/合标签</text>
+<rect x="920" y="890" width="185" height="62" rx="18" fill="#ffffff" stroke="#b89449" stroke-width="2"/>
+<text x="1012.5" y="916.8" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">关系建议</text>
+<text x="1012.5" y="936.0" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">人工接受后入库</text>
+<line x1="280" y1="801" x2="305" y2="801" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="475" y1="801" x2="500" y2="801" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="690" y1="801" x2="715" y2="801" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="860" y1="801" x2="885" y2="801" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="280" y1="921" x2="305" y2="921" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="475" y1="921" x2="500" y2="921" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="690" y1="921" x2="715" y2="921" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="895" y1="921" x2="920" y2="921" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="995" y1="832" x2="995" y2="890" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="935.0" y="834.0" width="120" height="30" rx="15" fill="#fffdf8" opacity="0.96"/>
+<text x="995.0" y="855.0" text-anchor="middle" font-size="17" font-weight="560" fill="#6a5a3c" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">进入暂存</text>
+</g>
+<g filter="url(#shadow)">
+<rect x="1235" y="690" width="1075" height="360" rx="28" fill="#eef6ee" stroke="#6f8f73" stroke-width="3"/>
+<text x="1265" y="736" text-anchor="start" font-size="30" font-weight="850" fill="#315f46" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">四、查询性能与大数据优化</text>
+<rect x="1275" y="770" width="220" height="62" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="1385.0" y="787.2" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">FTS5 全文索引</text>
+<text x="1385.0" y="806.4000000000001" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">name/code/al</text>
+<text x="1385.0" y="825.6" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">ias/content</text>
+<rect x="1520" y="770" width="220" height="62" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="1630.0" y="796.8" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">search_terms</text>
+<text x="1630.0" y="816.0" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">中文/拼音/别名/编号</text>
+<rect x="1765" y="770" width="180" height="62" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="1855.0" y="796.8" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">权重排序</text>
+<text x="1855.0" y="816.0" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">编号/名称优先</text>
+<rect x="1970" y="770" width="250" height="62" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="2095.0" y="777.6" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">列表读缓存</text>
+<text x="2095.0" y="796.8000000000001" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">knowledge_li</text>
+<text x="2095.0" y="816.0" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">st_view_cach</text>
+<text x="2095.0" y="835.2" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">e</text>
+<rect x="1275" y="890" width="220" height="62" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="1385.0" y="907.2" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">分页查询</text>
+<text x="1385.0" y="926.4000000000001" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">默认 50 / 最大 2</text>
+<text x="1385.0" y="945.6" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">00</text>
+<rect x="1520" y="890" width="220" height="62" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="1630.0" y="916.8" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">虚拟滚动</text>
+<text x="1630.0" y="936.0" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">表格录入/暂存区</text>
+<rect x="1765" y="890" width="210" height="62" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="1870.0" y="916.8" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">后台任务</text>
+<text x="1870.0" y="936.0" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">导入/索引/清洗/备份</text>
+<rect x="2000" y="890" width="220" height="62" rx="18" fill="#ffffff" stroke="#6f8f73" stroke-width="2"/>
+<text x="2110.0" y="907.2" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">关系数量缓存</text>
+<text x="2110.0" y="926.4000000000001" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">relation_cou</text>
+<text x="2110.0" y="945.6" text-anchor="middle" font-size="15" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">nt_cache</text>
+</g>
+<g filter="url(#shadow)">
+<rect x="90" y="1095" width="2220" height="275" rx="28" fill="#fffdf8" stroke="#b8a26a" stroke-width="3"/>
+<text x="120" y="1141" text-anchor="start" font-size="30" font-weight="850" fill="#315f46" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">五、核心数据层 SQLite + 本地文件</text>
+<rect x="130" y="1170" width="170" height="55" rx="18" fill="#ffffff" stroke="#a98f52" stroke-width="2"/>
+<text x="215.0" y="1184.62" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">knowledge_ite</text>
+<text x="215.0" y="1202.54" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">ms</text>
+<text x="215.0" y="1220.4599999999998" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">知识主表</text>
+<rect x="325" y="1170" width="250" height="55" rx="18" fill="#ffffff" stroke="#a98f52" stroke-width="2"/>
+<text x="450.0" y="1175.66" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">详情表</text>
+<text x="450.0" y="1193.5800000000002" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">herb/formula/</text>
+<text x="450.0" y="1211.5" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">meridian/acup</text>
+<text x="450.0" y="1229.42" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">oint</text>
+<rect x="600" y="1170" width="220" height="55" rx="18" fill="#ffffff" stroke="#a98f52" stroke-width="2"/>
+<text x="710.0" y="1184.62" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">导入表</text>
+<text x="710.0" y="1202.54" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">batches/rows/</text>
+<text x="710.0" y="1220.4599999999998" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">issues</text>
+<rect x="845" y="1170" width="220" height="55" rx="18" fill="#ffffff" stroke="#a98f52" stroke-width="2"/>
+<text x="955.0" y="1184.62" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">字段映射</text>
+<text x="955.0" y="1202.54" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">field_mapping</text>
+<text x="955.0" y="1220.4599999999998" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">_templates</text>
+<rect x="1090" y="1170" width="180" height="55" rx="18" fill="#ffffff" stroke="#a98f52" stroke-width="2"/>
+<text x="1180.0" y="1184.62" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">标准词典</text>
+<text x="1180.0" y="1202.54" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">standard_term</text>
+<text x="1180.0" y="1220.4599999999998" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">s</text>
+<rect x="1295" y="1170" width="230" height="55" rx="18" fill="#ffffff" stroke="#a98f52" stroke-width="2"/>
+<text x="1410.0" y="1184.62" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">清洗历史</text>
+<text x="1410.0" y="1202.54" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">transform_ste</text>
+<text x="1410.0" y="1220.4599999999998" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">ps/changes</text>
+<rect x="1550" y="1170" width="190" height="55" rx="18" fill="#ffffff" stroke="#a98f52" stroke-width="2"/>
+<text x="1645.0" y="1184.62" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">校验规则</text>
+<text x="1645.0" y="1202.54" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">validation_ru</text>
+<text x="1645.0" y="1220.4599999999998" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">les</text>
+<rect x="1765" y="1170" width="190" height="55" rx="18" fill="#ffffff" stroke="#a98f52" stroke-width="2"/>
+<text x="1860.0" y="1184.62" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">去重合并</text>
+<text x="1860.0" y="1202.54" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">duplicate/mer</text>
+<text x="1860.0" y="1220.4599999999998" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">ge</text>
+<rect x="1980" y="1170" width="230" height="55" rx="18" fill="#ffffff" stroke="#a98f52" stroke-width="2"/>
+<text x="2095.0" y="1184.62" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">关系表</text>
+<text x="2095.0" y="1202.54" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">suggestions/r</text>
+<text x="2095.0" y="1220.4599999999998" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">elations</text>
+<rect x="130" y="1260" width="170" height="55" rx="18" fill="#ffffff" stroke="#a98f52" stroke-width="2"/>
+<text x="215.0" y="1283.58" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">搜索索引</text>
+<text x="215.0" y="1301.5" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">knowledge_fts</text>
+<rect x="325" y="1260" width="170" height="55" rx="18" fill="#ffffff" stroke="#a98f52" stroke-width="2"/>
+<text x="410.0" y="1283.58" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">搜索词表</text>
+<text x="410.0" y="1301.5" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">search_terms</text>
+<rect x="520" y="1260" width="180" height="55" rx="18" fill="#ffffff" stroke="#a98f52" stroke-width="2"/>
+<text x="610.0" y="1274.62" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">列表缓存</text>
+<text x="610.0" y="1292.54" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">list_view_cac</text>
+<text x="610.0" y="1310.4599999999998" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">he</text>
+<rect x="725" y="1260" width="200" height="55" rx="18" fill="#ffffff" stroke="#a98f52" stroke-width="2"/>
+<text x="825.0" y="1274.62" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">关系缓存</text>
+<text x="825.0" y="1292.54" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">relation_coun</text>
+<text x="825.0" y="1310.4599999999998" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">t_cache</text>
+<rect x="950" y="1260" width="200" height="55" rx="18" fill="#ffffff" stroke="#a98f52" stroke-width="2"/>
+<text x="1050.0" y="1274.62" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">版本历史</text>
+<text x="1050.0" y="1292.54" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">knowledge_ver</text>
+<text x="1050.0" y="1310.4599999999998" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">sions</text>
+<rect x="1175" y="1260" width="200" height="55" rx="18" fill="#ffffff" stroke="#a98f52" stroke-width="2"/>
+<text x="1275.0" y="1274.62" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">后台任务</text>
+<text x="1275.0" y="1292.54" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">background_jo</text>
+<text x="1275.0" y="1310.4599999999998" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">bs</text>
+<rect x="1400" y="1260" width="200" height="55" rx="18" fill="#ffffff" stroke="#a98f52" stroke-width="2"/>
+<text x="1500.0" y="1274.62" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">性能日志</text>
+<text x="1500.0" y="1292.54" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">performance_l</text>
+<text x="1500.0" y="1310.4599999999998" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">ogs</text>
+<rect x="1625" y="1260" width="180" height="55" rx="18" fill="#ffffff" stroke="#a98f52" stroke-width="2"/>
+<text x="1715.0" y="1283.58" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">操作审计</text>
+<text x="1715.0" y="1301.5" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">audit_logs</text>
+<rect x="1830" y="1260" width="300" height="55" rx="18" fill="#ffffff" stroke="#a98f52" stroke-width="2"/>
+<text x="1980.0" y="1265.66" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">AI 预留表</text>
+<text x="1980.0" y="1283.5800000000002" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">provider/temp</text>
+<text x="1980.0" y="1301.5" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">lates/tasks/d</text>
+<text x="1980.0" y="1319.42" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">rafts/logs</text>
+</g>
+<g filter="url(#shadow)">
+<rect x="90" y="1415" width="2220" height="150" rx="28" fill="#f3f7fb" stroke="#55728c" stroke-width="3"/>
+<text x="120" y="1461" text-anchor="start" font-size="30" font-weight="850" fill="#37566b" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">六、AI 接口预留与安全边界</text>
+<rect x="130" y="1475" width="175" height="50" rx="18" fill="#ffffff" stroke="#55728c" stroke-width="2"/>
+<text x="217.5" y="1496.08" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">v0.1 只预留</text>
+<text x="217.5" y="1514.0" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">不真实调用</text>
+<rect x="330" y="1475" width="300" height="50" rx="18" fill="#ffffff" stroke="#55728c" stroke-width="2"/>
+<text x="480.0" y="1487.12" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">Provider 适配</text>
+<text x="480.0" y="1505.04" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">Ollama / Open</text>
+<text x="480.0" y="1522.9599999999998" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">AI兼容 / 本地HTTP</text>
+<rect x="655" y="1475" width="250" height="50" rx="18" fill="#ffffff" stroke="#55728c" stroke-width="2"/>
+<text x="780.0" y="1496.08" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">Prompt 模板</text>
+<text x="780.0" y="1514.0" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">结构化输出 Schema</text>
+<rect x="930" y="1475" width="260" height="50" rx="18" fill="#ffffff" stroke="#55728c" stroke-width="2"/>
+<text x="1060.0" y="1496.08" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">AI 任务后台执行</text>
+<text x="1060.0" y="1514.0" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">可取消 / 超时 / 日志</text>
+<rect x="1215" y="1475" width="260" height="50" rx="18" fill="#ffffff" stroke="#55728c" stroke-width="2"/>
+<text x="1345.0" y="1496.08" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">AI 输出进草稿</text>
+<text x="1345.0" y="1514.0" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">用户确认后才入库</text>
+<rect x="1500" y="1475" width="300" height="50" rx="18" fill="#ffffff" stroke="#55728c" stroke-width="2"/>
+<text x="1650.0" y="1496.08" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">安全过滤</text>
+<text x="1650.0" y="1514.0" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">禁诊断/禁开方/禁针刺方案</text>
+<rect x="1825" y="1475" width="280" height="50" rx="18" fill="#ffffff" stroke="#55728c" stroke-width="2"/>
+<text x="1965.0" y="1496.08" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">本地 RAG 后期接入</text>
+<text x="1965.0" y="1514.0" text-anchor="middle" font-size="14" font-weight="700" fill="#203327" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">只基于本地知识库</text>
+</g>
+<rect x="90" y="1595" width="2220" height="54" rx="18" fill="#e9efe8" stroke="#8aa389" stroke-width="2"/>
+<text x="120" y="1630" text-anchor="start" font-size="23" font-weight="800" fill="#315f46" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">v0.1 目标：把中医资料高效、干净、可回退、可搜索、不卡顿地录入本地知识库；AI 只预留接口，后续作为辅助整理工具。</text>
+<line x1="1200" y1="400" x2="1200" y2="445" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="1140.0" y="395.5" width="120" height="30" rx="15" fill="#fffdf8" opacity="0.96"/>
+<text x="1200.0" y="416.5" text-anchor="middle" font-size="17" font-weight="560" fill="#6a5a3c" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">前端调用</text>
+<line x1="660" y1="645" x2="660" y2="690" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="600.0" y="640.5" width="120" height="30" rx="15" fill="#fffdf8" opacity="0.96"/>
+<text x="660.0" y="661.5" text-anchor="middle" font-size="17" font-weight="560" fill="#6a5a3c" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">录入处理</text>
+<line x1="1770" y1="645" x2="1770" y2="690" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="1710.0" y="640.5" width="120" height="30" rx="15" fill="#fffdf8" opacity="0.96"/>
+<text x="1770.0" y="661.5" text-anchor="middle" font-size="17" font-weight="560" fill="#6a5a3c" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">性能支撑</text>
+<line x1="660" y1="1050" x2="660" y2="1095" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="600.0" y="1045.5" width="120" height="30" rx="15" fill="#fffdf8" opacity="0.96"/>
+<text x="660.0" y="1066.5" text-anchor="middle" font-size="17" font-weight="560" fill="#6a5a3c" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">正式入库</text>
+<line x1="1770" y1="1050" x2="1770" y2="1095" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="1710.0" y="1045.5" width="120" height="30" rx="15" fill="#fffdf8" opacity="0.96"/>
+<text x="1770.0" y="1066.5" text-anchor="middle" font-size="17" font-weight="560" fill="#6a5a3c" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">索引缓存</text>
+<line x1="1200" y1="1370" x2="1200" y2="1415" stroke="#6a5a3c" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="1140.0" y="1365.5" width="120" height="30" rx="15" fill="#fffdf8" opacity="0.96"/>
+<text x="1200.0" y="1386.5" text-anchor="middle" font-size="17" font-weight="560" fill="#6a5a3c" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif">AI 预留</text>
+</svg>

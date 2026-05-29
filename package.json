@@ -1,0 +1,12 @@
+{
+  "name": "zhongyi-daquan",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "tauri:dev": "npm --prefix frontend run tauri -- dev --config ../src-tauri/tauri.conf.json",
+    "build": "npm --prefix frontend run build",
+    "tauri:build": "npm --prefix frontend run tauri -- build --config ../src-tauri/tauri.conf.json",
+    "check": "npm --prefix frontend run check && cargo check --manifest-path src-tauri/Cargo.toml"
+  }
+}

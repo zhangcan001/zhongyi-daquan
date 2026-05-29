@@ -1,0 +1,16 @@
+[
+  {
+    "type": "formula",
+    "name": "补中益气汤",
+    "pinyin": "buzhongyiqitang",
+    "category": "补益剂",
+    "summary": "补中益气汤为常用方剂资料示例。",
+    "tags": ["补气", "脾胃"],
+    "detail": {
+      "source_text": "示例",
+      "composition": "黄芪、人参、白术、炙甘草、当归、陈皮、升麻、柴胡",
+      "effects": "",
+      "indications": ""
+    }
+  }
+]

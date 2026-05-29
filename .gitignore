@@ -1,0 +1,8 @@
+node_modules/
+frontend/node_modules/
+frontend/dist/
+src-tauri/target/
+src-tauri/gen/
+*.log
+local-data/database/*.db
+local-data/database/*.db-*

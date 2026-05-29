@@ -1,0 +1,18 @@
+[
+  {
+    "type": "herb",
+    "name": "黄芪",
+    "pinyin": "huangqi",
+    "alias": "黄耆",
+    "category": "补气药",
+    "summary": "黄芪为常用补气药。",
+    "tags": ["补气", "常用中药"],
+    "detail": {
+      "nature_flavor": "甘，微温",
+      "meridians": "肺、脾",
+      "effects": "",
+      "indications": "",
+      "notes": "示例数据"
+    }
+  }
+]

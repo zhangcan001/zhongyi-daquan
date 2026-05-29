@@ -1,0 +1,16 @@
+你负责《中医大全》线程 G：AI 接口预留。
+
+请先读取：
+1. docs/CODEX_DEV_DOC.md
+2. docs/codex_threads/线程G_AI接口预留.md
+
+只做 AI 表、AI 设置页面、ai_commands、AI 服务接口和占位返回。
+v0.1 不真实调用任何 AI。AI 默认关闭，无配置时主功能完整可用。
+
+验收：
+1. AI 设置页面存在。
+2. AI 默认关闭。
+3. 可以保存 provider_type、base_url、model_name。
+4. AI 占位命令返回“当前版本未启用 AI 调用”。
+
+完成后输出修改文件、新增接口/页面、测试结果、风险点和下一步建议。

@@ -1,0 +1,163 @@
+:root {
+  color: #1f2933;
+  background: #f4f7f3;
+  font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  width: min(1120px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 32px 0 48px;
+}
+
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #d6ded2;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 8px;
+  font-size: 32px;
+}
+
+h2 {
+  font-size: 20px;
+}
+
+.topbar p {
+  max-width: 760px;
+  margin-bottom: 0;
+  line-height: 1.7;
+  color: #54615a;
+}
+
+.status-pill {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border: 1px solid #93b17c;
+  border-radius: 999px;
+  background: #eef7e8;
+  color: #315b27;
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.6fr);
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.panel,
+.section-band {
+  border: 1px solid #d8dfd4;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 20px;
+}
+
+.search-panel {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.search-panel label {
+  font-weight: 700;
+}
+
+.search-panel input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #aebbac;
+  border-radius: 6px;
+  padding: 0 12px;
+  background: #f8faf7;
+}
+
+.search-panel span,
+dd {
+  color: #66736c;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 10px 12px;
+  margin: 0;
+}
+
+dt {
+  font-weight: 700;
+}
+
+dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.section-band {
+  margin-top: 16px;
+}
+
+.type-grid,
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 12px;
+}
+
+.type-grid button,
+.action-grid button {
+  min-height: 42px;
+  border: 1px solid #b9c5b5;
+  border-radius: 6px;
+  background: #f8faf7;
+  color: #33413a;
+}
+
+.error-text {
+  color: #a33826;
+}
+
+@media (max-width: 760px) {
+  .topbar,
+  .workspace-grid {
+    display: block;
+  }
+
+  .status-pill {
+    display: inline-block;
+    margin-top: 16px;
+  }
+
+  .panel + .panel {
+    margin-top: 16px;
+  }
+}

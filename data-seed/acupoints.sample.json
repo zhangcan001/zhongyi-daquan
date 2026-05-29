@@ -1,0 +1,20 @@
+[
+  {
+    "type": "acupoint",
+    "code": "ST36",
+    "name": "足三里",
+    "pinyin": "zusanli",
+    "category": "足阳明胃经",
+    "summary": "足阳明胃经常用穴。",
+    "tags": ["胃经", "常用穴", "下肢"],
+    "detail": {
+      "acupoint_code": "ST36",
+      "meridian_code": "ST",
+      "body_region": "下肢部",
+      "standard_location": "",
+      "locating_method": "",
+      "indications": "",
+      "precautions": "仅供专业学习参考，请勿自行操作。"
+    }
+  }
+]

@@ -1,0 +1,21 @@
+[
+  {
+    "type": "meridian",
+    "code": "ST",
+    "name": "足阳明胃经",
+    "pinyin": "zuyangmingweijing",
+    "category": "十二正经",
+    "summary": "足阳明胃经，经络资料示例。",
+    "tags": ["胃经", "足阳明"],
+    "detail": {
+      "meridian_code": "ST",
+      "category": "十二正经",
+      "yin_yang": "阳",
+      "hand_foot": "足",
+      "organ_relation": "胃",
+      "pathway_text": "",
+      "main_indications": "",
+      "notes": "示例数据"
+    }
+  }
+]

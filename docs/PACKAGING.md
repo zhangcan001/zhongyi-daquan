@@ -13,6 +13,7 @@
 - Rust fmt、test、check 通过。
 - AI 默认关闭。
 - 产品运行期无联网依赖。
+- `v0.1-alpha` 已验证可从源码构建为 Windows 桌面程序。
 
 ## 开发构建
 
@@ -22,11 +23,29 @@ npm run tauri:dev
 
 ## 生产打包
 
+已验证的 Windows 安装包构建命令：
+
+```powershell
+npm run tauri:build -- --bundles nsis
+```
+
+全量打包命令：
+
 ```powershell
 npm run tauri:build
 ```
 
-构建产物由 Tauri 写入 `src-tauri/target/release/bundle/` 下的对应 Windows 安装包目录。
+构建产物由 Tauri 写入 `src-tauri/target/release/`，其中：
+
+- 可执行文件：`src-tauri/target/release/zhongyi-daquan.exe`
+- NSIS 安装包：`src-tauri/target/release/bundle/nsis/中医大全_0.1.0_x64-setup.exe`
+- MSI 安装包：`src-tauri/target/release/bundle/msi/`
+
+说明：
+
+- `npm run tauri:build -- --bundles nsis` 已在当前环境验证通过。
+- `npm run tauri:build` 会继续尝试生成 MSI，并在本机缺少 WiX 工具链或首次拉取 WiX 资源时额外耗时。
+- 如果需要完整 MSI 产物，先确保 WiX 资源已可用，再执行全量打包。
 
 ## 数据与升级
 

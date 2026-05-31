@@ -6,6 +6,8 @@ use crate::models::search::{
 };
 use crate::repositories::{performance_repository, search_repository};
 use std::time::Instant;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 pub fn rebuild_search_index(database: &Database) -> AppResult<RebuildSearchIndexResponse> {
     let started_at = Instant::now();
@@ -262,4 +264,96 @@ mod tests {
 
         let _ = fs::remove_dir_all(data_dir);
     }
+}
+
+
+/// 重建单个条目的搜索索引（用于版本回滚后同步）
+pub fn rebuild_item_index(database: &Database, item_id: i64) -> AppResult<()> {
+    // 先删除旧索引
+    delete_knowledge_item_index(database, item_id)?;
+    // 重新索引
+    index_knowledge_item(database, item_id)?;
+    Ok(())
+}
+
+lazy_static::lazy_static! {
+    static ref SEARCH_CACHE: Arc<Mutex<HashMap<String, (SearchResponse, std::time::SystemTime)>>> =
+        Arc::new(Mutex::new(HashMap::new()));
+
+    static ref SEARCH_STATS: Arc<Mutex<HashMap<String, usize>>> =
+        Arc::new(Mutex::new(HashMap::new()));
+}
+
+pub fn search_with_cache(database: &Database, request: SearchRequest) -> AppResult<SearchResponse> {
+    let cache_key = format!(
+        "{}:{}:{}:{}",
+        request.query.trim(),
+        request.item_type.as_deref().unwrap_or("all"),
+        request.page.unwrap_or(1),
+        request.page_size.unwrap_or(50)
+    );
+
+    // 记录搜索统计
+    {
+        let mut stats = SEARCH_STATS.lock().unwrap();
+        *stats.entry(request.query.trim().to_string()).or_insert(0) += 1;
+    }
+
+    // 检查缓存（5分钟有效期）
+    {
+        let cache = SEARCH_CACHE.lock().unwrap();
+        if let Some((cached_response, cached_time)) = cache.get(&cache_key) {
+            if cached_time.elapsed().unwrap_or(std::time::Duration::from_secs(301))
+                < std::time::Duration::from_secs(300) {
+                return Ok(cached_response.clone());
+            }
+        }
+    }
+
+    // 执行搜索
+    let response = search(database, request)?;
+
+    // 更新缓存
+    {
+        let mut cache = SEARCH_CACHE.lock().unwrap();
+        cache.insert(cache_key, (response.clone(), std::time::SystemTime::now()));
+
+        // 限制缓存大小
+        if cache.len() > 100 {
+            // 移除最旧的条目
+            if let Some(oldest_key) = cache.iter()
+                .min_by_key(|(_, (_, time))| time)
+                .map(|(k, _)| k.clone()) {
+                cache.remove(&oldest_key);
+            }
+        }
+    }
+
+    Ok(response)
+}
+
+pub fn get_hot_search_terms(limit: usize) -> Vec<HotSearchTerm> {
+    let stats = SEARCH_STATS.lock().unwrap();
+
+    let mut terms: Vec<(String, usize)> = stats.iter()
+        .map(|(k, v)| (k.clone(), *v))
+        .collect();
+
+    terms.sort_by(|a, b| b.1.cmp(&a.1));
+
+    terms.into_iter()
+        .take(limit)
+        .map(|(term, count)| HotSearchTerm { term, count })
+        .collect()
+}
+
+pub fn clear_search_cache() {
+    let mut cache = SEARCH_CACHE.lock().unwrap();
+    cache.clear();
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct HotSearchTerm {
+    pub term: String,
+    pub count: usize,
 }

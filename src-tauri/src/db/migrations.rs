@@ -28,6 +28,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "thread_e_dedup_relation",
         sql: include_str!("../../migrations/004_thread_e_dedup_relation.sql"),
     },
+    Migration {
+        version: 5,
+        name: "error_logs",
+        sql: include_str!("../../migrations/005_error_logs.sql"),
+    },
 ];
 
 pub fn run(connection: &Connection) -> AppResult<()> {

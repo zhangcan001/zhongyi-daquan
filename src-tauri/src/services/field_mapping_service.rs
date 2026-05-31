@@ -92,9 +92,109 @@ pub fn auto_mapping(headers: &[String]) -> HashMap<String, String> {
         .iter()
         .filter_map(|header| {
             let normalized = normalize_header(header);
-            field_alias(&normalized).map(|field| (header.clone(), field.to_string()))
+
+            // 首先尝试精确匹配
+            if let Some(field) = field_alias(&normalized) {
+                return Some((header.clone(), field.to_string()));
+            }
+
+            // 如果精确匹配失败，尝试相似度匹配
+            let best_match = find_best_match(&normalized, TARGET_FIELDS);
+            if let Some((field, score)) = best_match {
+                if score > 0.6 {
+                    return Some((header.clone(), String::from(field)));
+                }
+            }
+
+            None
         })
         .collect()
+}
+
+fn find_best_match<'a>(input: &str, candidates: &'a [&'a str]) -> Option<(&'a str, f64)> {
+    let mut best_match = None;
+    let mut best_score = 0.0;
+
+    for candidate in candidates {
+        let score = string_similarity(input, &normalize_header(candidate));
+        if score > best_score {
+            best_score = score;
+            best_match = Some(*candidate);
+        }
+    }
+
+    best_match.map(|m| (m, best_score))
+}
+
+fn string_similarity(s1: &str, s2: &str) -> f64 {
+    if s1 == s2 {
+        return 1.0;
+    }
+
+    if s1.is_empty() || s2.is_empty() {
+        return 0.0;
+    }
+
+    // Jaro-Winkler 相似度简化版
+    let len1 = s1.chars().count();
+    let len2 = s2.chars().count();
+
+    if len1 == 0 && len2 == 0 {
+        return 1.0;
+    }
+
+    let max_len = len1.max(len2);
+    let match_window = (max_len / 2).saturating_sub(1).max(1);
+
+    let s1_chars: Vec<char> = s1.chars().collect();
+    let s2_chars: Vec<char> = s2.chars().collect();
+
+    let mut s1_matches = vec![false; len1];
+    let mut s2_matches = vec![false; len2];
+
+    let mut matches = 0;
+
+    for i in 0..len1 {
+        let start = i.saturating_sub(match_window);
+        let end = (i + match_window + 1).min(len2);
+
+        for j in start..end {
+            if s2_matches[j] || s1_chars[i] != s2_chars[j] {
+                continue;
+            }
+            s1_matches[i] = true;
+            s2_matches[j] = true;
+            matches += 1;
+            break;
+        }
+    }
+
+    if matches == 0 {
+        return 0.0;
+    }
+
+    let mut transpositions = 0;
+    let mut k = 0;
+
+    for i in 0..len1 {
+        if !s1_matches[i] {
+            continue;
+        }
+        while !s2_matches[k] {
+            k += 1;
+        }
+        if s1_chars[i] != s2_chars[k] {
+            transpositions += 1;
+        }
+        k += 1;
+    }
+
+    let jaro = (matches as f64 / len1 as f64
+        + matches as f64 / len2 as f64
+        + (matches as f64 - transpositions as f64 / 2.0) / matches as f64)
+        / 3.0;
+
+    jaro
 }
 
 pub fn apply_mapping(

@@ -36,16 +36,19 @@ pub fn list(
 }
 
 pub fn get(database: &Database, item_id: i64) -> AppResult<KnowledgeDetailResponse> {
-    database.with_connection(|connection| {
+    let (item, detail) = database.with_connection(|connection| {
         let item = knowledge_repository::get_by_id(connection, item_id)?
             .ok_or_else(|| AppError::InvalidInput(format!("知识条目不存在: {item_id}")))?;
         let detail = detail_repository::get_detail(connection, &item.item_type, item_id)?;
-        let versions = version_repository::list_versions(connection, item_id)?;
-        Ok(KnowledgeDetailResponse {
-            item,
-            detail,
-            versions,
-        })
+        Ok((item, detail))
+    })?;
+
+    let versions = version_repository::list_versions(database, item_id)?;
+
+    Ok(KnowledgeDetailResponse {
+        item,
+        detail,
+        versions,
     })
 }
 
@@ -169,4 +172,118 @@ fn validate_input(input: &KnowledgeInput) -> AppResult<()> {
         )));
     }
     Ok(())
+}
+
+pub fn batch_delete(database: &Database, item_ids: Vec<i64>) -> AppResult<BatchOperationResult> {
+    let mut success_count = 0;
+    let mut failed_ids = Vec::new();
+
+    for item_id in item_ids {
+        match delete(database, item_id) {
+            Ok(_) => success_count += 1,
+            Err(_) => failed_ids.push(item_id),
+        }
+    }
+
+    Ok(BatchOperationResult {
+        success_count,
+        failed_count: failed_ids.len(),
+        failed_ids,
+    })
+}
+
+pub fn batch_update_status(
+    database: &Database,
+    item_ids: Vec<i64>,
+    data_status: String,
+) -> AppResult<BatchOperationResult> {
+    if !DATA_STATUSES.contains(&data_status.as_str()) {
+        return Err(AppError::InvalidInput(format!(
+            "不支持的数据状态: {}",
+            data_status
+        )));
+    }
+
+    let mut success_count = 0;
+    let mut failed_ids = Vec::new();
+
+    database.with_connection(|connection| {
+        for item_id in item_ids {
+            let result = connection.execute(
+                "UPDATE knowledge_items SET data_status = ?1, updated_at = datetime('now') WHERE id = ?2",
+                rusqlite::params![data_status, item_id],
+            );
+
+            match result {
+                Ok(_) => success_count += 1,
+                Err(_) => failed_ids.push(item_id),
+            }
+        }
+        Ok(())
+    })?;
+
+    Ok(BatchOperationResult {
+        success_count,
+        failed_count: failed_ids.len(),
+        failed_ids,
+    })
+}
+
+pub fn batch_add_tags(
+    database: &Database,
+    item_ids: Vec<i64>,
+    tags_to_add: Vec<String>,
+) -> AppResult<BatchOperationResult> {
+    let mut success_count = 0;
+    let mut failed_ids = Vec::new();
+
+    database.with_connection(|connection| {
+        for item_id in &item_ids {
+            let current_tags: Option<String> = connection
+                .query_row(
+                    "SELECT tags FROM knowledge_items WHERE id = ?1",
+                    [item_id],
+                    |row| row.get(0),
+                )
+                .ok();
+
+            let mut tag_set: std::collections::HashSet<String> = current_tags
+                .unwrap_or_default()
+                .split(',')
+                .filter(|s| !s.trim().is_empty())
+                .map(|s| s.trim().to_string())
+                .collect();
+
+            for tag in &tags_to_add {
+                tag_set.insert(tag.trim().to_string());
+            }
+
+            let new_tags: Vec<String> = tag_set.into_iter().collect();
+            let new_tags_str = new_tags.join(",");
+
+            let result = connection.execute(
+                "UPDATE knowledge_items SET tags = ?1, updated_at = datetime('now') WHERE id = ?2",
+                rusqlite::params![new_tags_str, item_id],
+            );
+
+            match result {
+                Ok(_) => success_count += 1,
+                Err(_) => failed_ids.push(*item_id),
+            }
+        }
+        Ok(())
+    })?;
+
+    Ok(BatchOperationResult {
+        success_count,
+        failed_count: failed_ids.len(),
+        failed_ids,
+    })
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct BatchOperationResult {
+    pub success_count: usize,
+    pub failed_count: usize,
+    pub failed_ids: Vec<i64>,
 }

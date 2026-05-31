@@ -1,19 +1,66 @@
 use crate::db::connection::Database;
 use crate::errors::AppResult;
 use crate::models::data_pipeline::StagingIssue;
-use rusqlite::OptionalExtension;
 use serde_json::{Map, Value};
+use std::collections::HashSet;
 
 const KNOWLEDGE_TYPES: &[&str] = &[
     "中药", "方剂", "经络", "穴位", "证型", "病症", "herb", "formula", "meridian", "acupoint",
     "syndrome", "disease",
 ];
 
+pub struct ValidationContext {
+    known_meridians: HashSet<String>,
+}
+
+impl ValidationContext {
+    pub fn load(database: &Database) -> AppResult<Self> {
+        let known_meridians = database.with_connection(|connection| {
+            let mut stmt = connection.prepare(
+                "SELECT name FROM knowledge_items WHERE type IN ('经络','meridian')"
+            )?;
+            let names = stmt
+                .query_map([], |row| row.get::<_, String>(0))?
+                .collect::<Result<HashSet<_>, _>>()?;
+            Ok(names)
+        })?;
+
+        Ok(ValidationContext { known_meridians })
+    }
+
+    fn meridian_exists(&self, name: &str) -> bool {
+        self.known_meridians.contains(name)
+    }
+}
+#[allow(dead_code)]
+
+pub fn validate_rows_batch(
+    database: &Database,
+    target_type: &str,
+    rows: &[Map<String, Value>],
+) -> AppResult<Vec<Vec<StagingIssue>>> {
+    let context = ValidationContext::load(database)?;
+
+    Ok(rows
+        .iter()
+        .map(|row| validate_row_with_context(&context, target_type, row))
+        .collect())
+}
+
 pub fn validate_row(
     database: &Database,
     target_type: &str,
     row: &Map<String, Value>,
 ) -> AppResult<Vec<StagingIssue>> {
+    let context = ValidationContext::load(database)?;
+    Ok(validate_row_with_context(&context, target_type, row))
+}
+
+fn validate_row_with_context(
+    context: &ValidationContext,
+    target_type: &str,
+    row: &Map<String, Value>,
+) -> Vec<StagingIssue> {
     let mut issues = Vec::new();
 
     required(
@@ -49,7 +96,7 @@ pub fn validate_row(
 
     if matches!(target_type, "穴位" | "acupoint") {
         if let Some(meridians) = text(row, "meridians") {
-            if !meridian_exists(database, &meridians)? {
+            if !context.meridian_exists(&meridians) {
                 issues.push(warning(
                     "reference_not_found",
                     Some("meridians"),
@@ -61,7 +108,7 @@ pub fn validate_row(
     }
 
     // TODO: 线程 E 接入知识指纹后，在这里调用重复检测接口并写入 duplicate_candidates。
-    Ok(issues)
+    issues
 }
 
 pub fn status_from_issues(
@@ -120,19 +167,6 @@ fn valid_code(code: &str) -> bool {
         && code
             .chars()
             .all(|ch| ch.is_ascii_uppercase() || ch.is_ascii_digit() || ch == '-' || ch == '_')
-}
-
-fn meridian_exists(database: &Database, name: &str) -> AppResult<bool> {
-    database.with_connection(|connection| {
-        let found: Option<i64> = connection
-            .query_row(
-                "SELECT id FROM knowledge_items WHERE type IN ('经络','meridian') AND name = ?1 LIMIT 1",
-                [name],
-                |row| row.get(0),
-            )
-            .optional()?;
-        Ok(found.is_some())
-    })
 }
 
 fn error(code: &str, field: Option<&str>, message: &str, suggestion: Option<&str>) -> StagingIssue {

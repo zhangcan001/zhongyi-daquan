@@ -35,6 +35,7 @@ pub fn create_batch(
         })
     })
 }
+#[allow(dead_code)]
 
 pub fn insert_row(
     database: &Database,
@@ -64,6 +65,51 @@ pub fn insert_row(
             ],
         )?;
         Ok(connection.last_insert_rowid())
+    })
+}
+
+pub struct ImportRowData {
+    pub row_index: i64,
+    pub raw_json: String,
+    pub mapped_json: String,
+    pub normalized_json: String,
+    pub status: String,
+    pub error_message: Option<String>,
+    pub warning_message: Option<String>,
+}
+
+pub fn insert_rows_batch(
+    database: &Database,
+    batch_id: i64,
+    rows: Vec<ImportRowData>,
+) -> AppResult<Vec<i64>> {
+    if rows.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    database.with_connection(|connection| {
+        let mut row_ids = Vec::with_capacity(rows.len());
+
+        for row in rows {
+            connection.execute(
+                "INSERT INTO data_import_rows
+                 (batch_id, row_index, raw_json, mapped_json, normalized_json, status, error_message, warning_message)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![
+                    batch_id,
+                    row.row_index,
+                    row.raw_json,
+                    row.mapped_json,
+                    row.normalized_json,
+                    row.status,
+                    row.error_message,
+                    row.warning_message
+                ],
+            )?;
+            row_ids.push(connection.last_insert_rowid());
+        }
+
+        Ok(row_ids)
     })
 }
 

@@ -12,6 +12,7 @@ use chrono::Utc;
 use rusqlite::{params, OptionalExtension};
 use serde_json::{Map, Value};
 use std::collections::BTreeSet;
+use calamine::{Reader, Xlsx, open_workbook_from_rs, Data};
 
 pub fn preview_json(content: &str) -> AppResult<ImportParsedPreview> {
     let rows = parse_json_rows(content)?;
@@ -35,6 +36,18 @@ pub fn import_csv(
     request: CreateImportRequest,
 ) -> AppResult<ImportBatchSummary> {
     import_rows(database, "csv", request, parse_csv_rows)
+}
+
+pub fn preview_excel(content: &[u8]) -> AppResult<ImportParsedPreview> {
+    let rows = parse_excel_rows(content)?;
+    Ok(preview_from_rows(rows))
+}
+
+pub fn import_excel(
+    database: &Database,
+    request: CreateImportRequest,
+) -> AppResult<ImportBatchSummary> {
+    import_rows_from_bytes(database, "excel", request)
 }
 
 pub fn staging_page(
@@ -271,6 +284,41 @@ pub fn confirm_import(database: &Database, batch_id: i64) -> AppResult<ConfirmIm
     })
 }
 
+pub fn update_staging_row_field(
+    database: &Database,
+    batch_id: i64,
+    row_id: i64,
+    field_name: &str,
+    new_value: &str,
+) -> AppResult<ImportBatchSummary> {
+    let batch = import_repository::get_batch(database, batch_id)?;
+    let row = row_by_id(database, row_id)?;
+
+    let mut normalized = parse_optional_json(row.normalized_json)?
+        .as_object()
+        .cloned()
+        .unwrap_or_default();
+
+    normalized.insert(field_name.to_string(), Value::String(new_value.to_string()));
+
+    let issues = validation_service::validate_row(database, &batch.target_type, &normalized)?;
+    let (status, error_message, warning_message) = validation_service::status_from_issues(&issues);
+
+    import_repository::update_row_normalized(
+        database,
+        row_id,
+        &serde_json::to_string(&Value::Object(normalized))?,
+        status,
+        error_message.as_deref(),
+        warning_message.as_deref(),
+    )?;
+
+    validation_repository::replace_row_issues(database, batch_id, row_id, &issues)?;
+    import_repository::update_batch_counts(database, batch_id, "edited")?;
+
+    import_repository::summary(database, batch_id)
+}
+
 fn import_rows(
     database: &Database,
     import_type: &str,
@@ -293,25 +341,43 @@ fn import_rows(
     )?;
     let batch_id = batch.id.unwrap_or_default();
 
-    for (index, raw) in rows.iter().enumerate() {
-        let mapped =
-            field_mapping_service::apply_mapping(raw, mapping.as_ref(), &request.target_type);
-        let normalized = normalize_service::normalize_row(database, mapped.clone())?;
-        let issues = validation_service::validate_row(database, &request.target_type, &normalized)?;
+    let mapped_rows: Vec<Map<String, Value>> = rows
+        .iter()
+        .map(|raw| field_mapping_service::apply_mapping(raw, mapping.as_ref(), &request.target_type))
+        .collect();
+
+    let normalized_rows = normalize_service::normalize_rows_batch(database, mapped_rows.clone())?;
+
+    let mut import_rows_data = Vec::with_capacity(rows.len());
+    let mut all_issues = Vec::new();
+
+    for (index, ((raw, mapped), normalized)) in rows
+        .iter()
+        .zip(mapped_rows.iter())
+        .zip(normalized_rows.iter())
+        .enumerate()
+    {
+        let issues = validation_service::validate_row(database, &request.target_type, normalized)?;
         let (status, error_message, warning_message) =
             validation_service::status_from_issues(&issues);
-        let row_id = import_repository::insert_row(
-            database,
-            batch_id,
-            index as i64 + 1,
-            &serde_json::to_string(&Value::Object(raw.clone()))?,
-            &serde_json::to_string(&Value::Object(mapped))?,
-            &serde_json::to_string(&Value::Object(normalized))?,
-            status,
-            error_message.as_deref(),
-            warning_message.as_deref(),
-        )?;
-        validation_repository::replace_row_issues(database, batch_id, row_id, &issues)?;
+
+        import_rows_data.push(import_repository::ImportRowData {
+            row_index: index as i64 + 1,
+            raw_json: serde_json::to_string(&Value::Object(raw.clone()))?,
+            mapped_json: serde_json::to_string(&Value::Object(mapped.clone()))?,
+            normalized_json: serde_json::to_string(&Value::Object(normalized.clone()))?,
+            status: status.to_string(),
+            error_message,
+            warning_message,
+        });
+
+        all_issues.push(issues);
+    }
+
+    let row_ids = import_repository::insert_rows_batch(database, batch_id, import_rows_data)?;
+
+    for (row_id, issues) in row_ids.iter().zip(all_issues.iter()) {
+        validation_repository::replace_row_issues(database, batch_id, *row_id, issues)?;
     }
 
     // TODO: 线程 F 完成后，大文件在这里创建 background_jobs 并切到异步解析。
@@ -396,6 +462,131 @@ fn parse_csv_records(content: &str) -> AppResult<Vec<Vec<String>>> {
         records.push(record);
     }
     Ok(records)
+}
+
+fn parse_excel_rows(content: &[u8]) -> AppResult<Vec<Map<String, Value>>> {
+    use std::io::Cursor;
+
+    let cursor = Cursor::new(content);
+    let mut workbook: Xlsx<_> = open_workbook_from_rs(cursor)
+        .map_err(|e| AppError::InvalidInput(format!("无法打开 Excel 文件: {}", e)))?;
+
+    let sheet_name = workbook.sheet_names().first()
+        .ok_or_else(|| AppError::InvalidInput("Excel 文件没有工作表".to_string()))?
+        .clone();
+
+    let range = workbook.worksheet_range(&sheet_name)
+        .map_err(|e| AppError::InvalidInput(format!("无法读取工作表: {}", e)))?;
+
+    let mut rows_data = Vec::new();
+    let mut headers = Vec::new();
+
+    for (row_idx, row) in range.rows().enumerate() {
+        if row_idx == 0 {
+            // 第一行作为表头
+            for cell in row {
+                headers.push(cell_to_string(cell));
+            }
+            continue;
+        }
+
+        // 跳过空行
+        if row.iter().all(|cell| matches!(cell, Data::Empty)) {
+            continue;
+        }
+
+        let mut row_map = Map::new();
+        for (col_idx, cell) in row.iter().enumerate() {
+            if let Some(header) = headers.get(col_idx) {
+                if !header.is_empty() {
+                    row_map.insert(header.clone(), Value::String(cell_to_string(cell)));
+                }
+            }
+        }
+
+        if !row_map.is_empty() {
+            rows_data.push(row_map);
+        }
+    }
+
+    Ok(rows_data)
+}
+
+fn cell_to_string(cell: &Data) -> String {
+    match cell {
+        Data::Int(i) => i.to_string(),
+        Data::Float(f) => f.to_string(),
+        Data::String(s) => s.clone(),
+        Data::Bool(b) => b.to_string(),
+        Data::DateTime(dt) => dt.to_string(),
+        Data::Error(e) => format!("Error: {:?}", e),
+        Data::Empty => String::new(),
+        _ => String::new(),
+    }
+}
+
+fn import_rows_from_bytes(
+    database: &Database,
+    import_type: &str,
+    request: CreateImportRequest,
+) -> AppResult<ImportBatchSummary> {
+    let rows = parse_excel_rows(request.content.as_bytes())?;
+    let mapping = request
+        .mapping
+        .or(field_mapping_service::mapping_from_template(
+            database,
+            request.template_id,
+        )?);
+    let batch = import_repository::create_batch(
+        database,
+        &request.file_name,
+        import_type,
+        &request.target_type,
+        rows.len() as i64,
+    )?;
+    let batch_id = batch.id.unwrap_or_default();
+
+    let mapped_rows: Vec<Map<String, Value>> = rows
+        .iter()
+        .map(|raw| field_mapping_service::apply_mapping(raw, mapping.as_ref(), &request.target_type))
+        .collect();
+
+    let normalized_rows = normalize_service::normalize_rows_batch(database, mapped_rows.clone())?;
+
+    let mut import_rows_data = Vec::with_capacity(rows.len());
+    let mut all_issues = Vec::new();
+
+    for (index, ((raw, mapped), normalized)) in rows
+        .iter()
+        .zip(mapped_rows.iter())
+        .zip(normalized_rows.iter())
+        .enumerate()
+    {
+        let issues = validation_service::validate_row(database, &request.target_type, normalized)?;
+        let (status, error_message, warning_message) =
+            validation_service::status_from_issues(&issues);
+
+        import_rows_data.push(import_repository::ImportRowData {
+            row_index: index as i64 + 1,
+            raw_json: serde_json::to_string(&Value::Object(raw.clone()))?,
+            mapped_json: serde_json::to_string(&Value::Object(mapped.clone()))?,
+            normalized_json: serde_json::to_string(&Value::Object(normalized.clone()))?,
+            status: status.to_string(),
+            error_message,
+            warning_message,
+        });
+
+        all_issues.push(issues);
+    }
+
+    let row_ids = import_repository::insert_rows_batch(database, batch_id, import_rows_data)?;
+
+    for (row_id, issues) in row_ids.iter().zip(all_issues.iter()) {
+        validation_repository::replace_row_issues(database, batch_id, *row_id, issues)?;
+    }
+
+    import_repository::update_batch_counts(database, batch_id, "staged")?;
+    import_repository::summary(database, batch_id)
 }
 
 fn preview_from_rows(rows: Vec<Map<String, Value>>) -> ImportParsedPreview {

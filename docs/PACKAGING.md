@@ -23,16 +23,20 @@ npm run tauri:dev
 
 ## 生产打包
 
+## v0.1-alpha-package
+
+`v0.1-alpha-package` 基于 `v0.1-alpha`，用于确认本地 Windows 打包链路、启动链路和发布文档完整性。
+
 已验证的 Windows 安装包构建命令：
 
 ```powershell
-npm run tauri:build -- --bundles nsis
+npm run tauri:build
 ```
 
-全量打包命令：
+等价底层命令：
 
 ```powershell
-npm run tauri:build
+.\frontend\node_modules\.bin\tauri.cmd build --config src-tauri/tauri.conf.json --bundles nsis --ci
 ```
 
 构建产物由 Tauri 写入 `src-tauri/target/release/`，其中：
@@ -43,8 +47,8 @@ npm run tauri:build
 
 说明：
 
-- `npm run tauri:build -- --bundles nsis` 已在当前环境验证通过。
-- `npm run tauri:build` 会继续尝试生成 MSI，并在本机缺少 WiX 工具链或首次拉取 WiX 资源时额外耗时。
+- `npm run tauri:build` 已在当前环境验证通过。
+- 默认脚本生成 NSIS 安装包，避免 `targets = all` 在本机缺少 WiX/MSI 工具链时卡住。
 - 如果需要完整 MSI 产物，先确保 WiX 资源已可用，再执行全量打包。
 
 ## 数据与升级

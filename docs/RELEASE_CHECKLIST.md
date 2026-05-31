@@ -1,5 +1,22 @@
 # 发布检查清单
 
+## v0.1-alpha-package
+
+基于：`v0.1-alpha`
+
+内容：
+
+- 打包验证。
+- 启动验证。
+- 发布文档补齐。
+
+限制：
+
+- 不真实调用 AI。
+- 不在线问诊。
+- 不自动诊断。
+- 不自动开方。
+
 ## 代码检查
 
 - [x] `powershell -ExecutionPolicy Bypass -File .\scripts\check_all.ps1`
@@ -22,13 +39,12 @@
 
 ## 生产打包
 
-- [x] `npm run tauri:build -- --bundles nsis`
+- [x] `npm run tauri:build`
 - [x] `src-tauri/target/release/zhongyi-daquan.exe`
 - [x] `src-tauri/target/release/bundle/nsis/中医大全_0.1.0_x64-setup.exe`
 - [x] 安装包可启动
 - [x] 首次启动可创建本地数据目录
 - [x] 启动后首页正常
-- [ ] `npm run tauri:build`
 - [ ] `src-tauri/target/release/bundle/msi/`
 
 ## 发布边界

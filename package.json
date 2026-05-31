@@ -6,7 +6,7 @@
     "dev": "npm --prefix frontend run dev",
     "tauri:dev": ".\\frontend\\node_modules\\.bin\\tauri.cmd dev --config src-tauri/tauri.conf.json",
     "build": "npm --prefix frontend run build",
-    "tauri:build": ".\\frontend\\node_modules\\.bin\\tauri.cmd build --config src-tauri/tauri.conf.json",
+    "tauri:build": ".\\frontend\\node_modules\\.bin\\tauri.cmd build --config src-tauri/tauri.conf.json --bundles nsis --ci",
     "check": "npm --prefix frontend run check && cargo check --manifest-path src-tauri/Cargo.toml"
   }
 }

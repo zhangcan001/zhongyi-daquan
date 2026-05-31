@@ -42,6 +42,23 @@
 
 本软件仅用于中医知识学习、资料整理与本地记录，不构成医疗诊断、治疗建议或处方依据。
 
+## v0.1-alpha-package
+
+`v0.1-alpha-package` 基于 `v0.1-alpha`，完成打包验证、启动验证和发布文档补齐。
+
+验收结果：
+
+- 全量检查通过。
+- `npm run tauri:build` 通过。
+- 已生成 Windows 可执行文件和 NSIS 安装包。
+
+打包产物路径：
+
+```text
+src-tauri/target/release/zhongyi-daquan.exe
+src-tauri/target/release/bundle/nsis/中医大全_0.1.0_x64-setup.exe
+```
+
 ## 启动
 
 首次运行前需要安装 Node.js、npm、Rust 和 Tauri 所需系统依赖。
@@ -79,6 +96,12 @@ cargo check --manifest-path src-tauri/Cargo.toml
 
 ```powershell
 .\scripts\check_all.ps1
+```
+
+生产打包：
+
+```powershell
+npm run tauri:build
 ```
 
 生成线程 H 回归数据并执行性能阈值检查：

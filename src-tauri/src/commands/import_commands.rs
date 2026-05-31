@@ -39,11 +39,25 @@ pub fn preview_excel_import(content: Vec<u8>) -> AppResult<ImportParsedPreview> 
 }
 
 #[tauri::command]
+pub fn preview_zip_import(file_name: String, content: Vec<u8>) -> AppResult<ImportParsedPreview> {
+    import_project_service::preview_zip(&file_name, &content)
+}
+
+#[tauri::command]
 pub fn import_excel_to_staging(
     state: State<'_, AppState>,
     request: CreateImportRequest,
 ) -> AppResult<ImportBatchSummary> {
     import_project_service::import_excel(&state.database, request)
+}
+
+#[tauri::command]
+pub fn import_zip_to_staging(
+    state: State<'_, AppState>,
+    request: CreateImportRequest,
+    content: Vec<u8>,
+) -> AppResult<ImportBatchSummary> {
+    import_project_service::import_zip(&state.database, request, &content)
 }
 
 #[tauri::command]

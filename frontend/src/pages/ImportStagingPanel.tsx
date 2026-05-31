@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { FieldMappingTemplate, ImportBatchSummary, Mapping, StagingPage } from "../modules/importPipeline/types";
+import type {
+  FieldMappingSuggestion,
+  FieldMappingTemplate,
+  ImportBatchSummary,
+  ImportParsedPreview,
+  Mapping,
+  StagingPage,
+} from "../modules/importPipeline/types";
 
 const sampleJson = JSON.stringify(
   [
@@ -23,16 +30,18 @@ const knowledgeTypes = [
 ];
 
 export function ImportStagingPanel() {
-  const [importType, setImportType] = useState<"json" | "csv">("json");
+  const [importType, setImportType] = useState<"json" | "csv" | "zip">("json");
   const [targetType, setTargetType] = useState("穴位");
   const [fileName, setFileName] = useState("manual-import.json");
   const [content, setContent] = useState(sampleJson);
+  const [binaryContent, setBinaryContent] = useState<number[] | null>(null);
   const [mappingText, setMappingText] = useState("");
   const [templateName, setTemplateName] = useState("默认导入映射");
   const [templates, setTemplates] = useState<FieldMappingTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [summary, setSummary] = useState<ImportBatchSummary | null>(null);
   const [staging, setStaging] = useState<StagingPage | null>(null);
+  const [preview, setPreview] = useState<ImportParsedPreview | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -48,10 +57,43 @@ export function ImportStagingPanel() {
   async function loadFile(file: File | null) {
     if (!file) return;
     setFileName(file.name);
-    setImportType(file.name.toLowerCase().endsWith(".csv") ? "csv" : "json");
-    setContent(await file.text());
+    const lowerName = file.name.toLowerCase();
+    const nextType = lowerName.endsWith(".zip") ? "zip" : lowerName.endsWith(".csv") ? "csv" : "json";
+    setImportType(nextType);
+    if (nextType === "zip") {
+      const bytes = Array.from(new Uint8Array(await file.arrayBuffer()));
+      setBinaryContent(bytes);
+      setContent("ZIP 数据包已读取，内容不在文本框中展开。");
+      await previewZip(file.name, bytes);
+    } else {
+      setBinaryContent(null);
+      const text = await file.text();
+      setContent(text);
+      await previewTextImport(nextType, text);
+    }
     if (file.name.includes("knowledge_items_import") || file.name.includes("curated")) {
       setTargetType("mixed");
+    }
+  }
+
+  async function previewTextImport(nextType = importType, nextContent = content) {
+    if (nextType === "zip") return;
+    try {
+      const command = nextType === "json" ? "preview_json_import" : "preview_csv_import";
+      setPreview(await invoke<ImportParsedPreview>(command, { content: nextContent }));
+    } catch (cause) {
+      setPreview(null);
+      setError(String(cause));
+    }
+  }
+
+  async function previewZip(nextFileName = fileName, bytes = binaryContent) {
+    if (!bytes) return;
+    try {
+      setPreview(await invoke<ImportParsedPreview>("preview_zip_import", { fileName: nextFileName, content: bytes }));
+    } catch (cause) {
+      setPreview(null);
+      setError(String(cause));
     }
   }
 
@@ -60,16 +102,16 @@ export function ImportStagingPanel() {
     setMessage("");
     try {
       const mapping = mappingText.trim() ? (JSON.parse(mappingText) as Mapping) : undefined;
-      const command = importType === "json" ? "import_json_to_staging" : "import_csv_to_staging";
-      const result = await invoke<ImportBatchSummary>(command, {
-        request: {
-          fileName,
-          targetType,
-          content,
-          mapping,
-          templateId: selectedTemplateId ? Number(selectedTemplateId) : null,
-        },
-      });
+      const request = {
+        fileName,
+        targetType: preview?.directImportReady ? "mixed" : targetType,
+        content,
+        mapping,
+        templateId: selectedTemplateId ? Number(selectedTemplateId) : null,
+      };
+      const result = importType === "zip"
+        ? await invoke<ImportBatchSummary>("import_zip_to_staging", { request, content: binaryContent ?? [] })
+        : await invoke<ImportBatchSummary>(importType === "json" ? "import_json_to_staging" : "import_csv_to_staging", { request });
       setSummary(result);
       await loadStaging(result.batch.id);
       setMessage("已导入暂存区，未写入正式知识库。");
@@ -144,21 +186,24 @@ export function ImportStagingPanel() {
       <div className="import-grid">
         <label>
           文件
-          <input type="file" accept=".json,.csv,application/json,text/csv" onChange={(event) => loadFile(event.target.files?.[0] ?? null)} />
+          <input type="file" accept=".json,.csv,.zip,application/json,text/csv,application/zip" onChange={(event) => loadFile(event.target.files?.[0] ?? null)} />
         </label>
         <label>
           格式
           <select
             value={importType}
             onChange={(event) => {
-              const nextType = event.target.value as "json" | "csv";
+              const nextType = event.target.value as "json" | "csv" | "zip";
               setImportType(nextType);
-              setFileName(nextType === "json" ? "manual-import.json" : "manual-import.csv");
-              setContent(nextType === "json" ? sampleJson : sampleCsv);
+              setBinaryContent(null);
+              setPreview(null);
+              setFileName(nextType === "json" ? "manual-import.json" : nextType === "csv" ? "manual-import.csv" : "manual-import.zip");
+              setContent(nextType === "json" ? sampleJson : nextType === "csv" ? sampleCsv : "请选择 ZIP 数据包。");
             }}
           >
             <option value="json">JSON</option>
             <option value="csv">CSV</option>
+            <option value="zip">ZIP 数据包</option>
           </select>
         </label>
         <label>
@@ -186,8 +231,34 @@ export function ImportStagingPanel() {
 
       <label className="stacked-field">
         导入内容
-        <textarea value={content} onChange={(event) => setContent(event.target.value)} rows={7} />
+        <textarea
+          value={content}
+          onChange={(event) => {
+            setContent(event.target.value);
+            setPreview(null);
+          }}
+          rows={7}
+          disabled={importType === "zip"}
+        />
       </label>
+
+      <div className="import-actions">
+        <button type="button" onClick={() => importType === "zip" ? previewZip() : previewTextImport()}>识别文件</button>
+      </div>
+
+      {preview ? (
+        <div className="preview-panel">
+          <div className="summary-grid">
+            <Metric label="识别类型" value={preview.detection.detectedType} />
+            <Metric label="置信度" value={`${Math.round(preview.detection.confidence * 100)}%`} />
+            <Metric label="记录数" value={preview.detection.recordCount} />
+            <Metric label="导入方式" value={preview.directImportReady ? "可直接导入" : "需映射确认"} />
+          </div>
+          <p className="ai-message">{preview.detection.reason}</p>
+          {preview.warnings.length ? <p className="error-text">{preview.warnings.join("；")}</p> : null}
+          {!preview.directImportReady && preview.mappingSuggestions.length ? <MappingSuggestionTable suggestions={preview.mappingSuggestions} /> : null}
+        </div>
+      ) : null}
 
       <div className="mapping-row">
         <label>
@@ -212,6 +283,8 @@ export function ImportStagingPanel() {
             setImportType("json");
             setFileName("manual-import.json");
             setContent(sampleJson);
+            setBinaryContent(null);
+            setPreview(null);
           }}
         >
           载入 JSON 示例
@@ -222,6 +295,8 @@ export function ImportStagingPanel() {
             setImportType("csv");
             setFileName("manual-import.csv");
             setContent(sampleCsv);
+            setBinaryContent(null);
+            setPreview(null);
           }}
         >
           载入 CSV 示例
@@ -255,6 +330,8 @@ export function ImportStagingPanel() {
                 <th>类型</th>
                 <th>编号</th>
                 <th>摘要 / 内容</th>
+                <th>原始字段</th>
+                <th>映射后字段</th>
                 <th>错误原因</th>
                 <th>修正建议</th>
               </tr>
@@ -268,6 +345,8 @@ export function ImportStagingPanel() {
                   <td>{String(row.normalized.type ?? "")}</td>
                   <td>{String(row.normalized.code ?? "")}</td>
                   <td>{previewText(row.normalized.summary ?? row.normalized.content)}</td>
+                  <td>{Object.keys(row.raw ?? {}).slice(0, 8).join("，")}</td>
+                  <td>{Object.keys(row.mapped ?? {}).slice(0, 8).join("，")}</td>
                   <td>{row.issues.map((issue) => issue.message).join("；")}</td>
                   <td>{row.issues.map((issue) => issue.suggestion).filter(Boolean).join("；")}</td>
                 </tr>
@@ -285,7 +364,7 @@ function previewText(value: unknown) {
   return text.length > 80 ? `${text.slice(0, 80)}...` : text;
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function Metric({ label, value }: { label: string; value: number | string }) {
   return (
     <div>
       <span>{label}</span>
@@ -294,8 +373,38 @@ function Metric({ label, value }: { label: string; value: number }) {
   );
 }
 
-function readSourceHeaders(content: string, importType: "json" | "csv") {
+function MappingSuggestionTable({ suggestions }: { suggestions: FieldMappingSuggestion[] }) {
+  return (
+    <div className="staging-table-wrap compact">
+      <table className="staging-table">
+        <thead>
+          <tr>
+            <th>原始字段</th>
+            <th>建议目标</th>
+            <th>置信度</th>
+            <th>处理</th>
+            <th>原因</th>
+          </tr>
+        </thead>
+        <tbody>
+          {suggestions.map((suggestion) => (
+            <tr key={suggestion.sourceField}>
+              <td>{suggestion.sourceField}</td>
+              <td>{suggestion.targetField ?? "不自动映射"}</td>
+              <td>{Math.round(suggestion.confidence * 100)}%</td>
+              <td>{suggestion.decision === "auto" ? "自动勾选" : suggestion.decision === "confirm" ? "需确认" : "忽略"}</td>
+              <td>{suggestion.reason}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function readSourceHeaders(content: string, importType: "json" | "csv" | "zip") {
   try {
+    if (importType === "zip") return [];
     if (importType === "csv") {
       return content.split(/\r?\n/)[0]?.split(",").map((header) => header.trim()).filter(Boolean) ?? [];
     }

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::db::connection::Database;
 use crate::errors::AppResult;
 use crate::models::data_pipeline::{FieldMappingTemplate, SaveMappingTemplateRequest};

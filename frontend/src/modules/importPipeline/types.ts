@@ -1,5 +1,30 @@
 export type Mapping = Record<string, string>;
 
+export type ImportDetectionResult = {
+  detectedType: string;
+  confidence: number;
+  reason: string;
+  sampleFields: string[];
+  recordCount: number;
+};
+
+export type FieldMappingSuggestion = {
+  sourceField: string;
+  targetField?: string | null;
+  confidence: number;
+  decision: "auto" | "confirm" | "ignore" | string;
+  reason: string;
+};
+
+export type ImportParsedPreview = {
+  headers: string[];
+  rows: Record<string, unknown>[];
+  detection: ImportDetectionResult;
+  mappingSuggestions: FieldMappingSuggestion[];
+  directImportReady: boolean;
+  warnings: string[];
+};
+
 export type ImportBatchSummary = {
   batch: {
     id: number;

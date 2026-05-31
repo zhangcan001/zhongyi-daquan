@@ -19,6 +19,14 @@ cargo test --manifest-path src-tauri/Cargo.toml
 - 导入流程：批次、暂存行、校验问题写入。
 - 备份恢复：复制数据库后仍可搜索。
 - AI 占位：命令返回禁用状态，不真实调用 AI。
+- Import Engine V2：
+  - `knowledge_items_v1` 检测。
+  - `classic_passages_v1` 检测。
+  - `generic_csv` 字段评分映射。
+  - `tags` 数组与字符串标准化。
+  - `detail` 对象写入对应详情字段。
+  - `content` 原文和 `source_note` 出处保留。
+  - 确认入库后重建搜索索引，并可搜索 `上古天真论`、`太阳病` 等导入内容。
 
 前端检查：
 
@@ -50,6 +58,7 @@ npm --prefix frontend run build
 - `ST36`
 - `补中益气汤`
 - `胃经`
+- 经典数据包导入后补充验证：`桂枝汤`、`太阳病`、`上古天真论`、`神农本草经`
 
 ## 性能阈值
 

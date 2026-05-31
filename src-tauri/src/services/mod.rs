@@ -12,6 +12,7 @@ pub mod error_log_service;
 pub mod export_service;
 pub mod field_mapping_service;
 pub mod grid_edit_service;
+pub mod import_engine_service;
 pub mod import_project_service;
 pub mod knowledge_service;
 pub mod maintenance_service;

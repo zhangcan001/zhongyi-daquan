@@ -6,22 +6,30 @@ use crate::models::data_pipeline::{
 };
 use crate::repositories::{import_repository, validation_repository};
 use crate::services::{
-    field_mapping_service, normalize_service, search_index_service, validation_service,
+    field_mapping_service, import_engine_service, normalize_service, search_index_service,
+    validation_service,
 };
 use calamine::{open_workbook_from_rs, Data, Reader, Xlsx};
 use chrono::Utc;
 use rusqlite::{params, OptionalExtension};
 use serde_json::{Map, Value};
 use std::collections::BTreeSet;
+use std::io::{Cursor, Read};
+use zip::ZipArchive;
 
 pub fn preview_json(content: &str) -> AppResult<ImportParsedPreview> {
     let rows = parse_json_rows(content)?;
-    Ok(preview_from_rows(rows))
+    Ok(preview_from_rows(
+        "manual-import.json",
+        "json",
+        rows,
+        "mixed",
+    ))
 }
 
 pub fn preview_csv(content: &str) -> AppResult<ImportParsedPreview> {
     let rows = parse_csv_rows(content)?;
-    Ok(preview_from_rows(rows))
+    Ok(preview_from_rows("manual-import.csv", "csv", rows, "mixed"))
 }
 
 pub fn import_json(
@@ -40,7 +48,12 @@ pub fn import_csv(
 
 pub fn preview_excel(content: &[u8]) -> AppResult<ImportParsedPreview> {
     let rows = parse_excel_rows(content)?;
-    Ok(preview_from_rows(rows))
+    Ok(preview_from_rows(
+        "manual-import.xlsx",
+        "excel",
+        rows,
+        "mixed",
+    ))
 }
 
 pub fn import_excel(
@@ -48,6 +61,22 @@ pub fn import_excel(
     request: CreateImportRequest,
 ) -> AppResult<ImportBatchSummary> {
     import_rows_from_bytes(database, "excel", request)
+}
+
+pub fn preview_zip(file_name: &str, content: &[u8]) -> AppResult<ImportParsedPreview> {
+    let (rows, import_type, warnings) = parse_zip_import_rows(content)?;
+    let mut preview = preview_from_rows(file_name, &import_type, rows, "mixed");
+    preview.warnings.extend(warnings);
+    Ok(preview)
+}
+
+pub fn import_zip(
+    database: &Database,
+    request: CreateImportRequest,
+    bytes: &[u8],
+) -> AppResult<ImportBatchSummary> {
+    let (rows, import_type, _warnings) = parse_zip_import_rows(bytes)?;
+    import_preparsed_rows(database, &import_type, request, rows)
 }
 
 pub fn staging_page(
@@ -330,27 +359,44 @@ fn import_rows(
     parser: fn(&str) -> AppResult<Vec<Map<String, Value>>>,
 ) -> AppResult<ImportBatchSummary> {
     let rows = parser(&request.content)?;
+    import_preparsed_rows(database, import_type, request, rows)
+}
+
+fn import_preparsed_rows(
+    database: &Database,
+    import_type: &str,
+    request: CreateImportRequest,
+    rows: Vec<Map<String, Value>>,
+) -> AppResult<ImportBatchSummary> {
     let mapping = request
         .mapping
         .or(field_mapping_service::mapping_from_template(
             database,
             request.template_id,
         )?);
-    let batch = import_repository::create_batch(
-        database,
+    let engine = import_engine_service::prepare_import_rows(
         &request.file_name,
         import_type,
         &request.target_type,
+        &rows,
+        mapping.as_ref(),
+    );
+    let _ = (&engine.mapping_suggestions, &engine.warnings);
+    let target_type = if engine.direct_import_ready {
+        "mixed"
+    } else {
+        &request.target_type
+    };
+    let batch = import_repository::create_batch(
+        database,
+        &request.file_name,
+        &engine.detection.detected_type,
+        target_type,
         rows.len() as i64,
     )?;
     let batch_id = batch.id.unwrap_or_default();
 
-    let mapped_rows: Vec<Map<String, Value>> = rows
-        .iter()
-        .map(|raw| {
-            field_mapping_service::apply_mapping(raw, mapping.as_ref(), &request.target_type)
-        })
-        .collect();
+    let mapped_rows = engine.mapped_rows;
 
     let normalized_rows = normalize_service::normalize_rows_batch(database, mapped_rows.clone())?;
 
@@ -363,7 +409,7 @@ fn import_rows(
         .zip(normalized_rows.iter())
         .enumerate()
     {
-        let effective_type = effective_target_type(&request.target_type, normalized);
+        let effective_type = effective_target_type(target_type, normalized);
         let issues = validation_service::validate_row(database, &effective_type, normalized)?;
         let (status, error_message, warning_message) =
             validation_service::status_from_issues(&issues);
@@ -541,76 +587,163 @@ fn import_rows_from_bytes(
     request: CreateImportRequest,
 ) -> AppResult<ImportBatchSummary> {
     let rows = parse_excel_rows(request.content.as_bytes())?;
-    let mapping = request
-        .mapping
-        .or(field_mapping_service::mapping_from_template(
-            database,
-            request.template_id,
-        )?);
-    let batch = import_repository::create_batch(
-        database,
-        &request.file_name,
-        import_type,
-        &request.target_type,
-        rows.len() as i64,
-    )?;
-    let batch_id = batch.id.unwrap_or_default();
-
-    let mapped_rows: Vec<Map<String, Value>> = rows
-        .iter()
-        .map(|raw| {
-            field_mapping_service::apply_mapping(raw, mapping.as_ref(), &request.target_type)
-        })
-        .collect();
-
-    let normalized_rows = normalize_service::normalize_rows_batch(database, mapped_rows.clone())?;
-
-    let mut import_rows_data = Vec::with_capacity(rows.len());
-    let mut all_issues = Vec::new();
-
-    for (index, ((raw, mapped), normalized)) in rows
-        .iter()
-        .zip(mapped_rows.iter())
-        .zip(normalized_rows.iter())
-        .enumerate()
-    {
-        let effective_type = effective_target_type(&request.target_type, normalized);
-        let issues = validation_service::validate_row(database, &effective_type, normalized)?;
-        let (status, error_message, warning_message) =
-            validation_service::status_from_issues(&issues);
-
-        import_rows_data.push(import_repository::ImportRowData {
-            row_index: index as i64 + 1,
-            raw_json: serde_json::to_string(&Value::Object(raw.clone()))?,
-            mapped_json: serde_json::to_string(&Value::Object(mapped.clone()))?,
-            normalized_json: serde_json::to_string(&Value::Object(normalized.clone()))?,
-            status: status.to_string(),
-            error_message,
-            warning_message,
-        });
-
-        all_issues.push(issues);
-    }
-
-    let row_ids = import_repository::insert_rows_batch(database, batch_id, import_rows_data)?;
-
-    for (row_id, issues) in row_ids.iter().zip(all_issues.iter()) {
-        validation_repository::replace_row_issues(database, batch_id, *row_id, issues)?;
-    }
-
-    import_repository::update_batch_counts(database, batch_id, "staged")?;
-    import_repository::summary(database, batch_id)
+    import_preparsed_rows(database, import_type, request, rows)
 }
 
-fn preview_from_rows(rows: Vec<Map<String, Value>>) -> ImportParsedPreview {
+fn parse_zip_import_rows(
+    content: &[u8],
+) -> AppResult<(Vec<Map<String, Value>>, String, Vec<String>)> {
+    let cursor = Cursor::new(content);
+    let mut archive = ZipArchive::new(cursor)
+        .map_err(|error| AppError::InvalidInput(format!("无法读取 ZIP 数据包: {}", error)))?;
+    let import_manifest = read_zip_text(&mut archive, "import_manifest.json")?;
+    let package_manifest = if import_manifest.is_none() {
+        read_zip_text(&mut archive, "manifest.json")?
+    } else {
+        None
+    };
+    let mut warnings = Vec::new();
+    let mut candidates = Vec::new();
+
+    if let Some(manifest_text) = import_manifest {
+        let manifest_value: Value = serde_json::from_str(&manifest_text)?;
+        let files = manifest_value
+            .get("files")
+            .and_then(Value::as_array)
+            .ok_or_else(|| AppError::InvalidInput("manifest 缺少 files 数组".to_string()))?;
+        if let Some(package_name) = manifest_value.get("package_name").and_then(Value::as_str) {
+            warnings.push(format!("数据包: {}", package_name));
+        }
+        warnings.push(format!("manifest 文件数: {}", files.len()));
+        for file in files {
+            let path = file
+                .get("path")
+                .and_then(Value::as_str)
+                .ok_or_else(|| AppError::InvalidInput("manifest 文件项缺少 path".to_string()))?;
+            let import_type = file
+                .get("type")
+                .and_then(Value::as_str)
+                .unwrap_or("generic_json");
+            let target = file
+                .get("target")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let primary = file
+                .get("primary")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let can_direct_import = import_type == "knowledge_items_v1"
+                || import_type == "classic_passages_v1"
+                || target == "knowledge_items"
+                || primary;
+            warnings.push(format!(
+                "文件: {} / 类型: {} / 目标: {} / 可直接导入: {}",
+                path,
+                import_type,
+                if target.is_empty() {
+                    "未声明"
+                } else {
+                    target
+                },
+                can_direct_import
+            ));
+            if can_direct_import {
+                let text = read_zip_text(&mut archive, path)?.ok_or_else(|| {
+                    AppError::InvalidInput(format!("manifest 指向的文件不存在: {}", path))
+                })?;
+                let rows = if path.to_ascii_lowercase().ends_with(".csv") {
+                    parse_csv_rows(&text)?
+                } else {
+                    parse_json_rows(&text)?
+                };
+                candidates.extend(rows);
+            } else {
+                warnings.push(format!(
+                    "已识别 manifest 文件 {}，v0.1 暂不直接导入目标 {}",
+                    path, target
+                ));
+            }
+        }
+        if candidates.is_empty() {
+            return Err(AppError::InvalidInput(
+                "manifest 中没有可导入到 knowledge_items 的文件".to_string(),
+            ));
+        }
+        return Ok((candidates, "zip_manifest".to_string(), warnings));
+    }
+
+    if package_manifest.is_some() {
+        warnings.push("检测到 package manifest，但不是 Import Engine V2 的 import_manifest.json，已按内置经典包规则自动查找可导入文件。".to_string());
+    }
+
+    for path in [
+        "json/knowledge_items_import_curated.json",
+        "json/knowledge_items_import_full_clean.json",
+        "json/classic_passages_curated.json",
+        "json/classic_passages_full_clean.json",
+        "csv/knowledge_items_import_curated.csv",
+        "csv/knowledge_items_import_full_clean.csv",
+        "csv/classic_passages_curated.csv",
+        "csv/classic_passages_full_clean.csv",
+    ] {
+        if let Some(text) = read_zip_text(&mut archive, path)? {
+            let rows = if path.ends_with(".csv") {
+                parse_csv_rows(&text)?
+            } else {
+                parse_json_rows(&text)?
+            };
+            return Ok((rows, "zip_auto".to_string(), warnings));
+        }
+    }
+
+    Err(AppError::InvalidInput(
+        "ZIP 中未找到 import_manifest.json 或支持的经典数据文件".to_string(),
+    ))
+}
+
+fn read_zip_text<R: Read + std::io::Seek>(
+    archive: &mut ZipArchive<R>,
+    path: &str,
+) -> AppResult<Option<String>> {
+    let normalized = path.replace('\\', "/");
+    for index in 0..archive.len() {
+        let mut file = archive
+            .by_index(index)
+            .map_err(|error| AppError::InvalidInput(format!("无法读取 ZIP 文件项: {}", error)))?;
+        if file.name().replace('\\', "/").ends_with(&normalized) {
+            let mut text = String::new();
+            file.read_to_string(&mut text)?;
+            return Ok(Some(text));
+        }
+    }
+    Ok(None)
+}
+
+fn preview_from_rows(
+    file_name: &str,
+    import_type: &str,
+    rows: Vec<Map<String, Value>>,
+    target_type: &str,
+) -> ImportParsedPreview {
     let headers = rows
         .iter()
         .flat_map(|row| row.keys().cloned())
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect();
+    let detection = import_engine_service::detect_import_type(file_name, import_type, &rows);
+    let mapping_suggestions = import_engine_service::score_mapping(&rows, target_type);
+    let direct_import_ready =
+        import_engine_service::is_direct_import_type(&detection.detected_type);
     let rows = rows.into_iter().take(100).map(Value::Object).collect();
-    ImportParsedPreview { headers, rows }
+    ImportParsedPreview {
+        headers,
+        rows,
+        detection,
+        mapping_suggestions,
+        direct_import_ready,
+        warnings: Vec::new(),
+    }
 }
 
 fn parse_optional_json(json: Option<String>) -> AppResult<Value> {
@@ -811,7 +944,7 @@ fn insert_knowledge_item(
         "INSERT INTO knowledge_items
          (type, code, name, alias, pinyin, category, summary, content, source_note, tags,
           data_status, completeness_status, content_version, is_favorite, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'imported', 'partial', 1, 0, ?11, ?12)",
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'partial', 1, 0, ?12, ?13)",
         params![
             text(object, "type").unwrap_or_else(|| target_type.to_string()),
             text(object, "code"),
@@ -823,6 +956,7 @@ fn insert_knowledge_item(
             text(object, "content"),
             text(object, "source_note"),
             text(object, "tags"),
+            text(object, "data_status").unwrap_or_else(|| "validated".to_string()),
             now,
             now
         ],
@@ -955,10 +1089,13 @@ fn effective_target_type(target_type: &str, object: &Map<String, Value>) -> Stri
 
 #[cfg(test)]
 mod tests {
-    use super::{confirm_import, import_json};
+    use super::{confirm_import, import_csv, import_json, import_zip};
     use crate::db::connection::Database;
     use crate::models::data_pipeline::CreateImportRequest;
+    use crate::models::search::SearchRequest;
+    use crate::services::search_index_service;
     use std::fs;
+    use std::io::Write;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn temp_database(test_name: &str) -> (std::path::PathBuf, Database) {
@@ -1086,6 +1223,198 @@ mod tests {
                 Ok(())
             })
             .expect("inspect imported rows");
+
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn classic_passages_import_preserves_content_source_and_searches() {
+        let (data_dir, database) = temp_database("classic-passages");
+        let content = r#"
+        [
+          {
+            "work_title": "黄帝内经·素问",
+            "page_title": "卷第一",
+            "section_title": "上古天真论",
+            "original_text": "上古天真论曰：上古之人，其知道者，法于阴阳。",
+            "source_note": "黄帝内经·素问 / 上古天真论",
+            "source_url": "local://classics/huangdi-neijing"
+          },
+          {
+            "work_title": "伤寒论",
+            "page_title": "辨太阳病脉证并治",
+            "section_title": "太阳病",
+            "original_text": "太阳之为病，脉浮，头项强痛而恶寒。",
+            "source_note": "伤寒论 / 太阳病"
+          }
+        ]
+        "#;
+
+        let summary = import_json(
+            &database,
+            CreateImportRequest {
+                file_name: "classic_passages_curated.json".to_string(),
+                target_type: "mixed".to_string(),
+                content: content.to_string(),
+                mapping: None,
+                template_id: None,
+            },
+        )
+        .expect("import classic passages");
+        assert_eq!(summary.importable_rows, 2);
+        confirm_import(&database, summary.batch.id.unwrap()).expect("confirm classic passages");
+
+        database
+            .with_connection(|connection| {
+                let content: String = connection.query_row(
+                    "SELECT content FROM knowledge_items WHERE name LIKE '%上古天真论%'",
+                    [],
+                    |row| row.get(0),
+                )?;
+                assert!(content.contains("法于阴阳"));
+
+                let source_note: String = connection.query_row(
+                    "SELECT source_note FROM knowledge_items WHERE name LIKE '%上古天真论%'",
+                    [],
+                    |row| row.get(0),
+                )?;
+                assert!(source_note.contains("黄帝内经·素问"));
+                assert!(source_note.contains("local://classics/huangdi-neijing"));
+                Ok(())
+            })
+            .expect("inspect classic import");
+
+        for query in ["上古天真论", "太阳病"] {
+            let response = search_index_service::search(
+                &database,
+                SearchRequest {
+                    query: query.to_string(),
+                    item_type: None,
+                    page: Some(1),
+                    page_size: Some(10),
+                },
+            )
+            .expect("search after import");
+            assert!(!response.results.is_empty(), "expected hit for {query}");
+        }
+
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn generic_csv_uses_scored_mapping() {
+        let (data_dir, database) = temp_database("generic-csv");
+        let content = "名称,编号,原文,标签\r\n桂枝汤,GZT-001,桂枝汤经典原文内容用于测试导入正文识别,方剂、原典\r\n";
+        let summary = import_csv(
+            &database,
+            CreateImportRequest {
+                file_name: "generic.csv".to_string(),
+                target_type: "formula".to_string(),
+                content: content.to_string(),
+                mapping: None,
+                template_id: None,
+            },
+        )
+        .expect("import generic csv");
+        assert_eq!(summary.error_rows, 0);
+
+        database
+            .with_connection(|connection| {
+                let mapped_name: String = connection.query_row(
+                    "SELECT json_extract(normalized_json, '$.name') FROM data_import_rows LIMIT 1",
+                    [],
+                    |row| row.get(0),
+                )?;
+                let mapped_content: String = connection.query_row(
+                    "SELECT json_extract(normalized_json, '$.content') FROM data_import_rows LIMIT 1",
+                    [],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(mapped_name, "桂枝汤");
+                assert!(mapped_content.contains("经典原文"));
+                Ok(())
+            })
+            .expect("inspect csv mapping");
+
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn zip_import_manifest_loads_primary_knowledge_file() {
+        let (data_dir, database) = temp_database("zip-manifest");
+        let mut buffer = std::io::Cursor::new(Vec::new());
+        {
+            let mut writer = zip::ZipWriter::new(&mut buffer);
+            let options = zip::write::SimpleFileOptions::default();
+            writer.start_file("import_manifest.json", options).unwrap();
+            writer
+                .write_all(
+                    br#"{
+                "package_name": "zhongyi_classics_curated_v0_3",
+                "schema_version": "1.0",
+                "import_profile": "classics_curated_v1",
+                "files": [
+                  {
+                    "path": "json/knowledge_items_import_curated.json",
+                    "type": "knowledge_items_v1",
+                    "target": "knowledge_items",
+                    "primary": true
+                  }
+                ],
+                "import_order": ["knowledge_items"]
+            }"#,
+                )
+                .unwrap();
+            writer
+                .start_file("json/knowledge_items_import_curated.json", options)
+                .unwrap();
+            writer
+                .write_all(
+                    r#"[
+              {
+                "type": "formula",
+                "code": "GZT-001",
+                "name": "桂枝汤",
+                "content": "桂枝汤经典原文，用于 ZIP manifest 导入测试。",
+                "source_note": "伤寒论",
+                "tags": ["方剂", "伤寒论"],
+                "data_status": "validated",
+                "detail": {"composition": "桂枝,芍药,甘草,生姜,大枣"}
+              }
+            ]"#
+                    .as_bytes(),
+                )
+                .unwrap();
+            writer.finish().unwrap();
+        }
+        let bytes = buffer.into_inner();
+
+        let summary = import_zip(
+            &database,
+            CreateImportRequest {
+                file_name: "zhongyi_classics_curated_v0_3_manifest.zip".to_string(),
+                target_type: "mixed".to_string(),
+                content: String::new(),
+                mapping: None,
+                template_id: None,
+            },
+            &bytes,
+        )
+        .expect("import zip manifest");
+        assert_eq!(summary.total_rows, 1);
+        confirm_import(&database, summary.batch.id.unwrap()).expect("confirm zip import");
+
+        let response = search_index_service::search(
+            &database,
+            SearchRequest {
+                query: "桂枝汤".to_string(),
+                item_type: None,
+                page: Some(1),
+                page_size: Some(10),
+            },
+        )
+        .expect("search zip import");
+        assert!(!response.results.is_empty());
 
         let _ = fs::remove_dir_all(data_dir);
     }

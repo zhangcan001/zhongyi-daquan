@@ -91,6 +91,32 @@ pub struct ValidationRule {
 pub struct ImportParsedPreview {
     pub headers: Vec<String>,
     pub rows: Vec<serde_json::Value>,
+    pub detection: ImportDetectionResult,
+    pub mapping_suggestions: Vec<FieldMappingSuggestion>,
+    pub direct_import_ready: bool,
+    pub warnings: Vec<String>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportDetectionResult {
+    pub detected_type: String,
+    pub confidence: f64,
+    pub reason: String,
+    pub sample_fields: Vec<String>,
+    pub record_count: i64,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FieldMappingSuggestion {
+    pub source_field: String,
+    pub target_field: Option<String>,
+    pub confidence: f64,
+    pub decision: String,
+    pub reason: String,
 }
 
 #[allow(dead_code)]

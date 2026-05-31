@@ -26,14 +26,36 @@
 | `related_items` | 关联中药、方剂、经络、穴位、证型、病症 |
 | `source_note` | 来源与版权说明 |
 
-## 导入流程
+## Import Engine V2 导入流程
 
-1. 将完整数据整理为 JSON、CSV 或 Excel。
-2. 使用导入模块选择字段映射模板。
-3. 先进入暂存区，不直接写入正式知识库。
-4. 执行清洗校验，处理空字段、重复条文、异常编号和关联名称。
-5. 使用去重合并与关系建议确认关联。
-6. 人工验收后写入正式知识库。
+推荐优先导入标准 JSON 或 ZIP 数据包：
+
+1. `knowledge_items_import_curated.json`
+2. `knowledge_items_import_full_clean.json`
+3. `classic_passages_curated.json`
+4. `classic_passages_full_clean.json`
+5. `zhongyi_classics_curated_v0_2.zip`
+6. 后续可使用带 `import_manifest.json` 的 `zhongyi_classics_curated_v0_3_manifest.zip`
+
+导入步骤：
+
+1. 在批量导入页面选择 JSON、CSV 或 ZIP。
+2. 点击“识别文件”，查看 `detected_type`、置信度、记录数和原因。
+3. 如果识别为 `knowledge_items_v1` 或 `classic_passages_v1`，页面会显示“可直接导入”，不需要人工映射。
+4. 如果识别为 `generic_csv`，系统显示字段映射候选，高置信字段自动映射，中置信字段建议确认，低置信字段不自动映射。
+5. 导入后先进入暂存区，不直接写入正式知识库。
+6. 执行清洗校验，处理空字段、重复条文、异常编号和关联名称。
+7. 人工验收后确认入库，系统会重建搜索索引。
+
+标准经典数据包中：
+
+- `content` 原文完整保留。
+- `source_note` 出处完整保留，并尽量附加 `source_url/classic_id/page_title/section_title`。
+- `tags` 支持数组和分隔字符串。
+- `detail` 对象会按知识类型写入详情字段，无法识别的上下文保留到 `notes`。
+- 空字段不会导致整批失败。
+
+详见 `docs/IMPORT_ENGINE_V2.md`。
 
 ## 数据存放策略
 

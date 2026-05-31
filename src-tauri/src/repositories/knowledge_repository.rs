@@ -203,3 +203,51 @@ fn empty_to_none(value: Option<&str>) -> Option<&str> {
         }
     })
 }
+
+/// 从版本快照恢复知识条目（用于版本回滚）
+pub fn update_from_snapshot(
+    connection: &Connection,
+    item_id: i64,
+    snapshot: &serde_json::Value,
+) -> AppResult<()> {
+    let obj = snapshot.as_object().ok_or_else(|| {
+        crate::errors::AppError::InvalidInput("快照格式错误".to_string())
+    })?;
+
+    // 提取字段
+    let name = obj.get("name")
+        .and_then(|v: &serde_json::Value| v.as_str())
+        .ok_or_else(|| crate::errors::AppError::InvalidInput("缺少 name 字段".to_string()))?;
+
+    let item_type = obj.get("type").or_else(|| obj.get("item_type"))
+        .and_then(|v: &serde_json::Value| v.as_str())
+        .ok_or_else(|| crate::errors::AppError::InvalidInput("缺少 type 字段".to_string()))?;
+
+    let code = obj.get("code").and_then(|v: &serde_json::Value| v.as_str());
+    let alias = obj.get("alias").and_then(|v: &serde_json::Value| v.as_str());
+    let pinyin = obj.get("pinyin").and_then(|v: &serde_json::Value| v.as_str());
+    let category = obj.get("category").and_then(|v: &serde_json::Value| v.as_str());
+    let summary = obj.get("summary").and_then(|v: &serde_json::Value| v.as_str());
+    let content = obj.get("content").and_then(|v: &serde_json::Value| v.as_str());
+    let source_note = obj.get("source_note").and_then(|v: &serde_json::Value| v.as_str());
+    let tags = obj.get("tags").and_then(|v: &serde_json::Value| v.as_str());
+    let data_status = obj.get("data_status").and_then(|v: &serde_json::Value| v.as_str()).unwrap_or("draft");
+    let completeness_status = obj.get("completeness_status").and_then(|v: &serde_json::Value| v.as_str()).unwrap_or("partial");
+
+    connection.execute(
+        "UPDATE knowledge_items
+         SET type = ?1, code = ?2, name = ?3, alias = ?4, pinyin = ?5,
+             category = ?6, summary = ?7, content = ?8, source_note = ?9,
+             tags = ?10, data_status = ?11, completeness_status = ?12,
+             updated_at = datetime('now')
+         WHERE id = ?13",
+        params![
+            item_type, code, name, alias, pinyin,
+            category, summary, content, source_note,
+            tags, data_status, completeness_status,
+            item_id
+        ],
+    )?;
+
+    Ok(())
+}

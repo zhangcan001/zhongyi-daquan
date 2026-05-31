@@ -18,4 +18,7 @@ pub mod performance_service;
 pub mod prompt_template_service;
 pub mod relation_suggest_service;
 pub mod search_index_service;
+pub mod settings_service;
+pub mod transform_history_service;
 pub mod validation_service;
+pub mod version_service;

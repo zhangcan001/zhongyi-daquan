@@ -263,3 +263,12 @@ mod tests {
         let _ = fs::remove_dir_all(data_dir);
     }
 }
+
+/// 重建单个条目的搜索索引（用于版本回滚后同步）
+pub fn rebuild_item_index(database: &Database, item_id: i64) -> AppResult<()> {
+    // 先删除旧索引
+    delete_knowledge_item_index(database, item_id)?;
+    // 重新索引
+    index_knowledge_item(database, item_id)?;
+    Ok(())
+}

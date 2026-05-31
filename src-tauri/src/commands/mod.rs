@@ -11,3 +11,5 @@ pub mod maintenance_commands;
 pub mod performance_commands;
 pub mod relation_commands;
 pub mod search_commands;
+pub mod settings_commands;
+pub mod version_commands;

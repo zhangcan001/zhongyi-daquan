@@ -29,3 +29,24 @@
 标准 `classic_passages_*` 文件会被识别为 `classic_passages_v1`。由于 v0.1 尚未建立独立 classic 专表，条文会暂时映射为 `syndrome` 类型，分类为 `原典 / 书名`，正文写入 `content`。
 
 如果后续数据包提供 `import_manifest.json`，ZIP 导入会优先按 manifest 中的 `files` 和 `import_order` 处理；如果只有普通 `manifest.json`，系统会自动查找已知经典数据文件。
+
+## v0.3 manifest 包
+
+推荐 Release 附件名：
+
+- `zhongyi_classics_curated_v0_3_manifest.zip`
+
+该包应在根目录包含 `import_manifest.json`，示例见：
+
+- `import_manifest.example.json`
+
+当前 v0.1 的 manifest 导入策略是先导入 `primary: true` 的主知识 JSON，即 `json/knowledge_items_import_curated.json`。`classic_passages` 和 `search_terms` 会在概览中展示，后续由专门导入能力接入。
+
+导入后建议搜索：
+
+- `桂枝汤`
+- `太阳病`
+- `上古天真论`
+- `神农本草经`
+- `黄帝内经`
+- `金匮要略`

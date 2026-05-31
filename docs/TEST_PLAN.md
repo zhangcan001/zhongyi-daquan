@@ -27,6 +27,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
   - `detail` 对象写入对应详情字段。
   - `content` 原文和 `source_note` 出处保留。
   - 确认入库后重建搜索索引，并可搜索 `上古天真论`、`太阳病` 等导入内容。
+  - 真实四部经典包验收：识别 `knowledge_items_import_curated.json`、`classic_passages_curated.json`、`search_terms_curated.json`，并验证 `zhongyi_classics_curated_v0_3_manifest.zip` manifest 驱动导入。
 
 前端检查：
 
@@ -59,6 +60,7 @@ npm --prefix frontend run build
 - `补中益气汤`
 - `胃经`
 - 经典数据包导入后补充验证：`桂枝汤`、`太阳病`、`上古天真论`、`神农本草经`
+- v0.3 manifest 数据包导入后补充验证：`黄帝内经`、`金匮要略`
 
 ## 性能阈值
 

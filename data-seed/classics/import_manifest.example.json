@@ -1,0 +1,35 @@
+{
+  "package_name": "zhongyi_classics_curated_v0_3_manifest",
+  "schema_version": "1.0",
+  "import_profile": "classics_curated_v1",
+  "description": "四部中医经典机器结构精校数据包，支持 Import Engine V2 manifest 驱动导入。",
+  "files": [
+    {
+      "path": "json/knowledge_items_import_curated.json",
+      "type": "knowledge_items_v1",
+      "target": "knowledge_items",
+      "primary": true,
+      "required": true
+    },
+    {
+      "path": "json/classic_passages_curated.json",
+      "type": "classic_passages_v1",
+      "target": "classic_passages",
+      "primary": false,
+      "required": false
+    },
+    {
+      "path": "json/search_terms_curated.json",
+      "type": "search_terms_v1",
+      "target": "search_terms",
+      "primary": false,
+      "required": false
+    }
+  ],
+  "import_order": [
+    "knowledge_items",
+    "classic_passages",
+    "search_terms"
+  ],
+  "safety_notice": "本数据包仅用于中医经典文本学习、资料整理与本地记录，不构成医疗诊断、治疗建议或处方依据。"
+}

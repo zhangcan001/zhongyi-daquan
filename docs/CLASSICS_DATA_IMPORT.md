@@ -34,8 +34,8 @@
 2. `knowledge_items_import_full_clean.json`
 3. `classic_passages_curated.json`
 4. `classic_passages_full_clean.json`
-5. `zhongyi_classics_curated_v0_2.zip`
-6. 后续可使用带 `import_manifest.json` 的 `zhongyi_classics_curated_v0_3_manifest.zip`
+5. `zhongyi_classics_curated_v0_3_manifest.zip`
+6. 如果暂时没有 v0.3 manifest 包，可导入 v0.2 包内的 `json/knowledge_items_import_curated.json`
 
 导入步骤：
 
@@ -54,6 +54,23 @@
 - `tags` 支持数组和分隔字符串。
 - `detail` 对象会按知识类型写入详情字段，无法识别的上下文保留到 `notes`。
 - 空字段不会导致整批失败。
+
+## v0.3 manifest 数据包
+
+`zhongyi_classics_curated_v0_3_manifest.zip` 基于 v0.2 数据包增加根目录 `import_manifest.json`。manifest 声明包名、schema、文件列表、主数据文件和导入顺序。当前 v0.1 会自动暂存 `primary: true` 的 `knowledge_items_import_curated.json`，其他文件显示在数据包概览中但不自动混入同一批次。
+
+仓库内提供示例：
+
+- `data-seed/classics/import_manifest.example.json`
+
+导入后搜索验收关键词：
+
+- `桂枝汤`
+- `太阳病`
+- `上古天真论`
+- `神农本草经`
+- `黄帝内经`
+- `金匮要略`
 
 详见 `docs/IMPORT_ENGINE_V2.md`。
 

@@ -66,6 +66,13 @@ pub fn import_excel(
 pub fn preview_zip(file_name: &str, content: &[u8]) -> AppResult<ImportParsedPreview> {
     let (rows, import_type, warnings) = parse_zip_import_rows(content)?;
     let mut preview = preview_from_rows(file_name, &import_type, rows, "mixed");
+    if import_type == "zip_manifest" {
+        preview.detection.detected_type = "classics_curated_v1".to_string();
+        preview.detection.confidence = 0.99;
+        preview.detection.reason =
+            "检测到 import_manifest.json，按 manifest 驱动的经典精校数据包导入".to_string();
+        preview.direct_import_ready = true;
+    }
     preview.warnings.extend(warnings);
     Ok(preview)
 }
@@ -439,7 +446,7 @@ fn import_preparsed_rows(
 }
 
 fn parse_json_rows(content: &str) -> AppResult<Vec<Map<String, Value>>> {
-    let value: Value = serde_json::from_str(content)?;
+    let value: Value = serde_json::from_str(strip_json_bom(content))?;
     let rows = match value {
         Value::Array(rows) => rows,
         Value::Object(mut object) => match object.remove("rows") {
@@ -606,7 +613,7 @@ fn parse_zip_import_rows(
     let mut candidates = Vec::new();
 
     if let Some(manifest_text) = import_manifest {
-        let manifest_value: Value = serde_json::from_str(&manifest_text)?;
+        let manifest_value: Value = serde_json::from_str(strip_json_bom(&manifest_text))?;
         let files = manifest_value
             .get("files")
             .and_then(Value::as_array)
@@ -632,10 +639,8 @@ fn parse_zip_import_rows(
                 .get("primary")
                 .and_then(Value::as_bool)
                 .unwrap_or(false);
-            let can_direct_import = import_type == "knowledge_items_v1"
-                || import_type == "classic_passages_v1"
-                || target == "knowledge_items"
-                || primary;
+            let can_direct_import =
+                import_type == "knowledge_items_v1" || import_type == "classic_passages_v1";
             warnings.push(format!(
                 "文件: {} / 类型: {} / 目标: {} / 可直接导入: {}",
                 path,
@@ -647,7 +652,14 @@ fn parse_zip_import_rows(
                 },
                 can_direct_import
             ));
-            if can_direct_import {
+            if can_direct_import && primary {
+                if import_type != "knowledge_items_v1" && import_type != "classic_passages_v1" {
+                    warnings.push(format!(
+                        "已跳过 {}：当前 v0.1 只直接导入 knowledge_items_v1 与 classic_passages_v1",
+                        path
+                    ));
+                    continue;
+                }
                 let text = read_zip_text(&mut archive, path)?.ok_or_else(|| {
                     AppError::InvalidInput(format!("manifest 指向的文件不存在: {}", path))
                 })?;
@@ -657,6 +669,11 @@ fn parse_zip_import_rows(
                     parse_json_rows(&text)?
                 };
                 candidates.extend(rows);
+            } else if can_direct_import {
+                warnings.push(format!(
+                    "已识别 {}，但它不是 primary 主数据文件；v0.1 manifest 导入先只自动暂存主知识文件。",
+                    path
+                ));
             } else {
                 warnings.push(format!(
                     "已识别 manifest 文件 {}，v0.1 暂不直接导入目标 {}",
@@ -699,6 +716,10 @@ fn parse_zip_import_rows(
     Err(AppError::InvalidInput(
         "ZIP 中未找到 import_manifest.json 或支持的经典数据文件".to_string(),
     ))
+}
+
+fn strip_json_bom(content: &str) -> &str {
+    content.trim_start_matches('\u{feff}')
 }
 
 fn read_zip_text<R: Read + std::io::Seek>(

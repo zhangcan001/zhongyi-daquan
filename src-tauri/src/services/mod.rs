@@ -6,6 +6,8 @@ pub mod app_service;
 pub mod audit_log_service;
 pub mod background_job_service;
 pub mod backup_service;
+#[cfg(test)]
+mod classics_package_acceptance_test;
 pub mod dedup_service;
 pub mod entry_service;
 pub mod error_log_service;

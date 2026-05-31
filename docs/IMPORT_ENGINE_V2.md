@@ -82,9 +82,24 @@ ZIP 数据包如果包含 `import_manifest.json`，优先按 manifest 导入。
 
 如果 ZIP 只有普通 `manifest.json`，系统会把它当作包说明，再自动查找 `json/knowledge_items_import_curated.json`、`json/classic_passages_curated.json` 等已知文件。
 
+v0.3 manifest 数据包建议命名为 `zhongyi_classics_curated_v0_3_manifest.zip`。当前 v0.1 导入策略为：自动暂存 `primary: true` 的主知识文件，其他文件会显示在概览中，但不会混入同一导入批次。这样可以保证 `knowledge_items_import_curated.json` 先稳定入库，`search_terms` 与扩展原典条文后续由专门工具接入。
+
 ## 常见错误
 
 - `manifest 指向的文件不存在`：检查 ZIP 内路径是否与 `import_manifest.json` 一致。
+- `找不到 manifest`：如果没有 `import_manifest.json`，系统会按内置经典包规则查找主 JSON；若 ZIP 结构被多包一层目录，也支持自动匹配结尾路径。
+- `缺少主 JSON`：确认 ZIP 内存在 `json/knowledge_items_import_curated.json`。
+- `detail 字段异常`：标准 `detail` 应为对象；无法识别字段会尽量保留到 `notes`。
+- `tags 格式异常`：建议使用数组，或使用逗号、顿号、分号分隔字符串。
 - `JSON 行必须是对象`：标准 JSON 应为对象数组，或包含 `rows` 数组。
 - `CSV 引号未闭合`：检查 CSV 中英文引号是否成对。
 - 搜索不到新导入数据：确认已执行“确认入库”，系统会在确认后重建搜索索引。
+
+导入后建议搜索验收：
+
+- `桂枝汤`
+- `太阳病`
+- `上古天真论`
+- `神农本草经`
+- `黄帝内经`
+- `金匮要略`

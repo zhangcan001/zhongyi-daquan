@@ -250,8 +250,8 @@ pub fn update_from_snapshot(
     )?;
 
     Ok(())
-#[allow(dead_code)]
 }
+#[allow(dead_code)]
 pub fn get_item(database: &Database, item_id: i64) -> AppResult<serde_json::Map<String, serde_json::Value>> {
     use serde_json::{Map, Value};
 

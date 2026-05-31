@@ -47,7 +47,7 @@ git worktree add ../zy-thread-qa codex/thread-qa-regression
 ## 1.2 当前版本目标
 
 ```text
-v0.1-entry-core-performance-ai-ready
+v0.1-alpha-package
 ```
 
 ## 1.3 产品定位
@@ -1537,7 +1537,7 @@ H 测试与文档
 下面这段可以直接复制给总控线程 Codex：
 
 ```text
-你是本项目的总控开发线程。项目名称为《中医大全》，版本目标为 v0.1-entry-core-performance-ai-ready。
+你是本项目的总控开发线程。项目名称为《中医大全》，当前发布收口版本为 v0.1-alpha-package，基于 v0.1-alpha。
 
 请严格按照 docs/CODEX_DEV_DOC.md 中的架构执行开发。
 

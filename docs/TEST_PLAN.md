@@ -43,6 +43,14 @@ npm --prefix frontend run build
 
 生成器会同步写入 `knowledge_fts`、`search_terms`、`knowledge_list_view_cache` 和 `relation_count_cache`，便于立即执行搜索与分页性能检查。
 
+当前性能验证关键词：
+
+- `黄芪`
+- `足三里`
+- `ST36`
+- `补中益气汤`
+- `胃经`
+
 ## 性能阈值
 
 生成器默认附带性能检查：
@@ -50,8 +58,36 @@ npm --prefix frontend run build
 - 搜索 10,000 条知识：小于 500ms。
 - 知识列表翻页：小于 300ms。
 - 关系表 50,000 条详情首屏：小于 500ms。
+- 上述五个关键词的单次搜索耗时应记录在回归输出中，作为发布收口报告依据。
 
 这些阈值是本地开发机上的回归门槛。若 CI 或低性能机器偶发超时，应记录环境、数据库大小、查询耗时和是否冷启动。
+
+## v0.1-alpha-package 实测结果
+
+本地执行：
+
+```powershell
+.\scripts\generate_regression_data.ps1
+```
+
+结果：
+
+| 项目 | 结果 |
+| --- | --- |
+| `knowledge_items` | 10,000 |
+| `knowledge_relations` | 50,000 |
+| `data_import_rows` | 10,000 |
+| `duplicate_candidates` | 1,000 |
+| `relation_suggestions` | 1,000 |
+| 数据生成耗时 | 3,104ms |
+| `performance_search_ms` | 5ms |
+| `performance_list_page_ms` | 0ms |
+| `performance_relation_first_page_ms` | 0ms |
+| `黄芪` | 10ms |
+| `足三里` | 9ms |
+| `ST36` | 7ms |
+| `补中益气汤` | 9ms |
+| `胃经` | 9ms |
 
 ## 手工回归重点
 

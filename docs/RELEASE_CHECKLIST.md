@@ -4,6 +4,8 @@
 
 基于：`v0.1-alpha`
 
+源码包版本：`0.1.0`
+
 内容：
 
 - 打包验证。
@@ -26,6 +28,16 @@
 - [x] `cargo test --manifest-path src-tauri/Cargo.toml`
 - [x] `cargo check --manifest-path src-tauri/Cargo.toml`
 
+## 性能验证
+
+- [x] `.\scripts\generate_regression_data.ps1`
+- [x] 10,000 条知识、50,000 条关系、10,000 条导入暂存行生成成功
+- [x] `黄芪` 搜索耗时 10ms
+- [x] `足三里` 搜索耗时 9ms
+- [x] `ST36` 搜索耗时 7ms
+- [x] `补中益气汤` 搜索耗时 9ms
+- [x] `胃经` 搜索耗时 9ms
+
 ## 开发启动
 
 - [x] `npm run tauri:dev`
@@ -46,6 +58,7 @@
 - [x] 首次启动可创建本地数据目录
 - [x] 启动后首页正常
 - [ ] `src-tauri/target/release/bundle/msi/`
+- [ ] 正式发布图标资源，当前 `bundle.icon` 为空，发布前需补齐 `.ico` 与多尺寸图标。
 
 ## 发布边界
 
@@ -60,3 +73,4 @@
 
 - 当前已验证 NSIS 安装包链路。
 - MSI 产物仍依赖 WiX 工具链可用性，当前环境下全量打包会在 WiX 下载阶段额外等待，属于发布前环境项，不属于业务功能问题。
+- 经典精校完整数据包不进入 Git 仓库，建议作为本地导入包或 GitHub Release 附件交付。

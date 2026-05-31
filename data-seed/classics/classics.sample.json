@@ -1,0 +1,50 @@
+[
+  {
+    "classic_name": "黄帝内经",
+    "volume": "素问",
+    "section": "上古天真论",
+    "entry_no": "sample-001",
+    "title": "养生总则示例",
+    "original_text": "上古之人，其知道者，法于阴阳，和于术数。",
+    "annotation": "小体积导入样例，仅用于字段映射验证。",
+    "keywords": ["阴阳", "养生"],
+    "related_items": ["阴阳"],
+    "source_note": "公版经典文本样例，正式数据需另行校勘。"
+  },
+  {
+    "classic_name": "伤寒论",
+    "volume": "辨太阳病脉证并治",
+    "section": "太阳病",
+    "entry_no": "sample-002",
+    "title": "太阳病条文示例",
+    "original_text": "太阳之为病，脉浮，头项强痛而恶寒。",
+    "annotation": "小体积导入样例，仅用于字段映射验证。",
+    "keywords": ["太阳病", "恶寒"],
+    "related_items": ["太阳病"],
+    "source_note": "公版经典文本样例，正式数据需另行校勘。"
+  },
+  {
+    "classic_name": "金匮要略",
+    "volume": "脏腑经络先后病脉证",
+    "section": "总论",
+    "entry_no": "sample-003",
+    "title": "治未病示例",
+    "original_text": "上工治未病，何也？师曰：夫治未病者，见肝之病，知肝传脾。",
+    "annotation": "小体积导入样例，仅用于字段映射验证。",
+    "keywords": ["治未病", "肝", "脾"],
+    "related_items": ["肝", "脾"],
+    "source_note": "公版经典文本样例，正式数据需另行校勘。"
+  },
+  {
+    "classic_name": "神农本草经",
+    "volume": "上品",
+    "section": "草部",
+    "entry_no": "sample-004",
+    "title": "黄芪示例",
+    "original_text": "黄芪，味甘，微温。主痈疽久败疮，排脓止痛。",
+    "annotation": "小体积导入样例，仅用于字段映射验证。",
+    "keywords": ["黄芪", "补气"],
+    "related_items": ["黄芪"],
+    "source_note": "公版经典文本样例，正式数据需另行校勘。"
+  }
+]

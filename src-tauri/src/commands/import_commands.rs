@@ -34,6 +34,19 @@ pub fn import_csv_to_staging(
 }
 
 #[tauri::command]
+pub fn preview_excel_import(content: Vec<u8>) -> AppResult<ImportParsedPreview> {
+    import_project_service::preview_excel(&content)
+}
+
+#[tauri::command]
+pub fn import_excel_to_staging(
+    state: State<'_, AppState>,
+    request: CreateImportRequest,
+) -> AppResult<ImportBatchSummary> {
+    import_project_service::import_excel(&state.database, request)
+}
+
+#[tauri::command]
 pub fn save_field_mapping_template(
     state: State<'_, AppState>,
     request: SaveMappingTemplateRequest,
@@ -73,4 +86,21 @@ pub fn confirm_import_batch(
     batch_id: i64,
 ) -> AppResult<ConfirmImportResult> {
     import_project_service::confirm_import(&state.database, batch_id)
+}
+
+#[tauri::command]
+pub fn update_staging_row_field(
+    state: State<'_, AppState>,
+    batch_id: i64,
+    row_id: i64,
+    field_name: String,
+    new_value: String,
+) -> AppResult<ImportBatchSummary> {
+    import_project_service::update_staging_row_field(
+        &state.database,
+        batch_id,
+        row_id,
+        &field_name,
+        &new_value,
+    )
 }

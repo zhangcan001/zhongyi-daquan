@@ -203,3 +203,94 @@ fn empty_to_none(value: Option<&str>) -> Option<&str> {
         }
     })
 }
+
+pub fn get_item(database: &Database, item_id: i64) -> AppResult<serde_json::Map<String, serde_json::Value>> {
+    use serde_json::{Map, Value};
+
+    database.with_connection(|connection| {
+        let mut map = Map::new();
+
+        // 获取主表数据
+        connection.query_row(
+            "SELECT type, code, name, alias, pinyin, category, summary, content, source_note, tags,
+                    data_status, completeness_status, content_version, is_favorite
+             FROM knowledge_items WHERE id = ?1",
+            [item_id],
+            |row| {
+                map.insert("id".to_string(), Value::Number(item_id.into()));
+                map.insert("type".to_string(), Value::String(row.get(0)?));
+                if let Ok(code) = row.get::<_, Option<String>>(1) {
+                    map.insert("code".to_string(), code.map(Value::String).unwrap_or(Value::Null));
+                }
+                map.insert("name".to_string(), Value::String(row.get(2)?));
+                if let Ok(alias) = row.get::<_, Option<String>>(3) {
+                    map.insert("alias".to_string(), alias.map(Value::String).unwrap_or(Value::Null));
+                }
+                if let Ok(pinyin) = row.get::<_, Option<String>>(4) {
+                    map.insert("pinyin".to_string(), pinyin.map(Value::String).unwrap_or(Value::Null));
+                }
+                if let Ok(category) = row.get::<_, Option<String>>(5) {
+                    map.insert("category".to_string(), category.map(Value::String).unwrap_or(Value::Null));
+                }
+                if let Ok(summary) = row.get::<_, Option<String>>(6) {
+                    map.insert("summary".to_string(), summary.map(Value::String).unwrap_or(Value::Null));
+                }
+                if let Ok(content) = row.get::<_, Option<String>>(7) {
+                    map.insert("content".to_string(), content.map(Value::String).unwrap_or(Value::Null));
+                }
+                if let Ok(source_note) = row.get::<_, Option<String>>(8) {
+                    map.insert("source_note".to_string(), source_note.map(Value::String).unwrap_or(Value::Null));
+                }
+                if let Ok(tags) = row.get::<_, Option<String>>(9) {
+                    map.insert("tags".to_string(), tags.map(Value::String).unwrap_or(Value::Null));
+                }
+                map.insert("data_status".to_string(), Value::String(row.get(10)?));
+                map.insert("completeness_status".to_string(), Value::String(row.get(11)?));
+                Ok(())
+            },
+        )?;
+
+        Ok(map)
+    })
+}
+
+pub fn update_from_snapshot(
+    database: &Database,
+    item_id: i64,
+    snapshot: &serde_json::Map<String, serde_json::Value>,
+) -> AppResult<()> {
+    use serde_json::Value;
+
+    database.with_connection(|connection| {
+        let get_str = |key: &str| -> Option<String> {
+            snapshot.get(key).and_then(|v| match v {
+                Value::String(s) => Some(s.clone()),
+                _ => None,
+            })
+        };
+
+        connection.execute(
+            "UPDATE knowledge_items
+             SET code = ?1, name = ?2, alias = ?3, pinyin = ?4, category = ?5,
+                 summary = ?6, content = ?7, source_note = ?8, tags = ?9,
+                 data_status = ?10, completeness_status = ?11, updated_at = datetime('now')
+             WHERE id = ?12",
+            rusqlite::params![
+                get_str("code"),
+                get_str("name").unwrap_or_default(),
+                get_str("alias"),
+                get_str("pinyin"),
+                get_str("category"),
+                get_str("summary"),
+                get_str("content"),
+                get_str("source_note"),
+                get_str("tags"),
+                get_str("data_status").unwrap_or_else(|| "draft".to_string()),
+                get_str("completeness_status").unwrap_or_else(|| "partial".to_string()),
+                item_id,
+            ],
+        )?;
+
+        Ok(())
+    })
+}

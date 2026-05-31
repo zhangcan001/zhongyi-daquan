@@ -40,3 +40,21 @@ pub fn generate_search_performance_test_data(
 pub fn smoke_test_searches(state: State<'_, AppState>) -> AppResult<Vec<KnowledgeSearchResult>> {
     search_index_service::smoke_test_searches(&state.database)
 }
+
+#[tauri::command]
+pub fn search_knowledge_with_cache(
+    state: State<'_, AppState>,
+    request: SearchRequest,
+) -> AppResult<SearchResponse> {
+    search_index_service::search_with_cache(&state.database, request)
+}
+
+#[tauri::command]
+pub fn get_hot_search_terms(limit: Option<usize>) -> Vec<search_index_service::HotSearchTerm> {
+    search_index_service::get_hot_search_terms(limit.unwrap_or(10))
+}
+
+#[tauri::command]
+pub fn clear_search_cache() {
+    search_index_service::clear_search_cache()
+}

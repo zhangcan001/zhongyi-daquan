@@ -52,3 +52,63 @@ pub fn set_knowledge_favorite(
 ) -> AppResult<KnowledgeDetailResponse> {
     knowledge_service::set_favorite(&state.database, request.item_id, request.is_favorite)
 }
+
+#[tauri::command]
+pub fn list_knowledge_versions(
+    state: State<'_, AppState>,
+    item_id: i64,
+) -> AppResult<Vec<crate::models::knowledge::KnowledgeVersion>> {
+    crate::services::version_service::list_versions(&state.database, item_id)
+}
+
+#[tauri::command]
+pub fn get_knowledge_version(
+    state: State<'_, AppState>,
+    version_id: i64,
+) -> AppResult<crate::models::knowledge::KnowledgeVersion> {
+    crate::services::version_service::get_version(&state.database, version_id)
+}
+
+#[tauri::command]
+pub fn compare_knowledge_versions(
+    state: State<'_, AppState>,
+    version_id_1: i64,
+    version_id_2: i64,
+) -> AppResult<crate::services::version_service::VersionComparison> {
+    crate::services::version_service::compare_versions(&state.database, version_id_1, version_id_2)
+}
+
+#[tauri::command]
+pub fn rollback_knowledge_version(
+    state: State<'_, AppState>,
+    item_id: i64,
+    version_id: i64,
+) -> AppResult<()> {
+    crate::services::version_service::rollback_to_version(&state.database, item_id, version_id)
+}
+
+#[tauri::command]
+pub fn batch_delete_knowledge_items(
+    state: State<'_, AppState>,
+    item_ids: Vec<i64>,
+) -> AppResult<crate::services::knowledge_service::BatchOperationResult> {
+    crate::services::knowledge_service::batch_delete(&state.database, item_ids)
+}
+
+#[tauri::command]
+pub fn batch_update_knowledge_status(
+    state: State<'_, AppState>,
+    item_ids: Vec<i64>,
+    data_status: String,
+) -> AppResult<crate::services::knowledge_service::BatchOperationResult> {
+    crate::services::knowledge_service::batch_update_status(&state.database, item_ids, data_status)
+}
+
+#[tauri::command]
+pub fn batch_add_knowledge_tags(
+    state: State<'_, AppState>,
+    item_ids: Vec<i64>,
+    tags: Vec<String>,
+) -> AppResult<crate::services::knowledge_service::BatchOperationResult> {
+    crate::services::knowledge_service::batch_add_tags(&state.database, item_ids, tags)
+}

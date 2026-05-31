@@ -80,6 +80,8 @@ pub fn run() {
             commands::import_commands::get_import_staging_page,
             commands::import_commands::validate_import_batch,
             commands::import_commands::confirm_import_batch,
+            commands::import_commands::get_import_quality_report,
+            commands::import_commands::rollback_import_batch,
             commands::import_commands::update_staging_row_field,
             commands::clean_commands::apply_import_clean_step,
             commands::clean_commands::undo_last_import_clean_step,

@@ -126,6 +126,44 @@ pub fn get_batch(database: &Database, batch_id: i64) -> AppResult<DataImportBatc
     })
 }
 
+pub fn confirmed_item_ids(database: &Database, batch_id: i64) -> AppResult<Vec<i64>> {
+    database.with_connection(|connection| {
+        let json: Option<String> = connection.query_row(
+            "SELECT confirmed_item_ids_json FROM data_import_batches WHERE id = ?1",
+            params![batch_id],
+            |row| row.get(0),
+        )?;
+        Ok(match json {
+            Some(json) if !json.trim().is_empty() => serde_json::from_str(&json)?,
+            _ => Vec::new(),
+        })
+    })
+}
+
+pub fn set_quality_report(database: &Database, batch_id: i64, report_json: &str) -> AppResult<()> {
+    database.with_connection(|connection| {
+        connection.execute(
+            "UPDATE data_import_batches SET quality_report_json = ?2 WHERE id = ?1",
+            params![batch_id, report_json],
+        )?;
+        Ok(())
+    })
+}
+
+pub fn mark_rolled_back(database: &Database, batch_id: i64) -> AppResult<()> {
+    database.with_connection(|connection| {
+        connection.execute(
+            "UPDATE data_import_batches SET status = 'rolled_back', rolled_back_at = datetime('now') WHERE id = ?1",
+            params![batch_id],
+        )?;
+        connection.execute(
+            "UPDATE data_import_rows SET status = 'rolled_back' WHERE batch_id = ?1 AND status = 'imported'",
+            params![batch_id],
+        )?;
+        Ok(())
+    })
+}
+
 pub fn list_rows(
     database: &Database,
     batch_id: i64,

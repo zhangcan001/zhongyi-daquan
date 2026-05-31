@@ -8,7 +8,7 @@ Import Engine V2 用于解决 v0.1-alpha-package 中“先手工映射所有字�
 | --- | --- | --- |
 | `knowledge_items_v1` | 顶层数组，元素包含 `type/name`，或包含 `content/source_note/detail`，或文件名为 `knowledge_items_import_*` | 直接适配为知识草稿，不要求人工映射 |
 | `classic_passages_v1` | 包含 `work_title/original_text/section_title`，或 `classic_id/page_title/original_text`，或文件名为 `classic_passages_*` | 转为 `syndrome` 类型原典条目 |
-| `search_terms_v1` | 包含 `term/term_type/weight`，或 `item_name/term` | 当前仅识别并提示，v0.1 不直接导入搜索词表 |
+| `search_terms_v1` | 包含 `term/term_type/weight`，或 `item_name/term` | 当前可识别并展示；确认导入知识主文件后会追加由名称、编号、分类、标签派生的包内搜索词 |
 | `standard_terms_v1` | 包含 `term_type/standard_name/aliases` | 当前仅识别并提示，后续由维护工具接入 |
 | `relation_suggestions_v1` | 包含 `source_name/target_name/relation_type`，或 `source_type/target_type` | 当前仅识别并提示，后续由关系工具接入 |
 | `generic_csv` | 未命中特定结构的 CSV | 使用 MappingScorer 输出映射候选 |
@@ -27,6 +27,8 @@ Import Engine V2 用于解决 v0.1-alpha-package 中“先手工映射所有字�
 - `source_url/classic_id/page_title/section_title` 会尽量并入 `source_note` 或 `notes`。
 - 空字段不会导致整批失败。
 - 确认入库后会重建搜索索引。
+- 确认入库后会生成导入质量报告，可查看字段覆盖率、批内重复指纹、搜索抽检结果。
+- 已确认入库的批次可按批次回滚，回滚会删除本批次写入条目并重建搜索索引。
 
 ## ClassicPassagesAdapter
 
@@ -82,7 +84,19 @@ ZIP 数据包如果包含 `import_manifest.json`，优先按 manifest 导入。
 
 如果 ZIP 只有普通 `manifest.json`，系统会把它当作包说明，再自动查找 `json/knowledge_items_import_curated.json`、`json/classic_passages_curated.json` 等已知文件。
 
-v0.3 manifest 数据包建议命名为 `zhongyi_classics_curated_v0_3_manifest.zip`。当前 v0.1 导入策略为：自动暂存 `primary: true` 的主知识文件，其他文件会显示在概览中，但不会混入同一导入批次。这样可以保证 `knowledge_items_import_curated.json` 先稳定入库，`search_terms` 与扩展原典条文后续由专门工具接入。
+v0.3 manifest 数据包建议命名为 `zhongyi_classics_curated_v0_3_manifest.zip`。当前 v0.1 导入策略为：自动暂存 `primary: true` 的主知识文件，其他文件会显示在概览中，但不会混入同一导入批次。确认入库后会从主知识文件的 `name/code/category/tags` 追加包内搜索词；独立 `search_terms_curated.json` 的完整字段级入库后续由专门工具接入。
+
+## 导入质量与回滚
+
+确认入库后可在导入暂存页查看“质量报告”。报告会显示：
+
+- 字段覆盖率，重点关注 `content`、`source_note`、`tags`。
+- 批内疑似重复指纹数。
+- 导入搜索词数量。
+- 经典关键词抽检命中情况。
+- 可执行修复建议。
+
+如果导入批次明显错误，可点击“回滚批次”。系统只回滚该批次确认入库时创建的知识条目，并同步清理搜索词、知识指纹和搜索索引。详见 `docs/IMPORT_QUALITY_V1.md`。
 
 ## 常见错误
 

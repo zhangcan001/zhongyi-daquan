@@ -45,7 +45,8 @@
 4. 如果识别为 `generic_csv`，系统显示字段映射候选，高置信字段自动映射，中置信字段建议确认，低置信字段不自动映射。
 5. 导入后先进入暂存区，不直接写入正式知识库。
 6. 执行清洗校验，处理空字段、重复条文、异常编号和关联名称。
-7. 人工验收后确认入库，系统会重建搜索索引。
+7. 人工验收后确认入库，系统会重建搜索索引，并生成导入质量报告。
+8. 如发现导入批次错误，可在暂存页回滚该批次；系统会删除本批次写入条目并重建搜索索引。
 
 标准经典数据包中：
 
@@ -54,10 +55,11 @@
 - `tags` 支持数组和分隔字符串。
 - `detail` 对象会按知识类型写入详情字段，无法识别的上下文保留到 `notes`。
 - 空字段不会导致整批失败。
+- 确认入库后会追加由 `name/code/category/tags` 派生的包内搜索词。
 
 ## v0.3 manifest 数据包
 
-`zhongyi_classics_curated_v0_3_manifest.zip` 基于 v0.2 数据包增加根目录 `import_manifest.json`。manifest 声明包名、schema、文件列表、主数据文件和导入顺序。当前 v0.1 会自动暂存 `primary: true` 的 `knowledge_items_import_curated.json`，其他文件显示在数据包概览中但不自动混入同一批次。
+`zhongyi_classics_curated_v0_3_manifest.zip` 基于 v0.2 数据包增加根目录 `import_manifest.json`。manifest 声明包名、schema、文件列表、主数据文件和导入顺序。当前 v0.1 会自动暂存 `primary: true` 的 `knowledge_items_import_curated.json`，其他文件显示在数据包概览中但不自动混入同一批次。确认入库后可查看质量报告，重点检查 `content`、`source_note`、`tags` 覆盖率，以及关键词搜索抽检。
 
 仓库内提供示例：
 
@@ -72,7 +74,7 @@
 - `黄帝内经`
 - `金匮要略`
 
-详见 `docs/IMPORT_ENGINE_V2.md`。
+详见 `docs/IMPORT_ENGINE_V2.md` 和 `docs/IMPORT_QUALITY_V1.md`。
 
 ## 数据存放策略
 

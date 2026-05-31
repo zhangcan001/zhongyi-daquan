@@ -33,6 +33,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "error_logs",
         sql: include_str!("../../migrations/005_error_logs.sql"),
     },
+    Migration {
+        version: 6,
+        name: "import_quality_v1",
+        sql: include_str!("../../migrations/006_import_quality_v1.sql"),
+    },
 ];
 
 pub fn run(connection: &Connection) -> AppResult<()> {

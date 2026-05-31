@@ -214,3 +214,31 @@ pub struct ConfirmImportResult {
     pub skipped_count: i64,
     pub summary: ImportBatchSummary,
 }
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportQualityReport {
+    pub batch_id: i64,
+    pub detected_type: String,
+    pub total_rows: i64,
+    pub importable_rows: i64,
+    pub warning_rows: i64,
+    pub error_rows: i64,
+    pub field_coverage: std::collections::BTreeMap<String, f64>,
+    pub empty_field_counts: std::collections::BTreeMap<String, i64>,
+    pub duplicate_fingerprint_count: i64,
+    pub search_terms_imported_count: i64,
+    pub searchable_keywords_checked: std::collections::BTreeMap<String, bool>,
+    pub suggestions: Vec<String>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RollbackImportResult {
+    pub batch_id: i64,
+    pub deleted_items: i64,
+    pub deleted_search_terms: i64,
+    pub summary: ImportBatchSummary,
+}

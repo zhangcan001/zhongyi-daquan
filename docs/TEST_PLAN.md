@@ -28,6 +28,11 @@ cargo test --manifest-path src-tauri/Cargo.toml
   - `content` 原文和 `source_note` 出处保留。
   - 确认入库后重建搜索索引，并可搜索 `上古天真论`、`太阳病` 等导入内容。
   - 真实四部经典包验收：识别 `knowledge_items_import_curated.json`、`classic_passages_curated.json`、`search_terms_curated.json`，并验证 `zhongyi_classics_curated_v0_3_manifest.zip` manifest 驱动导入。
+- Import Quality V1：
+  - 确认入库后记录 `confirmed_item_ids_json`。
+  - 生成导入质量报告，覆盖字段覆盖率、重复指纹、包内搜索词数量。
+  - 标准知识 JSON / manifest 主知识文件确认后追加 `imported_package` 搜索词。
+  - 批次回滚后删除本批次知识条目，并重建搜索索引，原关键词不再命中。
 
 前端检查：
 

@@ -5,6 +5,7 @@ import type {
   FieldMappingTemplate,
   ImportBatchSummary,
   ImportParsedPreview,
+  ImportQualityReport,
   Mapping,
   StagingPage,
 } from "../modules/importPipeline/types";
@@ -42,6 +43,7 @@ export function ImportStagingPanel() {
   const [summary, setSummary] = useState<ImportBatchSummary | null>(null);
   const [staging, setStaging] = useState<StagingPage | null>(null);
   const [preview, setPreview] = useState<ImportParsedPreview | null>(null);
+  const [qualityReport, setQualityReport] = useState<ImportQualityReport | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -114,6 +116,7 @@ export function ImportStagingPanel() {
         : await invoke<ImportBatchSummary>(importType === "json" ? "import_json_to_staging" : "import_csv_to_staging", { request });
       setSummary(result);
       await loadStaging(result.batch.id);
+      setQualityReport(null);
       setMessage("已导入暂存区，未写入正式知识库。");
     } catch (cause) {
       setError(String(cause));
@@ -170,7 +173,32 @@ export function ImportStagingPanel() {
     if (!batchId) return;
     const result = await invoke<{ importedCount: number; skippedCount: number }>("confirm_import_batch", { batchId });
     await loadStaging(batchId);
+    await loadQualityReport(batchId);
     setMessage(`确认入库完成：导入 ${result.importedCount} 行，跳过 ${result.skippedCount} 行。`);
+  }
+
+  async function loadQualityReport(id = batchId) {
+    if (!id) return;
+    setError("");
+    try {
+      setQualityReport(await invoke<ImportQualityReport>("get_import_quality_report", { batchId: id }));
+    } catch (cause) {
+      setError(String(cause));
+    }
+  }
+
+  async function rollbackImport() {
+    if (!batchId) return;
+    if (!window.confirm("确认回滚本批次已入库数据？此操作会删除本批次写入的知识条目并重建搜索索引。")) return;
+    setError("");
+    try {
+      const result = await invoke<{ deletedItems: number; deletedSearchTerms: number }>("rollback_import_batch", { batchId });
+      await loadStaging(batchId);
+      setQualityReport(null);
+      setMessage(`已回滚本批次：删除 ${result.deletedItems} 条知识、${result.deletedSearchTerms} 条搜索词。`);
+    } catch (cause) {
+      setError(String(cause));
+    }
   }
 
   return (
@@ -305,6 +333,8 @@ export function ImportStagingPanel() {
         <button type="button" disabled={!batchId} onClick={() => runClean("normalize_all")}>标准化清洗</button>
         <button type="button" disabled={!batchId} onClick={undoClean}>撤销清洗</button>
         <button type="button" disabled={!batchId} onClick={confirmImport}>确认入库</button>
+        <button type="button" disabled={!batchId} onClick={() => loadQualityReport()}>质量报告</button>
+        <button type="button" disabled={!batchId || summary?.batch.status !== "imported"} onClick={rollbackImport}>回滚批次</button>
       </div>
 
       {summary ? (
@@ -315,6 +345,8 @@ export function ImportStagingPanel() {
           <Metric label="错误数" value={summary.errorRows} />
         </div>
       ) : null}
+
+      {qualityReport ? <ImportQualityReportPanel report={qualityReport} /> : null}
 
       {message ? <p className="ai-message">{message}</p> : null}
       {error ? <p className="error-text">{error}</p> : null}
@@ -400,6 +432,36 @@ function MappingSuggestionTable({ suggestions }: { suggestions: FieldMappingSugg
       </table>
     </div>
   );
+}
+
+function ImportQualityReportPanel({ report }: { report: ImportQualityReport }) {
+  const keywordEntries = Object.entries(report.searchableKeywordsChecked);
+  return (
+    <div className="preview-panel">
+      <div className="summary-grid">
+        <Metric label="质量批次" value={`#${report.batchId}`} />
+        <Metric label="识别类型" value={report.detectedType} />
+        <Metric label="重复指纹" value={report.duplicateFingerprintCount} />
+        <Metric label="导入搜索词" value={report.searchTermsImportedCount} />
+      </div>
+      <div className="summary-grid">
+        <Metric label="content 覆盖" value={formatCoverage(report.fieldCoverage.content)} />
+        <Metric label="source_note 覆盖" value={formatCoverage(report.fieldCoverage.source_note)} />
+        <Metric label="tags 覆盖" value={formatCoverage(report.fieldCoverage.tags)} />
+        <Metric label="错误行" value={report.errorRows} />
+      </div>
+      {keywordEntries.length ? (
+        <p className="ai-message">
+          搜索抽检：{keywordEntries.map(([keyword, hit]) => `${keyword}${hit ? "命中" : "未命中"}`).join("，")}
+        </p>
+      ) : null}
+      {report.suggestions.length ? <p className="error-text">{report.suggestions.join("；")}</p> : null}
+    </div>
+  );
+}
+
+function formatCoverage(value?: number) {
+  return `${Math.round((value ?? 0) * 100)}%`;
 }
 
 function readSourceHeaders(content: string, importType: "json" | "csv" | "zip") {

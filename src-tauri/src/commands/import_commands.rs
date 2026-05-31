@@ -1,7 +1,8 @@
 use crate::errors::AppResult;
 use crate::models::data_pipeline::{
     ConfirmImportResult, CreateImportRequest, FieldMappingTemplate, ImportBatchSummary,
-    ImportParsedPreview, SaveMappingTemplateRequest, StagingPage,
+    ImportParsedPreview, ImportQualityReport, RollbackImportResult, SaveMappingTemplateRequest,
+    StagingPage,
 };
 use crate::services::{field_mapping_service, import_project_service};
 use crate::AppState;
@@ -100,6 +101,22 @@ pub fn confirm_import_batch(
     batch_id: i64,
 ) -> AppResult<ConfirmImportResult> {
     import_project_service::confirm_import(&state.database, batch_id)
+}
+
+#[tauri::command]
+pub fn get_import_quality_report(
+    state: State<'_, AppState>,
+    batch_id: i64,
+) -> AppResult<ImportQualityReport> {
+    import_project_service::import_quality_report(&state.database, batch_id)
+}
+
+#[tauri::command]
+pub fn rollback_import_batch(
+    state: State<'_, AppState>,
+    batch_id: i64,
+) -> AppResult<RollbackImportResult> {
+    import_project_service::rollback_import_batch(&state.database, batch_id)
 }
 
 #[tauri::command]

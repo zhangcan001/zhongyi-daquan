@@ -24,7 +24,7 @@
 3. `json/classic_passages_curated.json`
 4. `json/classic_passages_full_clean.json`
 
-标准 `knowledge_items_*` 文件会被识别为 `knowledge_items_v1`，不需要手工字段映射。系统会保留 `content` 原文、`source_note` 出处、`tags`、`detail`，并在确认入库后重建搜索索引。
+标准 `knowledge_items_*` 文件会被识别为 `knowledge_items_v1`，不需要手工字段映射。系统会保留 `content` 原文、`source_note` 出处、`tags`、`detail`，并在确认入库后重建搜索索引、追加包内搜索词和生成质量报告。
 
 标准 `classic_passages_*` 文件会被识别为 `classic_passages_v1`。由于 v0.1 尚未建立独立 classic 专表，条文会暂时映射为 `syndrome` 类型，分类为 `原典 / 书名`，正文写入 `content`。
 
@@ -40,7 +40,9 @@
 
 - `import_manifest.example.json`
 
-当前 v0.1 的 manifest 导入策略是先导入 `primary: true` 的主知识 JSON，即 `json/knowledge_items_import_curated.json`。`classic_passages` 和 `search_terms` 会在概览中展示，后续由专门导入能力接入。
+当前 v0.1 的 manifest 导入策略是先导入 `primary: true` 的主知识 JSON，即 `json/knowledge_items_import_curated.json`。`classic_passages` 和 `search_terms` 会在概览中展示；系统会先从主知识 JSON 的 `name/code/category/tags` 派生搜索词，独立 `search_terms_curated.json` 的完整入库后续由专门导入能力接入。
+
+确认入库后建议打开“质量报告”，检查字段覆盖率、疑似重复指纹、包内搜索词数量和关键词抽检结果。如果误导入，可使用批次回滚删除本批次写入数据。
 
 导入后建议搜索：
 

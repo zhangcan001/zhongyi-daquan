@@ -72,6 +72,21 @@ export type StagingPage = {
   pageSize: number;
 };
 
+export type ImportQualityReport = {
+  batchId: number;
+  detectedType: string;
+  totalRows: number;
+  importableRows: number;
+  warningRows: number;
+  errorRows: number;
+  fieldCoverage: Record<string, number>;
+  emptyFieldCounts: Record<string, number>;
+  duplicateFingerprintCount: number;
+  searchTermsImportedCount: number;
+  searchableKeywordsChecked: Record<string, boolean>;
+  suggestions: string[];
+};
+
 export type FieldMappingTemplate = {
   id: number;
   name: string;

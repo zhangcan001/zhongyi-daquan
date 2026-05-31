@@ -2,9 +2,10 @@ use crate::db::connection::Database;
 use crate::errors::{AppError, AppResult};
 use crate::models::data_pipeline::{
     CleanStepRequest, CleanStepResult, ConfirmImportResult, CreateImportRequest,
-    ImportBatchSummary, ImportParsedPreview, StagingIssue, StagingPage, StagingRowView,
+    ImportBatchSummary, ImportParsedPreview, ImportQualityReport, RollbackImportResult,
+    StagingIssue, StagingPage, StagingRowView,
 };
-use crate::repositories::{import_repository, validation_repository};
+use crate::repositories::{import_repository, search_repository, validation_repository};
 use crate::services::{
     field_mapping_service, import_engine_service, normalize_service, search_index_service,
     validation_service,
@@ -13,7 +14,7 @@ use calamine::{open_workbook_from_rs, Data, Reader, Xlsx};
 use chrono::Utc;
 use rusqlite::{params, OptionalExtension};
 use serde_json::{Map, Value};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::io::{Cursor, Read};
 use zip::ZipArchive;
 
@@ -285,6 +286,8 @@ pub fn confirm_import(database: &Database, batch_id: i64) -> AppResult<ConfirmIm
     let rows = import_repository::list_all_rows(database, batch_id)?;
     let mut imported_count = 0;
     let mut skipped_count = 0;
+    let mut imported_item_ids = Vec::new();
+    let mut imported_rows = Vec::new();
 
     database.with_connection(|connection| {
         let transaction = connection.unchecked_transaction()?;
@@ -299,15 +302,20 @@ pub fn confirm_import(database: &Database, batch_id: i64) -> AppResult<ConfirmIm
             let effective_type = effective_target_type(&batch.target_type, &object);
             let item_id = insert_knowledge_item(&transaction, &effective_type, &object)?;
             insert_detail(&transaction, item_id, &effective_type, &object)?;
+            upsert_import_fingerprint(&transaction, item_id)?;
             transaction.execute(
                 "UPDATE data_import_rows SET status = 'imported' WHERE id = ?1",
                 [row_id],
             )?;
             imported_count += 1;
+            imported_item_ids.push(item_id);
+            imported_rows.push(row.clone());
         }
         transaction.execute(
-            "UPDATE data_import_batches SET status = 'imported' WHERE id = ?1",
-            [batch_id],
+            "UPDATE data_import_batches
+             SET status = 'imported', confirmed_item_ids_json = ?2
+             WHERE id = ?1",
+            params![batch_id, serde_json::to_string(&imported_item_ids)?],
         )?;
         transaction.commit()?;
         Ok(())
@@ -315,10 +323,140 @@ pub fn confirm_import(database: &Database, batch_id: i64) -> AppResult<ConfirmIm
 
     import_repository::update_batch_counts(database, batch_id, "imported")?;
     search_index_service::rebuild_search_index(database)?;
+    let search_terms_imported = if should_import_package_terms(&batch.import_type) {
+        import_search_terms_for_items(database, &imported_rows, &imported_item_ids)?
+    } else {
+        0
+    };
+    set_search_terms_imported_count(database, batch_id, search_terms_imported)?;
+    let report = import_quality_report(database, batch_id)?;
+    import_repository::set_quality_report(database, batch_id, &serde_json::to_string(&report)?)?;
     Ok(ConfirmImportResult {
         batch_id,
         imported_count,
         skipped_count,
+        summary: import_repository::summary(database, batch_id)?,
+    })
+}
+
+pub fn import_quality_report(database: &Database, batch_id: i64) -> AppResult<ImportQualityReport> {
+    let summary = import_repository::summary(database, batch_id)?;
+    let rows = import_repository::list_all_rows(database, batch_id)?;
+    let mut field_counts: BTreeMap<String, i64> = BTreeMap::new();
+    let mut empty_counts: BTreeMap<String, i64> = BTreeMap::new();
+    let mut fingerprints = HashSet::new();
+    let mut duplicate_fingerprint_count = 0_i64;
+
+    for row in &rows {
+        let value = parse_optional_json(row.normalized_json.clone())?;
+        let object = value.as_object().cloned().unwrap_or_default();
+        let fingerprint = row_fingerprint(&object);
+        if !fingerprint.is_empty() && !fingerprints.insert(fingerprint) {
+            duplicate_fingerprint_count += 1;
+        }
+        for field in [
+            "type",
+            "code",
+            "name",
+            "category",
+            "summary",
+            "content",
+            "source_note",
+            "tags",
+        ] {
+            if object.contains_key(field) {
+                *field_counts.entry(field.to_string()).or_default() += 1;
+                if text(&object, field).is_none() {
+                    *empty_counts.entry(field.to_string()).or_default() += 1;
+                }
+            }
+        }
+    }
+
+    let total = rows.len().max(1) as f64;
+    let field_coverage = field_counts
+        .into_iter()
+        .map(|(field, count)| (field, count as f64 / total))
+        .collect::<BTreeMap<_, _>>();
+    let search_terms_imported_count = database.with_connection(|connection| {
+        let count: i64 = connection.query_row(
+            "SELECT COALESCE(search_terms_imported_count, 0) FROM data_import_batches WHERE id = ?1",
+            params![batch_id],
+            |row| row.get(0),
+        )?;
+        Ok(count)
+    })?;
+    let checked = search_keywords(database, &["桂枝汤", "太阳病", "上古天真论", "神农本草经"])?;
+    let mut suggestions = Vec::new();
+    if summary.error_rows > 0 {
+        suggestions.push("存在错误行，请先在暂存区修正后再确认入库。".to_string());
+    }
+    if duplicate_fingerprint_count > 0 {
+        suggestions.push(format!(
+            "发现 {duplicate_fingerprint_count} 条批内疑似重复，请运行去重检查。"
+        ));
+    }
+    if field_coverage
+        .get("source_note")
+        .copied()
+        .unwrap_or_default()
+        < 0.8
+    {
+        suggestions.push("source_note 覆盖率偏低，建议补充出处信息。".to_string());
+    }
+
+    Ok(ImportQualityReport {
+        batch_id,
+        detected_type: summary.batch.import_type,
+        total_rows: summary.total_rows,
+        importable_rows: summary.importable_rows,
+        warning_rows: summary.warning_rows,
+        error_rows: summary.error_rows,
+        field_coverage,
+        empty_field_counts: empty_counts,
+        duplicate_fingerprint_count,
+        search_terms_imported_count,
+        searchable_keywords_checked: checked,
+        suggestions,
+    })
+}
+
+pub fn rollback_import_batch(
+    database: &Database,
+    batch_id: i64,
+) -> AppResult<RollbackImportResult> {
+    let item_ids = import_repository::confirmed_item_ids(database, batch_id)?;
+    if item_ids.is_empty() {
+        return Err(AppError::InvalidInput(
+            "该批次没有可回滚的 confirmed_item_ids".to_string(),
+        ));
+    }
+    let deleted_search_terms = database.with_connection(|connection| {
+        let transaction = connection.unchecked_transaction()?;
+        let mut deleted_terms = 0_i64;
+        for item_id in &item_ids {
+            deleted_terms += transaction.execute(
+                "DELETE FROM search_terms WHERE item_id = ?1",
+                params![item_id],
+            )? as i64;
+            transaction.execute(
+                "DELETE FROM knowledge_fingerprints WHERE item_id = ?1",
+                params![item_id],
+            )?;
+            transaction.execute(
+                "DELETE FROM knowledge_items WHERE id = ?1",
+                params![item_id],
+            )?;
+        }
+        transaction.commit()?;
+        Ok(deleted_terms)
+    })?;
+    import_repository::mark_rolled_back(database, batch_id)?;
+    search_index_service::rebuild_search_index(database)?;
+    Ok(RollbackImportResult {
+        batch_id,
+        deleted_items: item_ids.len() as i64,
+        deleted_search_terms,
         summary: import_repository::summary(database, batch_id)?,
     })
 }
@@ -985,6 +1123,138 @@ fn insert_knowledge_item(
     Ok(transaction.last_insert_rowid())
 }
 
+fn upsert_import_fingerprint(
+    transaction: &rusqlite::Transaction<'_>,
+    item_id: i64,
+) -> AppResult<()> {
+    transaction.execute(
+        "INSERT INTO knowledge_fingerprints
+         (item_id, type, code_norm, name_norm, pinyin_norm, alias_norm, fingerprint)
+         SELECT id, type,
+                upper(replace(replace(COALESCE(code, ''), ' ', ''), '-', '')),
+                lower(replace(COALESCE(name, ''), ' ', '')),
+                lower(replace(COALESCE(pinyin, ''), ' ', '')),
+                lower(COALESCE(alias, '')),
+                lower(type || '|' || COALESCE(code, '') || '|' || name || '|' || COALESCE(source_note, ''))
+         FROM knowledge_items
+         WHERE id = ?1
+         ON CONFLICT(item_id) DO UPDATE SET
+           type = excluded.type,
+           code_norm = excluded.code_norm,
+           name_norm = excluded.name_norm,
+           pinyin_norm = excluded.pinyin_norm,
+           alias_norm = excluded.alias_norm,
+           fingerprint = excluded.fingerprint",
+        params![item_id],
+    )?;
+    Ok(())
+}
+
+fn import_search_terms_for_items(
+    database: &Database,
+    rows: &[crate::models::data_pipeline::DataImportRow],
+    item_ids: &[i64],
+) -> AppResult<i64> {
+    database.with_connection(|connection| {
+        let transaction = connection.unchecked_transaction()?;
+        let mut imported = 0_i64;
+        for (row, item_id) in rows.iter().zip(item_ids.iter()) {
+            let value = parse_optional_json(row.normalized_json.clone())?;
+            let object = value.as_object().cloned().unwrap_or_default();
+            let mut seen = HashSet::new();
+            let mut terms = Vec::new();
+            for field in ["name", "code", "category", "tags"] {
+                if let Some(value) = text(&object, field) {
+                    terms.extend(split_search_terms(&value));
+                }
+            }
+            for term in terms {
+                let normalized = search_repository::normalize_for_search(&term);
+                if normalized.is_empty() || !seen.insert(normalized.clone()) {
+                    continue;
+                }
+                transaction.execute(
+                    "INSERT INTO search_terms (item_id, term, term_type, weight)
+                     SELECT ?1, ?2, 'imported_package', 80
+                     WHERE NOT EXISTS (
+                       SELECT 1 FROM search_terms
+                       WHERE item_id = ?1 AND term = ?2 AND term_type = 'imported_package'
+                     )",
+                    params![item_id, normalized],
+                )?;
+                if transaction.changes() > 0 {
+                    imported += 1;
+                }
+            }
+        }
+        transaction.commit()?;
+        Ok(imported)
+    })
+}
+
+fn set_search_terms_imported_count(
+    database: &Database,
+    batch_id: i64,
+    imported_count: i64,
+) -> AppResult<()> {
+    database.with_connection(|connection| {
+        connection.execute(
+            "UPDATE data_import_batches SET search_terms_imported_count = ?2 WHERE id = ?1",
+            params![batch_id, imported_count],
+        )?;
+        Ok(())
+    })
+}
+
+fn should_import_package_terms(import_type: &str) -> bool {
+    matches!(
+        import_type,
+        "classics_curated_v1" | "knowledge_items_v1" | "classic_passages_v1"
+    )
+}
+
+fn split_search_terms(value: &str) -> Vec<String> {
+    value
+        .split([',', '，', ';', '；', '|', '/', '、'])
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .map(ToString::to_string)
+        .collect()
+}
+
+fn row_fingerprint(object: &Map<String, Value>) -> String {
+    [
+        text(object, "type").unwrap_or_default(),
+        text(object, "code").unwrap_or_default(),
+        text(object, "name").unwrap_or_default(),
+        text(object, "source_note").unwrap_or_default(),
+    ]
+    .join("|")
+    .to_lowercase()
+}
+
+fn search_keywords(database: &Database, keywords: &[&str]) -> AppResult<BTreeMap<String, bool>> {
+    let mut result = BTreeMap::new();
+    for keyword in keywords {
+        let response = search_index_service::search(
+            database,
+            crate::models::search::SearchRequest {
+                query: (*keyword).to_string(),
+                item_type: None,
+                page: Some(1),
+                page_size: Some(1),
+            },
+        );
+        result.insert(
+            (*keyword).to_string(),
+            response
+                .map(|response| !response.results.is_empty())
+                .unwrap_or(false),
+        );
+    }
+    Ok(result)
+}
+
 fn insert_detail(
     transaction: &rusqlite::Transaction<'_>,
     item_id: i64,
@@ -1110,7 +1380,10 @@ fn effective_target_type(target_type: &str, object: &Map<String, Value>) -> Stri
 
 #[cfg(test)]
 mod tests {
-    use super::{confirm_import, import_csv, import_json, import_zip};
+    use super::{
+        confirm_import, import_csv, import_json, import_quality_report, import_zip,
+        rollback_import_batch,
+    };
     use crate::db::connection::Database;
     use crate::models::data_pipeline::CreateImportRequest;
     use crate::models::search::SearchRequest;
@@ -1423,7 +1696,43 @@ mod tests {
         )
         .expect("import zip manifest");
         assert_eq!(summary.total_rows, 1);
-        confirm_import(&database, summary.batch.id.unwrap()).expect("confirm zip import");
+        let batch_id = summary.batch.id.unwrap();
+        confirm_import(&database, batch_id).expect("confirm zip import");
+
+        let report = import_quality_report(&database, batch_id).expect("quality report");
+        assert_eq!(report.detected_type, "knowledge_items_v1");
+        assert_eq!(report.total_rows, 1);
+        assert_eq!(report.duplicate_fingerprint_count, 0);
+        assert!(report.search_terms_imported_count >= 3);
+        assert!(
+            report
+                .field_coverage
+                .get("content")
+                .copied()
+                .unwrap_or_default()
+                >= 1.0
+        );
+
+        database
+            .with_connection(|connection| {
+                let confirmed_item_ids_json: String = connection.query_row(
+                    "SELECT confirmed_item_ids_json FROM data_import_batches WHERE id = ?1",
+                    [batch_id],
+                    |row| row.get(0),
+                )?;
+                let confirmed_item_ids: Vec<i64> =
+                    serde_json::from_str(&confirmed_item_ids_json).expect("confirmed ids json");
+                assert_eq!(confirmed_item_ids.len(), 1);
+
+                let imported_terms: i64 = connection.query_row(
+                    "SELECT COUNT(1) FROM search_terms WHERE term_type = 'imported_package'",
+                    [],
+                    |row| row.get(0),
+                )?;
+                assert!(imported_terms >= 3);
+                Ok(())
+            })
+            .expect("inspect import quality fields");
 
         let response = search_index_service::search(
             &database,
@@ -1436,6 +1745,86 @@ mod tests {
         )
         .expect("search zip import");
         assert!(!response.results.is_empty());
+
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn rollback_import_batch_removes_items_and_rebuilds_search() {
+        let (data_dir, database) = temp_database("rollback");
+        let content = r#"
+        [
+          {
+            "type": "formula",
+            "code": "ROLLBACK-GZT-001",
+            "name": "回滚测试桂枝汤",
+            "category": "原典/伤寒论",
+            "content": "桂枝汤原文用于回滚测试。",
+            "source_note": "伤寒论",
+            "tags": ["方剂", "回滚测试"]
+          }
+        ]
+        "#;
+
+        let summary = import_json(
+            &database,
+            CreateImportRequest {
+                file_name: "knowledge_items_import_curated.json".to_string(),
+                target_type: "mixed".to_string(),
+                content: content.to_string(),
+                mapping: None,
+                template_id: None,
+            },
+        )
+        .expect("import rollback fixture");
+        let batch_id = summary.batch.id.unwrap();
+        confirm_import(&database, batch_id).expect("confirm rollback fixture");
+
+        let before = search_index_service::search(
+            &database,
+            SearchRequest {
+                query: "回滚测试桂枝汤".to_string(),
+                item_type: None,
+                page: Some(1),
+                page_size: Some(10),
+            },
+        )
+        .expect("search before rollback");
+        assert_eq!(before.total, 1);
+
+        let rollback = rollback_import_batch(&database, batch_id).expect("rollback import");
+        assert_eq!(rollback.deleted_items, 1);
+
+        let after = search_index_service::search(
+            &database,
+            SearchRequest {
+                query: "回滚测试桂枝汤".to_string(),
+                item_type: None,
+                page: Some(1),
+                page_size: Some(10),
+            },
+        )
+        .expect("search after rollback");
+        assert_eq!(after.total, 0);
+
+        database
+            .with_connection(|connection| {
+                let batch_status: String = connection.query_row(
+                    "SELECT status FROM data_import_batches WHERE id = ?1",
+                    [batch_id],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(batch_status, "rolled_back");
+
+                let item_count: i64 = connection.query_row(
+                    "SELECT COUNT(1) FROM knowledge_items WHERE code = 'ROLLBACK-GZT-001'",
+                    [],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(item_count, 0);
+                Ok(())
+            })
+            .expect("inspect rollback state");
 
         let _ = fs::remove_dir_all(data_dir);
     }

@@ -1,0 +1,193 @@
+{
+  "templates": [
+    {
+      "name": "中药导入模板（标准格式）",
+      "target_type": "herb",
+      "description": "适用于标准格式的中药数据导入",
+      "source_headers": [
+        "编号",
+        "名称",
+        "别名",
+        "拼音",
+        "分类",
+        "性味",
+        "归经",
+        "功效",
+        "主治",
+        "用法用量",
+        "禁忌"
+      ],
+      "mapping": {
+        "编号": "code",
+        "名称": "name",
+        "别名": "alias",
+        "拼音": "pinyin",
+        "分类": "category",
+        "性味": "nature_flavor",
+        "归经": "meridians",
+        "功效": "effects",
+        "主治": "indications",
+        "用法用量": "dosage",
+        "禁忌": "contraindications"
+      }
+    },
+    {
+      "name": "穴位导入模板（标准格式）",
+      "target_type": "acupoint",
+      "description": "适用于标准格式的穴位数据导入",
+      "source_headers": [
+        "穴位编号",
+        "穴位名称",
+        "别名",
+        "拼音",
+        "所属经络",
+        "定位",
+        "取穴方法",
+        "功能",
+        "主治",
+        "刺法",
+        "禁忌"
+      ],
+      "mapping": {
+        "穴位编号": "acupoint_code",
+        "穴位名称": "name",
+        "别名": "alias",
+        "拼音": "pinyin",
+        "所属经络": "meridian",
+        "定位": "standard_location",
+        "取穴方法": "locating_method",
+        "功能": "functions",
+        "主治": "indications",
+        "刺法": "needling_summary",
+        "禁忌": "contraindications"
+      }
+    },
+    {
+      "name": "方剂导入模板（标准格式）",
+      "target_type": "formula",
+      "description": "适用于标准格式的方剂数据导入",
+      "source_headers": [
+        "编号",
+        "方剂名称",
+        "别名",
+        "拼音",
+        "分类",
+        "出处",
+        "组成",
+        "功效",
+        "主治",
+        "用法"
+      ],
+      "mapping": {
+        "编号": "code",
+        "方剂名称": "name",
+        "别名": "alias",
+        "拼音": "pinyin",
+        "分类": "category",
+        "出处": "source_text",
+        "组成": "composition",
+        "功效": "effects",
+        "主治": "indications",
+        "用法": "usage"
+      }
+    },
+    {
+      "name": "经络导入模板（标准格式）",
+      "target_type": "meridian",
+      "description": "适用于标准格式的经络数据导入",
+      "source_headers": [
+        "经络编号",
+        "经络名称",
+        "别名",
+        "拼音",
+        "分类",
+        "阴阳",
+        "手足",
+        "脏腑",
+        "循行路线",
+        "主治"
+      ],
+      "mapping": {
+        "经络编号": "meridian_code",
+        "经络名称": "name",
+        "别名": "alias",
+        "拼音": "pinyin",
+        "分类": "category",
+        "阴阳": "yin_yang",
+        "手足": "hand_foot",
+        "脏腑": "organ_relation",
+        "循行路线": "pathway_text",
+        "主治": "main_indications"
+      }
+    },
+    {
+      "name": "证型导入模板（标准格式）",
+      "target_type": "syndrome",
+      "description": "适用于标准格式的证型数据导入",
+      "source_headers": [
+        "编号",
+        "证型名称",
+        "别名",
+        "拼音",
+        "分类",
+        "症状",
+        "舌象",
+        "脉象",
+        "病机",
+        "治法"
+      ],
+      "mapping": {
+        "编号": "code",
+        "证型名称": "name",
+        "别名": "alias",
+        "拼音": "pinyin",
+        "分类": "category",
+        "症状": "symptoms",
+        "舌象": "tongue",
+        "脉象": "pulse",
+        "病机": "pathogenesis",
+        "治法": "treatment_principle"
+      }
+    },
+    {
+      "name": "病症导入模板（标准格式）",
+      "target_type": "disease",
+      "description": "适用于标准格式的病症数据导入",
+      "source_headers": [
+        "编号",
+        "病症名称",
+        "别名",
+        "拼音",
+        "分类",
+        "症状",
+        "常见证型",
+        "护理建议",
+        "就医提示"
+      ],
+      "mapping": {
+        "编号": "code",
+        "病症名称": "name",
+        "别名": "alias",
+        "拼音": "pinyin",
+        "分类": "category",
+        "症状": "symptoms",
+        "常见证型": "common_syndromes",
+        "护理建议": "care_advice",
+        "就医提示": "medical_warning"
+      }
+    }
+  ],
+  "common_variations": {
+    "description": "常见字段名称变体映射",
+    "variations": {
+      "name": ["名称", "品名", "药名", "穴名", "方名"],
+      "alias": ["别名", "异名", "又名"],
+      "pinyin": ["拼音", "汉语拼音"],
+      "category": ["分类", "类别", "归类"],
+      "code": ["编号", "代码", "编码"],
+      "effects": ["功效", "作用", "功能"],
+      "indications": ["主治", "适应症", "治疗"],
+      "contraindications": ["禁忌", "注意事项", "慎用"]
+    }
+  }
+}

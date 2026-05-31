@@ -19,6 +19,7 @@ pub fn insert_version_tx(
     )?;
     Ok(())
 }
+#[allow(dead_code)]
 
 pub fn create_snapshot(
     database: &Database,
@@ -67,6 +68,7 @@ pub fn list_versions(database: &Database, item_id: i64) -> AppResult<Vec<Knowled
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     })
 }
+#[allow(dead_code)]
 
 pub fn get_version(database: &Database, version_id: i64) -> AppResult<KnowledgeVersion> {
     database.with_connection(|connection| {

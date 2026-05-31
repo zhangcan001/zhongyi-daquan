@@ -5,6 +5,7 @@ use crate::repositories::{knowledge_repository, version_repository};
 use crate::services::search_index_service;
 use serde_json::Value;
 
+#[allow(dead_code)]
 /// 创建版本快照（在 update 时自动调用）
 pub fn create_version_snapshot(
     database: &Database,

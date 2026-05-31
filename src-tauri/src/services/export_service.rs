@@ -72,14 +72,8 @@ pub fn export_to_excel(
 }
 
 fn fetch_items(database: &Database, item_ids: &[i64]) -> AppResult<Vec<Map<String, Value>>> {
-    let mut items = Vec::new();
-
-    for item_id in item_ids {
-        let item = knowledge_repository::get_item(database, *item_id)?;
-        items.push(item);
-    }
-
-    Ok(items)
+    // 使用批量查询避免 N+1 问题
+    knowledge_repository::get_items_batch(database, item_ids)
 }
 
 fn escape_csv_value(value: &str) -> String {

@@ -1,0 +1,116 @@
+{
+  "herbs": [
+    {
+      "code": "HB001",
+      "name": "黄芪",
+      "alias": "北芪、绵芪、箭芪",
+      "pinyin": "huangqi",
+      "category": "补气药",
+      "summary": "补气升阳，固表止汗，利水消肿，生津养血，行滞通痹，托毒排脓，敛疮生肌",
+      "nature_flavor": "甘，微温",
+      "meridians": "归肺、脾经",
+      "effects": "补气升阳，固表止汗，利水消肿，生津养血，行滞通痹，托毒排脓，敛疮生肌",
+      "indications": "用于气虚乏力，食少便溏，中气下陷，久泻脱肛，便血崩漏，表虚自汗，气虚水肿，内热消渴，血虚萎黄，半身不遂，痹痛麻木，痈疽难溃，久溃不敛",
+      "dosage": "9-30g",
+      "contraindications": "表实邪盛，气滞湿阻，食积停滞，痈疽初起或溃后热毒尚盛等实证，以及阴虚阳亢者，均须禁服",
+      "tags": "补气,升阳,固表"
+    },
+    {
+      "code": "HB002",
+      "name": "人参",
+      "alias": "吉林参、红参、白参",
+      "pinyin": "renshen",
+      "category": "补气药",
+      "summary": "大补元气，复脉固脱，补脾益肺，生津养血，安神益智",
+      "nature_flavor": "甘，微苦，微温",
+      "meridians": "归脾、肺、心、肾经",
+      "effects": "大补元气，复脉固脱，补脾益肺，生津养血，安神益智",
+      "indications": "用于体虚欲脱，肢冷脉微，脾虚食少，肺虚喘咳，津伤口渴，内热消渴，气血亏虚，久病虚羸，惊悸失眠，阳痿宫冷",
+      "dosage": "3-9g",
+      "contraindications": "实证、热证而正气不虚者忌服",
+      "tags": "补气,固脱,益智"
+    }
+  ],
+  "formulas": [
+    {
+      "code": "FO001",
+      "name": "补中益气汤",
+      "alias": "补中汤",
+      "pinyin": "buzhongyiqitang",
+      "category": "补益剂",
+      "summary": "补中益气，升阳举陷",
+      "source_text": "《脾胃论》",
+      "composition": "黄芪、人参、白术、甘草、当归、陈皮、升麻、柴胡",
+      "effects": "补中益气，升阳举陷",
+      "indications": "脾胃气虚，中气下陷证。饮食减少，体倦肢软，少气懒言，面色萎黄，大便稀溏，脱肛，子宫脱垂等",
+      "tags": "补气,升阳,举陷"
+    }
+  ],
+  "meridians": [
+    {
+      "code": "ST",
+      "name": "足阳明胃经",
+      "alias": "胃经、足阳明",
+      "pinyin": "zuyangmingweijing",
+      "category": "十二正经",
+      "yin_yang": "阳",
+      "hand_foot": "足",
+      "organ_relation": "胃",
+      "paired_meridian": "足太阴脾经",
+      "pathway_text": "起于鼻旁，上行至鼻根部，与足太阳膀胱经相交，向下沿鼻外侧进入上齿龈内...",
+      "main_indications": "胃肠病、头面五官病、神志病、皮肤病及经脉循行部位的其他病证",
+      "tags": "阳明,足经,胃"
+    }
+  ],
+  "acupoints": [
+    {
+      "code": "ST36",
+      "name": "足三里",
+      "alias": "三里",
+      "pinyin": "zusanli",
+      "acupoint_code": "ST36",
+      "meridian": "足阳明胃经",
+      "category": "常用穴",
+      "body_region": "下肢",
+      "body_subregion": "小腿前外侧",
+      "side_type": "双侧",
+      "standard_location": "在小腿前外侧，当犊鼻下3寸，距胫骨前缘一横指（中指）",
+      "locating_method": "正坐屈膝，用同侧手张开虎口围住髌骨上外缘，余4指向下，中指尖处即是",
+      "functions": "调理脾胃，补中益气，通经活络，疏风化湿，扶正祛邪",
+      "indications": "胃痛，呕吐，噎膈，腹胀，泄泻，痢疾，便秘，乳痈，肠痈，下肢痿痹，癫狂，中风，脚气，水肿，虚劳羸瘦",
+      "needling_summary": "直刺1-2寸",
+      "contraindications": "孕妇慎用",
+      "risk_level": "低风险",
+      "tags": "保健穴,常用穴,胃经"
+    }
+  ],
+  "syndromes": [
+    {
+      "code": "SY001",
+      "name": "脾气虚证",
+      "alias": "脾虚证",
+      "pinyin": "piqixuzheng",
+      "category": "脏腑辨证",
+      "symptoms": "食少，腹胀，便溏，肢体倦怠，少气懒言，面色萎黄或白",
+      "tongue": "舌淡，苔白",
+      "pulse": "脉缓弱",
+      "pathogenesis": "脾气不足，运化失职",
+      "treatment_principle": "健脾益气",
+      "tags": "脾虚,气虚"
+    }
+  ],
+  "diseases": [
+    {
+      "code": "DI001",
+      "name": "感冒",
+      "alias": "伤风",
+      "pinyin": "ganmao",
+      "category": "外感病",
+      "symptoms": "恶寒发热，头痛，鼻塞流涕，喷嚏，咳嗽，咽痛",
+      "common_syndromes": "风寒感冒、风热感冒、暑湿感冒",
+      "care_advice": "注意休息，多饮温开水，饮食清淡",
+      "medical_warning": "高热不退、咳嗽加重、呼吸困难等情况应及时就医",
+      "tags": "外感,常见病"
+    }
+  ]
+}

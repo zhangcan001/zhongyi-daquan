@@ -32,6 +32,7 @@ impl ValidationContext {
         self.known_meridians.contains(name)
     }
 }
+#[allow(dead_code)]
 
 pub fn validate_rows_batch(
     database: &Database,

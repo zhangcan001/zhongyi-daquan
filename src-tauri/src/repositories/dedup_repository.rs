@@ -1196,6 +1196,7 @@ fn detail_table_columns(item_type: &str) -> Option<(&'static str, &'static [&'st
         _ => None,
     }
 }
+#[allow(dead_code)]
 
 pub fn calculate_multi_dimensional_similarity(
     name1: &str,
@@ -1232,6 +1233,7 @@ pub fn calculate_multi_dimensional_similarity(
         0.0
     }
 }
+#[allow(dead_code)]
 
 fn jaro_winkler_similarity(s1: &str, s2: &str) -> f64 {
     if s1 == s2 {

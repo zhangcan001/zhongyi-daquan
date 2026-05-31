@@ -35,6 +35,7 @@ pub fn create_batch(
         })
     })
 }
+#[allow(dead_code)]
 
 pub fn insert_row(
     database: &Database,

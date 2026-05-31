@@ -1,0 +1,113 @@
+{
+  "meridians": [
+    {
+      "standard_name": "手太阴肺经",
+      "code": "LU",
+      "aliases": ["肺经", "手太阴", "太阴肺经"],
+      "category": "手三阴经"
+    },
+    {
+      "standard_name": "手阳明大肠经",
+      "code": "LI",
+      "aliases": ["大肠经", "手阳明", "阳明大肠经"],
+      "category": "手三阳经"
+    },
+    {
+      "standard_name": "足阳明胃经",
+      "code": "ST",
+      "aliases": ["胃经", "足阳明", "阳明胃经"],
+      "category": "足三阳经"
+    },
+    {
+      "standard_name": "足太阴脾经",
+      "code": "SP",
+      "aliases": ["脾经", "足太阴", "太阴脾经"],
+      "category": "足三阴经"
+    },
+    {
+      "standard_name": "手少阴心经",
+      "code": "HT",
+      "aliases": ["心经", "手少阴", "少阴心经"],
+      "category": "手三阴经"
+    },
+    {
+      "standard_name": "手太阳小肠经",
+      "code": "SI",
+      "aliases": ["小肠经", "手太阳", "太阳小肠经"],
+      "category": "手三阳经"
+    },
+    {
+      "standard_name": "足太阳膀胱经",
+      "code": "BL",
+      "aliases": ["膀胱经", "足太阳", "太阳膀胱经"],
+      "category": "足三阳经"
+    },
+    {
+      "standard_name": "足少阴肾经",
+      "code": "KI",
+      "aliases": ["肾经", "足少阴", "少阴肾经"],
+      "category": "足三阴经"
+    },
+    {
+      "standard_name": "手厥阴心包经",
+      "code": "PC",
+      "aliases": ["心包经", "手厥阴", "厥阴心包经"],
+      "category": "手三阴经"
+    },
+    {
+      "standard_name": "手少阳三焦经",
+      "code": "TE",
+      "aliases": ["三焦经", "手少阳", "少阳三焦经"],
+      "category": "手三阳经"
+    },
+    {
+      "standard_name": "足少阳胆经",
+      "code": "GB",
+      "aliases": ["胆经", "足少阳", "少阳胆经"],
+      "category": "足三阳经"
+    },
+    {
+      "standard_name": "足厥阴肝经",
+      "code": "LR",
+      "aliases": ["肝经", "足厥阴", "厥阴肝经"],
+      "category": "足三阴经"
+    }
+  ],
+  "acupoint_code_patterns": {
+    "description": "穴位编号标准格式",
+    "pattern": "^[A-Z]{2}\\d+$",
+    "examples": [
+      "ST36 - 足三里（足阳明胃经第36穴）",
+      "LI4 - 合谷（手阳明大肠经第4穴）",
+      "SP6 - 三阴交（足太阴脾经第6穴）",
+      "BL23 - 肾俞（足太阳膀胱经第23穴）"
+    ],
+    "normalization_rules": [
+      "小写转大写: st36 → ST36",
+      "去除空格: ST 36 → ST36",
+      "全角转半角: ＳＴ３６ → ST36"
+    ]
+  },
+  "herb_aliases": [
+    {
+      "standard_name": "黄芪",
+      "aliases": ["北芪", "绵芪", "箭芪", "口芪"],
+      "latin_name": "Astragali Radix"
+    },
+    {
+      "standard_name": "人参",
+      "aliases": ["吉林参", "红参", "白参", "野山参"],
+      "latin_name": "Ginseng Radix et Rhizoma"
+    },
+    {
+      "standard_name": "当归",
+      "aliases": ["秦归", "云归", "西当归", "岷当归"],
+      "latin_name": "Angelicae Sinensis Radix"
+    },
+    {
+      "standard_name": "甘草",
+      "aliases": ["国老", "粉草", "炙甘草"],
+      "latin_name": "Glycyrrhizae Radix et Rhizoma"
+    }
+  ]
+}

@@ -1,0 +1,167 @@
+{
+  "validation_rules": [
+    {
+      "target_type": "herb",
+      "field_name": "name",
+      "rule_type": "required",
+      "severity": "error",
+      "message": "中药名称不能为空"
+    },
+    {
+      "target_type": "herb",
+      "field_name": "code",
+      "rule_type": "pattern",
+      "rule_params": {
+        "pattern": "^[A-Z]{2}\\d{3,4}$"
+      },
+      "severity": "warning",
+      "message": "中药编号格式建议为：HB001（HB+3-4位数字）"
+    },
+    {
+      "target_type": "acupoint",
+      "field_name": "name",
+      "rule_type": "required",
+      "severity": "error",
+      "message": "穴位名称不能为空"
+    },
+    {
+      "target_type": "acupoint",
+      "field_name": "acupoint_code",
+      "rule_type": "pattern",
+      "rule_params": {
+        "pattern": "^[A-Z]{2}\\d+$"
+      },
+      "severity": "error",
+      "message": "穴位编号格式错误，应为大写字母+数字，如：ST36"
+    },
+    {
+      "target_type": "acupoint",
+      "field_name": "meridian",
+      "rule_type": "enum",
+      "rule_params": {
+        "allowed_values": [
+          "手太阴肺经",
+          "手阳明大肠经",
+          "足阳明胃经",
+          "足太阴脾经",
+          "手少阴心经",
+          "手太阳小肠经",
+          "足太阳膀胱经",
+          "足少阴肾经",
+          "手厥阴心包经",
+          "手少阳三焦经",
+          "足少阳胆经",
+          "足厥阴肝经",
+          "任脉",
+          "督脉"
+        ]
+      },
+      "severity": "warning",
+      "message": "经络名称不在标准列表中，建议使用标准名称"
+    },
+    {
+      "target_type": "formula",
+      "field_name": "name",
+      "rule_type": "required",
+      "severity": "error",
+      "message": "方剂名称不能为空"
+    },
+    {
+      "target_type": "formula",
+      "field_name": "composition",
+      "rule_type": "required",
+      "severity": "warning",
+      "message": "建议填写方剂组成"
+    },
+    {
+      "target_type": "meridian",
+      "field_name": "name",
+      "rule_type": "required",
+      "severity": "error",
+      "message": "经络名称不能为空"
+    },
+    {
+      "target_type": "meridian",
+      "field_name": "meridian_code",
+      "rule_type": "pattern",
+      "rule_params": {
+        "pattern": "^[A-Z]{2}$"
+      },
+      "severity": "warning",
+      "message": "经络编号格式建议为2位大写字母，如：ST、LI"
+    },
+    {
+      "target_type": "syndrome",
+      "field_name": "name",
+      "rule_type": "required",
+      "severity": "error",
+      "message": "证型名称不能为空"
+    },
+    {
+      "target_type": "disease",
+      "field_name": "name",
+      "rule_type": "required",
+      "severity": "error",
+      "message": "病症名称不能为空"
+    }
+  ],
+  "normalization_rules": {
+    "acupoint_code": {
+      "description": "穴位编号标准化",
+      "rules": [
+        {
+          "type": "uppercase",
+          "description": "转换为大写",
+          "examples": ["st36 → ST36", "li4 → LI4"]
+        },
+        {
+          "type": "remove_spaces",
+          "description": "移除空格",
+          "examples": ["ST 36 → ST36", "L I 4 → LI4"]
+        },
+        {
+          "type": "fullwidth_to_halfwidth",
+          "description": "全角转半角",
+          "examples": ["ＳＴ３６ → ST36"]
+        }
+      ]
+    },
+    "meridian_name": {
+      "description": "经络名称标准化",
+      "rules": [
+        {
+          "type": "alias_mapping",
+          "description": "别名映射到标准名称",
+          "mappings": {
+            "胃经": "足阳明胃经",
+            "足阳明": "足阳明胃经",
+            "阳明胃经": "足阳明胃经",
+            "脾经": "足太阴脾经",
+            "足太阴": "足太阴脾经",
+            "太阴脾经": "足太阴脾经",
+            "肺经": "手太阴肺经",
+            "手太阴": "手太阴肺经",
+            "太阴肺经": "手太阴肺经"
+          }
+        }
+      ]
+    },
+    "herb_name": {
+      "description": "中药名称标准化",
+      "rules": [
+        {
+          "type": "alias_mapping",
+          "description": "别名映射到标准名称",
+          "mappings": {
+            "北芪": "黄芪",
+            "绵芪": "黄芪",
+            "箭芪": "黄芪",
+            "吉林参": "人参",
+            "红参": "人参",
+            "白参": "人参"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -251,3 +251,52 @@ pub fn update_from_snapshot(
 
     Ok(())
 }
+pub fn get_item(database: &Database, item_id: i64) -> AppResult<serde_json::Map<String, serde_json::Value>> {
+    use serde_json::{Map, Value};
+
+    database.with_connection(|connection| {
+        let mut map = Map::new();
+
+        // 获取主表数据
+        connection.query_row(
+            "SELECT type, code, name, alias, pinyin, category, summary, content, source_note, tags,
+                    data_status, completeness_status, content_version, is_favorite
+             FROM knowledge_items WHERE id = ?1",
+            [item_id],
+            |row| {
+                map.insert("id".to_string(), Value::Number(item_id.into()));
+                map.insert("type".to_string(), Value::String(row.get(0)?));
+                if let Ok(code) = row.get::<_, Option<String>>(1) {
+                    map.insert("code".to_string(), code.map(Value::String).unwrap_or(Value::Null));
+                }
+                map.insert("name".to_string(), Value::String(row.get(2)?));
+                if let Ok(alias) = row.get::<_, Option<String>>(3) {
+                    map.insert("alias".to_string(), alias.map(Value::String).unwrap_or(Value::Null));
+                }
+                if let Ok(pinyin) = row.get::<_, Option<String>>(4) {
+                    map.insert("pinyin".to_string(), pinyin.map(Value::String).unwrap_or(Value::Null));
+                }
+                if let Ok(category) = row.get::<_, Option<String>>(5) {
+                    map.insert("category".to_string(), category.map(Value::String).unwrap_or(Value::Null));
+                }
+                if let Ok(summary) = row.get::<_, Option<String>>(6) {
+                    map.insert("summary".to_string(), summary.map(Value::String).unwrap_or(Value::Null));
+                }
+                if let Ok(content) = row.get::<_, Option<String>>(7) {
+                    map.insert("content".to_string(), content.map(Value::String).unwrap_or(Value::Null));
+                }
+                if let Ok(source_note) = row.get::<_, Option<String>>(8) {
+                    map.insert("source_note".to_string(), source_note.map(Value::String).unwrap_or(Value::Null));
+                }
+                if let Ok(tags) = row.get::<_, Option<String>>(9) {
+                    map.insert("tags".to_string(), tags.map(Value::String).unwrap_or(Value::Null));
+                }
+                map.insert("data_status".to_string(), Value::String(row.get(10)?));
+                map.insert("completeness_status".to_string(), Value::String(row.get(11)?));
+                Ok(())
+            },
+        )?;
+
+        Ok(map)
+    })
+}

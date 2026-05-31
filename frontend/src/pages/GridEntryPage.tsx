@@ -84,11 +84,7 @@ export function GridEntryPage() {
       current.map((row, index) => (index === rowIndex ? writeCell(row, key, value) : row)),
     );
     setDirtyRows((current) => new Set(current).add(rowIndex));
-    setErrors((current) => {
-      const next = { ...current };
-      delete next[`${rowIndex}:${key}`];
-      return next;
-    });
+    validateCellOnChange(rowIndex, key, value);
   }
 
   function addRow() {
@@ -134,12 +130,68 @@ export function GridEntryPage() {
     const nextErrors: Record<string, string> = {};
     dirtyRows.forEach((rowIndex) => {
       const row = rows[rowIndex];
-      if (!row?.name.trim()) {
+      if (!row) return;
+
+      if (!row.name.trim()) {
         nextErrors[`${rowIndex}:name`] = "名称不能为空";
+      }
+
+      if (row.code && !validateCode(row.code)) {
+        nextErrors[`${rowIndex}:code`] = "编号格式错误，应为大写字母开头，如 ST36";
+      }
+
+      if (itemType === "acupoint") {
+        const acupointCode = readCell(row, "acupoint_code") || readCell(row, "acupointCode");
+        if (acupointCode && !validateAcupointCode(String(acupointCode))) {
+          nextErrors[`${rowIndex}:acupointCode`] = "穴位编号格式错误，应为 ST36 格式";
+        }
+      }
+
+      if (row.itemType !== itemType) {
+        nextErrors[`${rowIndex}:itemType`] = "行类型与表格类型不一致";
       }
     });
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
+  }
+
+  function validateCode(code: string): boolean {
+    if (!code.trim()) return true;
+    const trimmed = code.trim();
+    return /^[A-Z][A-Z0-9_-]*$/.test(trimmed);
+  }
+
+  function validateAcupointCode(code: string): boolean {
+    if (!code.trim()) return true;
+    return /^[A-Z]{2}\d+$/.test(code.trim());
+  }
+
+  function validateCellOnChange(rowIndex: number, key: string, value: string) {
+    const row = rows[rowIndex];
+    if (!row) return;
+
+    const errorKey = `${rowIndex}:${key}`;
+
+    if (key === "name" && !value.trim()) {
+      setErrors((current) => ({ ...current, [errorKey]: "名称不能为空" }));
+      return;
+    }
+
+    if (key === "code" && value && !validateCode(value)) {
+      setErrors((current) => ({ ...current, [errorKey]: "编号格式错误" }));
+      return;
+    }
+
+    if ((key === "acupointCode" || key === "acupoint_code") && value && !validateAcupointCode(value)) {
+      setErrors((current) => ({ ...current, [errorKey]: "穴位编号格式错误" }));
+      return;
+    }
+
+    setErrors((current) => {
+      const next = { ...current };
+      delete next[errorKey];
+      return next;
+    });
   }
 
   function saveRows() {

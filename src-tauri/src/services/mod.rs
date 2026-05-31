@@ -8,6 +8,8 @@ pub mod background_job_service;
 pub mod backup_service;
 pub mod dedup_service;
 pub mod entry_service;
+pub mod error_log_service;
+pub mod export_service;
 pub mod field_mapping_service;
 pub mod grid_edit_service;
 pub mod import_project_service;

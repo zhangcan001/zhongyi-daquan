@@ -249,3 +249,129 @@ fn clean_tmp_files(path: &Path) -> AppResult<i64> {
     }
     Ok(removed)
 }
+
+pub fn check_data_integrity(database: &Database) -> AppResult<MaintenanceReport> {
+    let job = background_job_service::create_internal_job(
+        database,
+        "data_integrity_check",
+        None,
+    )?;
+
+    let result = (|| {
+        background_job_service::set_progress(database, job.id, 10.0)?;
+
+        let mut issues = Vec::new();
+
+        // 检查孤立的 detail 记录
+        let orphaned_details = database.with_connection(|connection| {
+            let mut count = 0;
+
+            for table in &["herb_details", "formula_details", "meridian_details",
+                          "acupoint_details", "syndrome_details", "disease_details"] {
+                let sql = format!(
+                    "SELECT COUNT(*) FROM {} WHERE item_id NOT IN (SELECT id FROM knowledge_items)",
+                    table
+                );
+                let table_count: i64 = connection.query_row(&sql, [], |row| row.get(0))?;
+                count += table_count;
+
+                if table_count > 0 {
+                    issues.push(format!("{} 表有 {} 条孤立记录", table, table_count));
+                }
+            }
+
+            Ok::<i64, crate::errors::AppError>(count)
+        })?;
+
+        background_job_service::set_progress(database, job.id, 40.0)?;
+
+        // 检查缺失必填字段的记录
+        let missing_required = database.with_connection(|connection| {
+            let count: i64 = connection.query_row(
+                "SELECT COUNT(*) FROM knowledge_items WHERE name IS NULL OR TRIM(name) = ''",
+                [],
+                |row| row.get(0),
+            )?;
+
+            if count > 0 {
+                issues.push(format!("{} 条记录缺少名称", count));
+            }
+
+            Ok::<i64, crate::errors::AppError>(count)
+        })?;
+
+        background_job_service::set_progress(database, job.id, 60.0)?;
+
+        // 检查无效的外键引用
+        let invalid_fk = database.with_connection(|connection| {
+            let count: i64 = connection.query_row(
+                "SELECT COUNT(*) FROM acupoint_details
+                 WHERE meridian_item_id IS NOT NULL
+                 AND meridian_item_id NOT IN (SELECT id FROM knowledge_items WHERE type IN ('经络', 'meridian'))",
+                [],
+                |row| row.get(0),
+            )?;
+
+            if count > 0 {
+                issues.push(format!("{} 条穴位记录引用了不存在的经络", count));
+            }
+
+            Ok::<i64, crate::errors::AppError>(count)
+        })?;
+
+        background_job_service::set_progress(database, job.id, 80.0)?;
+
+        // 检查重复的 code
+        let duplicate_codes = database.with_connection(|connection| {
+            let count: i64 = connection.query_row(
+                "SELECT COUNT(*) FROM (
+                    SELECT code FROM knowledge_items
+                    WHERE code IS NOT NULL AND TRIM(code) != ''
+                    GROUP BY type, code
+                    HAVING COUNT(*) > 1
+                )",
+                [],
+                |row| row.get(0),
+            )?;
+
+            if count > 0 {
+                issues.push(format!("{} 个编号存在重复", count));
+            }
+
+            Ok::<i64, crate::errors::AppError>(count)
+        })?;
+
+        let total_issues = orphaned_details + missing_required + invalid_fk + duplicate_codes;
+
+        let report = serde_json::json!({
+            "orphaned_details": orphaned_details,
+            "missing_required": missing_required,
+            "invalid_foreign_keys": invalid_fk,
+            "duplicate_codes": duplicate_codes,
+            "total_issues": total_issues,
+            "issues": issues,
+        });
+
+        let completed_job = background_job_service::success_with_json(
+            database,
+            job.id,
+            &report.to_string(),
+        )?;
+
+        let message = if total_issues == 0 {
+            "数据完整性检查通过，未发现问题。".to_string()
+        } else {
+            format!("发现 {} 个数据完整性问题：{}", total_issues, issues.join("; "))
+        };
+
+        Ok(MaintenanceReport {
+            job: completed_job,
+            action: "data_integrity_check".to_string(),
+            message,
+            affected_rows: Some(total_issues),
+            output_path: None,
+        })
+    })();
+
+    finish_or_fail(database, job.id, result)
+}

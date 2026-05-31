@@ -36,7 +36,7 @@ pub fn create_version_snapshot(
 
 /// 列出某个知识条目的所有版本
 pub fn list_versions(database: &Database, item_id: i64) -> AppResult<Vec<KnowledgeVersion>> {
-    database.with_connection(|connection| version_repository::list_versions(connection, item_id))
+    version_repository::list_versions(database, item_id)
 }
 
 /// 获取特定版本的快照

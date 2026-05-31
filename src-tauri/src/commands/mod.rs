@@ -4,6 +4,8 @@ pub mod audit_commands;
 pub mod backup_commands;
 pub mod clean_commands;
 pub mod entry_commands;
+pub mod error_commands;
+pub mod export_commands;
 pub mod import_commands;
 pub mod job_commands;
 pub mod knowledge_commands;

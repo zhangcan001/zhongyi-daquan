@@ -9,7 +9,7 @@
 ## 🎯 项目概况
 
 **项目名称**: 中医大全  
-**版本**: v0.1-alpha  
+**版本**: v0.1-alpha-package（基于 v0.1-alpha）  
 **技术栈**: Tauri + React + SQLite  
 **架构**: Repository → Service → Command 三层分离  
 **定位**: 纯本地中医知识资产管理桌面软件

@@ -50,6 +50,13 @@ npm run tauri:build
 - `npm run tauri:build` 已在当前环境验证通过。
 - 默认脚本生成 NSIS 安装包，避免 `targets = all` 在本机缺少 WiX/MSI 工具链时卡住。
 - 如果需要完整 MSI 产物，先确保 WiX 资源已可用，再执行全量打包。
+- 当前 `src-tauri/tauri.conf.json` 的 `bundle.icon` 仍为空。TODO：正式发布前补齐 `.ico` 与对应尺寸图标资源；本次不临时生成占位图标。
+
+## 版本口径
+
+- 当前发布收口：`v0.1-alpha-package`。
+- 基础验收版本：`v0.1-alpha`。
+- Tauri/npm/Cargo 源码包版本：`0.1.0`。
 
 ## 数据与升级
 

@@ -492,6 +492,26 @@ fn check_performance(connection: &Connection) -> rusqlite::Result<()> {
     println!("performance_search_ms: {search_ms}");
     println!("performance_list_page_ms: {list_ms}");
     println!("performance_relation_first_page_ms: {relation_ms}");
+    for query in ["黄芪", "足三里", "ST36", "补中益气汤", "胃经"] {
+        let query_ms = elapsed_ms(|| {
+            let normalized = normalize(query);
+            let prefix = format!("{normalized}%");
+            let contains = format!("%{normalized}%");
+            let count: i64 = connection.query_row(
+                "SELECT COUNT(1)
+                 FROM search_terms st
+                 JOIN knowledge_list_view_cache lc ON lc.item_id = st.item_id
+                 WHERE lc.data_status IN ('validated', 'ready')
+                   AND (st.term = ?1 OR st.term LIKE ?2 OR st.term LIKE ?3)",
+                params![normalized, prefix, contains],
+                |row| row.get(0),
+            )?;
+            assert!(count >= 1, "expected search hits for {query}");
+            Ok(())
+        })?;
+        println!("performance_query_{query}_ms: {query_ms}");
+        assert_threshold(query_ms, 500, query);
+    }
     assert_threshold(search_ms, 500, "search 10,000 knowledge");
     assert_threshold(list_ms, 300, "knowledge list paging");
     assert_threshold(relation_ms, 500, "50,000 relation first page");

@@ -4,7 +4,7 @@
 1. docs/CODEX_DEV_DOC.md
 2. docs/codex_threads/00_总控线程_Codex完整指令.md
 
-当前版本目标：v0.1-entry-core-performance-ai-ready。
+当前发布收口版本：v0.1-alpha-package，基于 v0.1-alpha。
 
 硬性要求：
 1. 产品运行期默认不联网；开发过程允许联网安装依赖、查询资料和运行开发工具。

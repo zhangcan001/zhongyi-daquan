@@ -1,6 +1,6 @@
 # 中医大全
 
-《中医大全》是一个纯本地 Windows 桌面软件，目标版本为 `v0.1-entry-core-performance-ai-ready`。当前阶段聚焦中医知识资产管理：录入、导入、映射、清洗、校验、去重、合并、关系建议、搜索、备份恢复和 AI 接口预留。
+《中医大全》是一个纯本地 Windows 桌面软件，当前发布收口版本为 `v0.1-alpha-package`，基于 `v0.1-alpha` 完成本地打包验证。当前阶段聚焦中医知识资产管理：录入、导入、映射、清洗、校验、去重、合并、关系建议、搜索、备份恢复和 AI 接口预留。
 
 本项目不是问诊软件，不做自动诊断，不做自动开方。全局安全边界是：本软件仅用于中医知识学习、资料整理与本地记录，不构成医疗诊断、治疗建议或处方依据。
 
@@ -59,6 +59,12 @@ src-tauri/target/release/zhongyi-daquan.exe
 src-tauri/target/release/bundle/nsis/中医大全_0.1.0_x64-setup.exe
 ```
 
+版本口径：
+
+- 发布标签：`v0.1-alpha-package`。
+- 基础验收标签：`v0.1-alpha`。
+- 源码包版本：`0.1.0`，对应 `package.json`、`frontend/package.json`、`src-tauri/Cargo.toml` 和 `src-tauri/tauri.conf.json`。
+
 ## 启动
 
 首次运行前需要安装 Node.js、npm、Rust 和 Tauri 所需系统依赖。
@@ -112,6 +118,8 @@ npm run tauri:build
 
 默认生成到 `local-data/database/thread_h_regression.db`，包含 10,000 条 `knowledge_items`、50,000 条 `knowledge_relations`、10,000 条 `data_import_rows`、1,000 条 `duplicate_candidates` 和 1,000 条 `relation_suggestions`。
 
+`v0.1-alpha-package` 收口实测中，`黄芪`、`足三里`、`ST36`、`补中益气汤`、`胃经` 五个关键词搜索均小于 500ms。
+
 ## 数据目录
 
 应用启动后会在 Tauri 应用数据目录下创建：
@@ -135,4 +143,5 @@ npm run tauri:build
 - [测试计划](docs/TEST_PLAN.md)
 - [打包说明](docs/PACKAGING.md)
 - [发布检查清单](docs/RELEASE_CHECKLIST.md)
+- [经典数据导入说明](docs/CLASSICS_DATA_IMPORT.md)
 - [Codex 开发总文档](docs/CODEX_DEV_DOC.md)

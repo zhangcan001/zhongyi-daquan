@@ -12,7 +12,15 @@ const sampleJson = JSON.stringify(
 );
 const sampleCsv = "code,name,type,meridians,tags\r\n st36 , 足三里 ,穴位,胃经,常用;保健\r\nbad code,,穴位,未知经,\r\n";
 
-const knowledgeTypes = ["中药", "方剂", "经络", "穴位", "证型", "病症"];
+const knowledgeTypes = [
+  { value: "mixed", label: "自动识别 / 混合类型" },
+  { value: "中药", label: "中药" },
+  { value: "方剂", label: "方剂" },
+  { value: "经络", label: "经络" },
+  { value: "穴位", label: "穴位" },
+  { value: "证型", label: "证型" },
+  { value: "病症", label: "病症" },
+];
 
 export function ImportStagingPanel() {
   const [importType, setImportType] = useState<"json" | "csv">("json");
@@ -42,6 +50,9 @@ export function ImportStagingPanel() {
     setFileName(file.name);
     setImportType(file.name.toLowerCase().endsWith(".csv") ? "csv" : "json");
     setContent(await file.text());
+    if (file.name.includes("knowledge_items_import") || file.name.includes("curated")) {
+      setTargetType("mixed");
+    }
   }
 
   async function importToStaging() {
@@ -154,8 +165,8 @@ export function ImportStagingPanel() {
           知识类型
           <select value={targetType} onChange={(event) => setTargetType(event.target.value)}>
             {knowledgeTypes.map((type) => (
-              <option key={type} value={type}>
-                {type}
+              <option key={type.value} value={type.value}>
+                {type.label}
               </option>
             ))}
           </select>
@@ -241,7 +252,9 @@ export function ImportStagingPanel() {
                 <th>行</th>
                 <th>状态</th>
                 <th>名称</th>
+                <th>类型</th>
                 <th>编号</th>
+                <th>摘要 / 内容</th>
                 <th>错误原因</th>
                 <th>修正建议</th>
               </tr>
@@ -252,7 +265,9 @@ export function ImportStagingPanel() {
                   <td>{row.rowIndex}</td>
                   <td>{row.status}</td>
                   <td>{String(row.normalized.name ?? "")}</td>
+                  <td>{String(row.normalized.type ?? "")}</td>
                   <td>{String(row.normalized.code ?? "")}</td>
+                  <td>{previewText(row.normalized.summary ?? row.normalized.content)}</td>
                   <td>{row.issues.map((issue) => issue.message).join("；")}</td>
                   <td>{row.issues.map((issue) => issue.suggestion).filter(Boolean).join("；")}</td>
                 </tr>
@@ -263,6 +278,11 @@ export function ImportStagingPanel() {
       ) : null}
     </section>
   );
+}
+
+function previewText(value: unknown) {
+  const text = typeof value === "string" ? value : value == null ? "" : JSON.stringify(value);
+  return text.length > 80 ? `${text.slice(0, 80)}...` : text;
 }
 
 function Metric({ label, value }: { label: string; value: number }) {

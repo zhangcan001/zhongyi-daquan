@@ -103,7 +103,8 @@ pub fn validate_batch(database: &Database, batch_id: i64) -> AppResult<ImportBat
         let row_id = row.id.unwrap_or_default();
         let normalized = parse_optional_json(row.normalized_json)?;
         let object = normalized.as_object().cloned().unwrap_or_default();
-        let issues = validation_service::validate_row(database, &batch.target_type, &object)?;
+        let effective_type = effective_target_type(&batch.target_type, &object);
+        let issues = validation_service::validate_row(database, &effective_type, &object)?;
         let (status, error_message, warning_message) =
             validation_service::status_from_issues(&issues);
         validation_repository::replace_row_issues(database, batch_id, row_id, &issues)?;
@@ -158,7 +159,8 @@ pub fn apply_clean_step(
         }
 
         if before_object != object {
-            let issues = validation_service::validate_row(database, &batch.target_type, &object)?;
+            let effective_type = effective_target_type(&batch.target_type, &object);
+            let issues = validation_service::validate_row(database, &effective_type, &object)?;
             let (status, error_message, warning_message) =
                 validation_service::status_from_issues(&issues);
             validation_repository::replace_row_issues(database, request.batch_id, row_id, &issues)?;
@@ -258,8 +260,9 @@ pub fn confirm_import(database: &Database, batch_id: i64) -> AppResult<ConfirmIm
             }
             let normalized = parse_optional_json(row.normalized_json.clone())?;
             let object = normalized.as_object().cloned().unwrap_or_default();
-            let item_id = insert_knowledge_item(&transaction, &batch.target_type, &object)?;
-            insert_detail(&transaction, item_id, &batch.target_type, &object)?;
+            let effective_type = effective_target_type(&batch.target_type, &object);
+            let item_id = insert_knowledge_item(&transaction, &effective_type, &object)?;
+            insert_detail(&transaction, item_id, &effective_type, &object)?;
             transaction.execute(
                 "UPDATE data_import_rows SET status = 'imported' WHERE id = ?1",
                 [row_id],
@@ -301,7 +304,8 @@ pub fn update_staging_row_field(
 
     normalized.insert(field_name.to_string(), Value::String(new_value.to_string()));
 
-    let issues = validation_service::validate_row(database, &batch.target_type, &normalized)?;
+    let effective_type = effective_target_type(&batch.target_type, &normalized);
+    let issues = validation_service::validate_row(database, &effective_type, &normalized)?;
     let (status, error_message, warning_message) = validation_service::status_from_issues(&issues);
 
     import_repository::update_row_normalized(
@@ -359,7 +363,8 @@ fn import_rows(
         .zip(normalized_rows.iter())
         .enumerate()
     {
-        let issues = validation_service::validate_row(database, &request.target_type, normalized)?;
+        let effective_type = effective_target_type(&request.target_type, normalized);
+        let issues = validation_service::validate_row(database, &effective_type, normalized)?;
         let (status, error_message, warning_message) =
             validation_service::status_from_issues(&issues);
 
@@ -569,7 +574,8 @@ fn import_rows_from_bytes(
         .zip(normalized_rows.iter())
         .enumerate()
     {
-        let issues = validation_service::validate_row(database, &request.target_type, normalized)?;
+        let effective_type = effective_target_type(&request.target_type, normalized);
+        let issues = validation_service::validate_row(database, &effective_type, normalized)?;
         let (status, error_message, warning_message) =
             validation_service::status_from_issues(&issues);
 
@@ -918,9 +924,169 @@ fn lookup_meridian_id(
 }
 
 fn text(object: &Map<String, Value>, field: &str) -> Option<String> {
-    match object.get(field) {
-        Some(Value::String(text)) if !text.trim().is_empty() => Some(text.trim().to_string()),
-        Some(Value::Number(number)) => Some(number.to_string()),
+    object.get(field).and_then(value_to_text)
+}
+
+fn value_to_text(value: &Value) -> Option<String> {
+    match value {
+        Value::String(text) if !text.trim().is_empty() => Some(text.trim().to_string()),
+        Value::Number(number) => Some(number.to_string()),
+        Value::Bool(value) => Some(value.to_string()),
+        Value::Array(values) => {
+            let joined = values
+                .iter()
+                .filter_map(value_to_text)
+                .collect::<Vec<_>>()
+                .join(",");
+            (!joined.is_empty()).then_some(joined)
+        }
         _ => None,
+    }
+}
+
+fn effective_target_type(target_type: &str, object: &Map<String, Value>) -> String {
+    match target_type {
+        "mixed" | "auto" | "自动识别" | "混合类型" => {
+            text(object, "type").unwrap_or_else(|| "mixed".to_string())
+        }
+        _ => target_type.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{confirm_import, import_json};
+    use crate::db::connection::Database;
+    use crate::models::data_pipeline::CreateImportRequest;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_database(test_name: &str) -> (std::path::PathBuf, Database) {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        let data_dir = std::env::temp_dir().join(format!("zhongyi-import-{test_name}-{unique}"));
+        let database = Database::initialize(&data_dir).expect("initialize database");
+        (data_dir, database)
+    }
+
+    #[test]
+    fn mixed_classics_json_import_uses_row_type_and_detail_fields() {
+        let (data_dir, database) = temp_database("classics");
+        let content = r#"
+        [
+          {
+            "type": "syndrome",
+            "code": "HDNJ_SW-00001",
+            "name": "上古天真论篇第一",
+            "category": "原典/黄帝内经·素问",
+            "summary": "养生原文摘要",
+            "content": "昔在黄帝，生而神灵。",
+            "source_note": "黄帝内经·素问",
+            "tags": ["原典", "黄帝内经·素问", "机器精校"],
+            "detail": {
+              "symptoms": "原典篇章内容",
+              "notes": "机器结构精校"
+            }
+          },
+          {
+            "type": "herb",
+            "code": "SNBCJ-00084",
+            "name": "甘草",
+            "category": "原典/神农本草经",
+            "summary": "甘草条文摘要",
+            "content": "甘草，味甘平。",
+            "source_note": "神农本草经",
+            "tags": ["原典", "神农本草经"],
+            "detail": {
+              "nature_flavor": "味甘平",
+              "effects": "主五脏六腑寒热邪气",
+              "notes": "机器结构精校"
+            }
+          }
+        ]
+        "#;
+
+        let summary = import_json(
+            &database,
+            CreateImportRequest {
+                file_name: "knowledge_items_import_curated.json".to_string(),
+                target_type: "mixed".to_string(),
+                content: content.to_string(),
+                mapping: None,
+                template_id: None,
+            },
+        )
+        .expect("import classics json");
+
+        assert_eq!(summary.total_rows, 2);
+        assert_eq!(summary.importable_rows, 2);
+        assert_eq!(summary.error_rows, 0);
+
+        database
+            .with_connection(|connection| {
+                let staged_tags: String = connection.query_row(
+                    "SELECT json_extract(normalized_json, '$.tags')
+                     FROM data_import_rows WHERE row_index = 1",
+                    [],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(staged_tags, "原典,黄帝内经·素问,机器精校");
+
+                let staged_symptoms: String = connection.query_row(
+                    "SELECT json_extract(normalized_json, '$.symptoms')
+                     FROM data_import_rows WHERE row_index = 1",
+                    [],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(staged_symptoms, "原典篇章内容");
+                Ok(())
+            })
+            .expect("inspect staging rows");
+
+        let result = confirm_import(&database, summary.batch.id.unwrap()).expect("confirm import");
+        assert_eq!(result.imported_count, 2);
+        assert_eq!(result.skipped_count, 0);
+
+        database
+            .with_connection(|connection| {
+                let syndrome_count: i64 = connection.query_row(
+                    "SELECT COUNT(1) FROM knowledge_items WHERE type = 'syndrome'",
+                    [],
+                    |row| row.get(0),
+                )?;
+                let herb_count: i64 = connection.query_row(
+                    "SELECT COUNT(1) FROM knowledge_items WHERE type = 'herb'",
+                    [],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(syndrome_count, 1);
+                assert_eq!(herb_count, 1);
+
+                let symptoms: String = connection.query_row(
+                    "SELECT sd.symptoms
+                     FROM syndrome_details sd
+                     JOIN knowledge_items ki ON ki.id = sd.item_id
+                     WHERE ki.code = 'HDNJ_SW-00001'",
+                    [],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(symptoms, "原典篇章内容");
+
+                let effects: String = connection.query_row(
+                    "SELECT hd.effects
+                     FROM herb_details hd
+                     JOIN knowledge_items ki ON ki.id = hd.item_id
+                     WHERE ki.code = 'SNBCJ-00084'",
+                    [],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(effects, "主五脏六腑寒热邪气");
+                Ok(())
+            })
+            .expect("inspect imported rows");
+
+        let _ = fs::remove_dir_all(data_dir);
     }
 }

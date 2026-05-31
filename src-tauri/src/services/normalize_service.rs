@@ -222,6 +222,15 @@ pub fn to_half_width(input: &str) -> String {
 }
 
 fn normalize_tag_field(row: &mut Map<String, Value>, field: &str) {
+    if let Some(Value::Array(values)) = row.get(field).cloned() {
+        let value = values
+            .iter()
+            .filter_map(value_to_text)
+            .collect::<Vec<_>>()
+            .join(",");
+        row.insert(field.to_string(), Value::String(split_join(&value)));
+        return;
+    }
     if let Some(Value::String(text)) = row.get(field).cloned() {
         let value = split_join(&text);
         row.insert(field.to_string(), Value::String(value));
@@ -229,8 +238,26 @@ fn normalize_tag_field(row: &mut Map<String, Value>, field: &str) {
 }
 
 fn normalize_list_field(row: &mut Map<String, Value>, field: &str) {
+    if let Some(Value::Array(values)) = row.get(field).cloned() {
+        let value = values
+            .iter()
+            .filter_map(value_to_text)
+            .collect::<Vec<_>>()
+            .join(",");
+        row.insert(field.to_string(), Value::String(split_join(&value)));
+        return;
+    }
     if let Some(Value::String(text)) = row.get(field).cloned() {
         row.insert(field.to_string(), Value::String(split_join(&text)));
+    }
+}
+
+fn value_to_text(value: &Value) -> Option<String> {
+    match value {
+        Value::String(text) if !text.trim().is_empty() => Some(text.trim().to_string()),
+        Value::Number(number) => Some(number.to_string()),
+        Value::Bool(value) => Some(value.to_string()),
+        _ => None,
     }
 }
 

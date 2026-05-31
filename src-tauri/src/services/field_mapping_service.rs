@@ -58,6 +58,7 @@ const TARGET_FIELDS: &[&str] = &[
     "common_syndromes",
     "care_advice",
     "medical_warning",
+    "detail",
 ];
 
 pub fn save_template(
@@ -220,10 +221,26 @@ pub fn apply_mapping(
             }
         }
     }
+    merge_detail_fields(&mut output);
     output
         .entry("type".to_string())
         .or_insert_with(|| Value::String(target_type.to_string()));
     output
+}
+
+fn merge_detail_fields(output: &mut Map<String, Value>) {
+    let Some(Value::Object(detail)) = output.get("detail").cloned() else {
+        return;
+    };
+
+    for (key, value) in detail {
+        let normalized = normalize_header(&key);
+        if let Some(target) = field_alias(&normalized) {
+            output.entry(target.to_string()).or_insert(value);
+        } else if TARGET_FIELDS.contains(&key.as_str()) {
+            output.entry(key).or_insert(value);
+        }
+    }
 }
 
 fn normalize_header(header: &str) -> String {
@@ -244,19 +261,49 @@ fn field_alias(header: &str) -> Option<&'static str> {
         "summary" | "摘要" | "简介" => Some("summary"),
         "content" | "正文" | "内容" => Some("content"),
         "sourcenote" | "来源" | "出处" => Some("source_note"),
-        "tags" | "标签" => Some("tags"),
+        "tags" | "标签" | "keywords" | "关键词" => Some("tags"),
+        "detail" | "详情" | "扩展字段" => Some("detail"),
         "natureflavor" | "性味" => Some("nature_flavor"),
         "meridians" | "归经" | "经络" => Some("meridians"),
         "effects" | "功效" => Some("effects"),
         "indications" | "主治" => Some("indications"),
         "dosage" | "用量" => Some("dosage"),
         "contraindications" | "禁忌" => Some("contraindications"),
+        "compatibility" | "配伍" => Some("compatibility"),
+        "sourcetext" | "原文" | "出处原文" => Some("source_text"),
         "composition" | "组成" => Some("composition"),
         "usage" | "用法" => Some("usage"),
+        "explanation" | "方解" => Some("explanation"),
+        "modifications" | "加减" => Some("modifications"),
+        "meridiancode" => Some("meridian_code"),
+        "yinyang" | "阴阳" => Some("yin_yang"),
+        "handfoot" | "手足" => Some("hand_foot"),
+        "organrelation" | "脏腑关系" => Some("organ_relation"),
+        "pairedmeridian" | "表里经" => Some("paired_meridian"),
+        "pathwaytext" | "循行" | "循行原文" => Some("pathway_text"),
+        "mainindications" | "主病" => Some("main_indications"),
+        "acupointcode" => Some("acupoint_code"),
+        "bodyregion" | "部位" => Some("body_region"),
+        "bodysubregion" | "分区" => Some("body_subregion"),
+        "sidetype" | "侧别" => Some("side_type"),
         "standardlocation" | "定位" | "标准定位" => Some("standard_location"),
         "locatingmethod" | "取穴" | "取穴方法" => Some("locating_method"),
+        "bonecun" | "骨度分寸" => Some("bone_cun"),
+        "anatomy" | "解剖" => Some("anatomy"),
         "functions" | "作用" => Some("functions"),
+        "needlingsummary" | "针刺概要" => Some("needling_summary"),
+        "moxibustionsummary" | "艾灸概要" => Some("moxibustion_summary"),
+        "massagesummary" | "推拿概要" => Some("massage_summary"),
+        "precautions" | "注意事项" => Some("precautions"),
+        "risklevel" | "风险等级" => Some("risk_level"),
         "symptoms" | "症状" => Some("symptoms"),
+        "tongue" | "舌象" => Some("tongue"),
+        "pulse" | "脉象" => Some("pulse"),
+        "pathogenesis" | "病机" => Some("pathogenesis"),
+        "treatmentprinciple" | "治则" | "治法" => Some("treatment_principle"),
+        "commonsyndromes" | "常见证型" => Some("common_syndromes"),
+        "careadvice" | "调护建议" => Some("care_advice"),
+        "medicalwarning" | "医学警示" => Some("medical_warning"),
         "notes" | "备注" => Some("notes"),
         _ => None,
     }

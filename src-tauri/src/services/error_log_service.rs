@@ -30,10 +30,7 @@ pub fn log_error(
     Ok(error_id)
 }
 
-pub fn get_recent_errors(
-    database: &Database,
-    limit: i64,
-) -> AppResult<Vec<ErrorLog>> {
+pub fn get_recent_errors(database: &Database, limit: i64) -> AppResult<Vec<ErrorLog>> {
     database.with_connection(|connection| {
         let mut stmt = connection.prepare(
             "SELECT id, error_type, error_message, stack_trace, context, created_at
@@ -59,11 +56,8 @@ pub fn get_recent_errors(
 
 pub fn get_error_statistics(database: &Database) -> AppResult<ErrorStatistics> {
     database.with_connection(|connection| {
-        let total_errors: i64 = connection.query_row(
-            "SELECT COUNT(*) FROM error_logs",
-            [],
-            |row| row.get(0),
-        )?;
+        let total_errors: i64 =
+            connection.query_row("SELECT COUNT(*) FROM error_logs", [], |row| row.get(0))?;
 
         let errors_last_24h: i64 = connection.query_row(
             "SELECT COUNT(*) FROM error_logs

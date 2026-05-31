@@ -8,11 +8,11 @@ use crate::repositories::{import_repository, validation_repository};
 use crate::services::{
     field_mapping_service, normalize_service, search_index_service, validation_service,
 };
+use calamine::{open_workbook_from_rs, Data, Reader, Xlsx};
 use chrono::Utc;
 use rusqlite::{params, OptionalExtension};
 use serde_json::{Map, Value};
 use std::collections::BTreeSet;
-use calamine::{Reader, Xlsx, open_workbook_from_rs, Data};
 
 pub fn preview_json(content: &str) -> AppResult<ImportParsedPreview> {
     let rows = parse_json_rows(content)?;
@@ -343,7 +343,9 @@ fn import_rows(
 
     let mapped_rows: Vec<Map<String, Value>> = rows
         .iter()
-        .map(|raw| field_mapping_service::apply_mapping(raw, mapping.as_ref(), &request.target_type))
+        .map(|raw| {
+            field_mapping_service::apply_mapping(raw, mapping.as_ref(), &request.target_type)
+        })
         .collect();
 
     let normalized_rows = normalize_service::normalize_rows_batch(database, mapped_rows.clone())?;
@@ -471,11 +473,14 @@ fn parse_excel_rows(content: &[u8]) -> AppResult<Vec<Map<String, Value>>> {
     let mut workbook: Xlsx<_> = open_workbook_from_rs(cursor)
         .map_err(|e| AppError::InvalidInput(format!("无法打开 Excel 文件: {}", e)))?;
 
-    let sheet_name = workbook.sheet_names().first()
+    let sheet_name = workbook
+        .sheet_names()
+        .first()
         .ok_or_else(|| AppError::InvalidInput("Excel 文件没有工作表".to_string()))?
         .clone();
 
-    let range = workbook.worksheet_range(&sheet_name)
+    let range = workbook
+        .worksheet_range(&sheet_name)
         .map_err(|e| AppError::InvalidInput(format!("无法读取工作表: {}", e)))?;
 
     let mut rows_data = Vec::new();
@@ -548,7 +553,9 @@ fn import_rows_from_bytes(
 
     let mapped_rows: Vec<Map<String, Value>> = rows
         .iter()
-        .map(|raw| field_mapping_service::apply_mapping(raw, mapping.as_ref(), &request.target_type))
+        .map(|raw| {
+            field_mapping_service::apply_mapping(raw, mapping.as_ref(), &request.target_type)
+        })
         .collect();
 
     let normalized_rows = normalize_service::normalize_rows_batch(database, mapped_rows.clone())?;

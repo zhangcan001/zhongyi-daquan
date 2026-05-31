@@ -30,9 +30,6 @@ pub fn compare_knowledge_versions(
 }
 
 #[tauri::command]
-pub fn rollback_knowledge_version(
-    state: State<'_, AppState>,
-    version_id: i64,
-) -> AppResult<i64> {
+pub fn rollback_knowledge_version(state: State<'_, AppState>, version_id: i64) -> AppResult<i64> {
     version_service::rollback_to_version(&state.database, version_id)
 }

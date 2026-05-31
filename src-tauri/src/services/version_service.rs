@@ -43,23 +43,24 @@ pub fn list_versions(database: &Database, item_id: i64) -> AppResult<Vec<Knowled
 /// 获取特定版本的快照
 pub fn get_version(database: &Database, version_id: i64) -> AppResult<KnowledgeVersion> {
     database.with_connection(|connection| {
-        connection.query_row(
-            "SELECT id, item_id, version_no, snapshot_json, change_summary, changed_at
+        connection
+            .query_row(
+                "SELECT id, item_id, version_no, snapshot_json, change_summary, changed_at
              FROM knowledge_versions
              WHERE id = ?1",
-            [version_id],
-            |row| {
-                Ok(KnowledgeVersion {
-                    id: row.get(0)?,
-                    item_id: row.get(1)?,
-                    version_no: row.get(2)?,
-                    snapshot_json: row.get(3)?,
-                    change_summary: row.get(4)?,
-                    changed_at: row.get(5)?,
-                })
-            },
-        )
-        .map_err(Into::into)
+                [version_id],
+                |row| {
+                    Ok(KnowledgeVersion {
+                        id: row.get(0)?,
+                        item_id: row.get(1)?,
+                        version_no: row.get(2)?,
+                        snapshot_json: row.get(3)?,
+                        change_summary: row.get(4)?,
+                        changed_at: row.get(5)?,
+                    })
+                },
+            )
+            .map_err(Into::into)
     })
 }
 

@@ -251,11 +251,7 @@ fn clean_tmp_files(path: &Path) -> AppResult<i64> {
 }
 
 pub fn check_data_integrity(database: &Database) -> AppResult<MaintenanceReport> {
-    let job = background_job_service::create_internal_job(
-        database,
-        "data_integrity_check",
-        None,
-    )?;
+    let job = background_job_service::create_internal_job(database, "data_integrity_check", None)?;
 
     let result = (|| {
         background_job_service::set_progress(database, job.id, 10.0)?;
@@ -266,8 +262,14 @@ pub fn check_data_integrity(database: &Database) -> AppResult<MaintenanceReport>
         let orphaned_details = database.with_connection(|connection| {
             let mut count = 0;
 
-            for table in &["herb_details", "formula_details", "meridian_details",
-                          "acupoint_details", "syndrome_details", "disease_details"] {
+            for table in &[
+                "herb_details",
+                "formula_details",
+                "meridian_details",
+                "acupoint_details",
+                "syndrome_details",
+                "disease_details",
+            ] {
                 let sql = format!(
                     "SELECT COUNT(*) FROM {} WHERE item_id NOT IN (SELECT id FROM knowledge_items)",
                     table
@@ -352,16 +354,17 @@ pub fn check_data_integrity(database: &Database) -> AppResult<MaintenanceReport>
             "issues": issues,
         });
 
-        let completed_job = background_job_service::success_with_json(
-            database,
-            job.id,
-            &report.to_string(),
-        )?;
+        let completed_job =
+            background_job_service::success_with_json(database, job.id, &report.to_string())?;
 
         let message = if total_issues == 0 {
             "数据完整性检查通过，未发现问题。".to_string()
         } else {
-            format!("发现 {} 个数据完整性问题：{}", total_issues, issues.join("; "))
+            format!(
+                "发现 {} 个数据完整性问题：{}",
+                total_issues,
+                issues.join("; ")
+            )
         };
 
         Ok(MaintenanceReport {

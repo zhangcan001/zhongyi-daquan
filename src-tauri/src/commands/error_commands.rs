@@ -36,9 +36,6 @@ pub fn get_error_statistics(
 }
 
 #[tauri::command]
-pub fn clear_old_error_logs(
-    state: State<'_, AppState>,
-    days: i64,
-) -> AppResult<i64> {
+pub fn clear_old_error_logs(state: State<'_, AppState>, days: i64) -> AppResult<i64> {
     error_log_service::clear_old_error_logs(&state.database, days)
 }

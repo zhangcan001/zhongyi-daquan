@@ -210,29 +210,50 @@ pub fn update_from_snapshot(
     item_id: i64,
     snapshot: &serde_json::Value,
 ) -> AppResult<()> {
-    let obj = snapshot.as_object().ok_or_else(|| {
-        crate::errors::AppError::InvalidInput("快照格式错误".to_string())
-    })?;
+    let obj = snapshot
+        .as_object()
+        .ok_or_else(|| crate::errors::AppError::InvalidInput("快照格式错误".to_string()))?;
 
     // 提取字段
-    let name = obj.get("name")
+    let name = obj
+        .get("name")
         .and_then(|v: &serde_json::Value| v.as_str())
         .ok_or_else(|| crate::errors::AppError::InvalidInput("缺少 name 字段".to_string()))?;
 
-    let item_type = obj.get("type").or_else(|| obj.get("item_type"))
+    let item_type = obj
+        .get("type")
+        .or_else(|| obj.get("item_type"))
         .and_then(|v: &serde_json::Value| v.as_str())
         .ok_or_else(|| crate::errors::AppError::InvalidInput("缺少 type 字段".to_string()))?;
 
     let code = obj.get("code").and_then(|v: &serde_json::Value| v.as_str());
-    let alias = obj.get("alias").and_then(|v: &serde_json::Value| v.as_str());
-    let pinyin = obj.get("pinyin").and_then(|v: &serde_json::Value| v.as_str());
-    let category = obj.get("category").and_then(|v: &serde_json::Value| v.as_str());
-    let summary = obj.get("summary").and_then(|v: &serde_json::Value| v.as_str());
-    let content = obj.get("content").and_then(|v: &serde_json::Value| v.as_str());
-    let source_note = obj.get("source_note").and_then(|v: &serde_json::Value| v.as_str());
+    let alias = obj
+        .get("alias")
+        .and_then(|v: &serde_json::Value| v.as_str());
+    let pinyin = obj
+        .get("pinyin")
+        .and_then(|v: &serde_json::Value| v.as_str());
+    let category = obj
+        .get("category")
+        .and_then(|v: &serde_json::Value| v.as_str());
+    let summary = obj
+        .get("summary")
+        .and_then(|v: &serde_json::Value| v.as_str());
+    let content = obj
+        .get("content")
+        .and_then(|v: &serde_json::Value| v.as_str());
+    let source_note = obj
+        .get("source_note")
+        .and_then(|v: &serde_json::Value| v.as_str());
     let tags = obj.get("tags").and_then(|v: &serde_json::Value| v.as_str());
-    let data_status = obj.get("data_status").and_then(|v: &serde_json::Value| v.as_str()).unwrap_or("draft");
-    let completeness_status = obj.get("completeness_status").and_then(|v: &serde_json::Value| v.as_str()).unwrap_or("partial");
+    let data_status = obj
+        .get("data_status")
+        .and_then(|v: &serde_json::Value| v.as_str())
+        .unwrap_or("draft");
+    let completeness_status = obj
+        .get("completeness_status")
+        .and_then(|v: &serde_json::Value| v.as_str())
+        .unwrap_or("partial");
 
     connection.execute(
         "UPDATE knowledge_items
@@ -242,9 +263,18 @@ pub fn update_from_snapshot(
              updated_at = datetime('now')
          WHERE id = ?13",
         params![
-            item_type, code, name, alias, pinyin,
-            category, summary, content, source_note,
-            tags, data_status, completeness_status,
+            item_type,
+            code,
+            name,
+            alias,
+            pinyin,
+            category,
+            summary,
+            content,
+            source_note,
+            tags,
+            data_status,
+            completeness_status,
             item_id
         ],
     )?;
@@ -252,7 +282,10 @@ pub fn update_from_snapshot(
     Ok(())
 }
 #[allow(dead_code)]
-pub fn get_item(database: &Database, item_id: i64) -> AppResult<serde_json::Map<String, serde_json::Value>> {
+pub fn get_item(
+    database: &Database,
+    item_id: i64,
+) -> AppResult<serde_json::Map<String, serde_json::Value>> {
     use serde_json::{Map, Value};
 
     database.with_connection(|connection| {
@@ -268,32 +301,59 @@ pub fn get_item(database: &Database, item_id: i64) -> AppResult<serde_json::Map<
                 map.insert("id".to_string(), Value::Number(item_id.into()));
                 map.insert("type".to_string(), Value::String(row.get(0)?));
                 if let Ok(code) = row.get::<_, Option<String>>(1) {
-                    map.insert("code".to_string(), code.map(Value::String).unwrap_or(Value::Null));
+                    map.insert(
+                        "code".to_string(),
+                        code.map(Value::String).unwrap_or(Value::Null),
+                    );
                 }
                 map.insert("name".to_string(), Value::String(row.get(2)?));
                 if let Ok(alias) = row.get::<_, Option<String>>(3) {
-                    map.insert("alias".to_string(), alias.map(Value::String).unwrap_or(Value::Null));
+                    map.insert(
+                        "alias".to_string(),
+                        alias.map(Value::String).unwrap_or(Value::Null),
+                    );
                 }
                 if let Ok(pinyin) = row.get::<_, Option<String>>(4) {
-                    map.insert("pinyin".to_string(), pinyin.map(Value::String).unwrap_or(Value::Null));
+                    map.insert(
+                        "pinyin".to_string(),
+                        pinyin.map(Value::String).unwrap_or(Value::Null),
+                    );
                 }
                 if let Ok(category) = row.get::<_, Option<String>>(5) {
-                    map.insert("category".to_string(), category.map(Value::String).unwrap_or(Value::Null));
+                    map.insert(
+                        "category".to_string(),
+                        category.map(Value::String).unwrap_or(Value::Null),
+                    );
                 }
                 if let Ok(summary) = row.get::<_, Option<String>>(6) {
-                    map.insert("summary".to_string(), summary.map(Value::String).unwrap_or(Value::Null));
+                    map.insert(
+                        "summary".to_string(),
+                        summary.map(Value::String).unwrap_or(Value::Null),
+                    );
                 }
                 if let Ok(content) = row.get::<_, Option<String>>(7) {
-                    map.insert("content".to_string(), content.map(Value::String).unwrap_or(Value::Null));
+                    map.insert(
+                        "content".to_string(),
+                        content.map(Value::String).unwrap_or(Value::Null),
+                    );
                 }
                 if let Ok(source_note) = row.get::<_, Option<String>>(8) {
-                    map.insert("source_note".to_string(), source_note.map(Value::String).unwrap_or(Value::Null));
+                    map.insert(
+                        "source_note".to_string(),
+                        source_note.map(Value::String).unwrap_or(Value::Null),
+                    );
                 }
                 if let Ok(tags) = row.get::<_, Option<String>>(9) {
-                    map.insert("tags".to_string(), tags.map(Value::String).unwrap_or(Value::Null));
+                    map.insert(
+                        "tags".to_string(),
+                        tags.map(Value::String).unwrap_or(Value::Null),
+                    );
                 }
                 map.insert("data_status".to_string(), Value::String(row.get(10)?));
-                map.insert("completeness_status".to_string(), Value::String(row.get(11)?));
+                map.insert(
+                    "completeness_status".to_string(),
+                    Value::String(row.get(11)?),
+                );
                 Ok(())
             },
         )?;
@@ -308,7 +368,7 @@ pub fn get_items_batch(
     item_ids: &[i64],
 ) -> AppResult<Vec<serde_json::Map<String, serde_json::Value>>> {
     use serde_json::{Map, Value};
-    
+
     if item_ids.is_empty() {
         return Ok(Vec::new());
     }
@@ -324,7 +384,7 @@ pub fn get_items_batch(
 
         let mut statement = connection.prepare(&query)?;
         let params: Vec<&dyn rusqlite::ToSql> = item_ids.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
-        
+
         let rows = statement.query_map(params.as_slice(), |row| {
             let mut map = Map::new();
             map.insert("id".to_string(), Value::Number(row.get::<_, i64>(0)?.into()));

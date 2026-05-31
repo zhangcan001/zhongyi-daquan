@@ -16,9 +16,8 @@ pub struct ValidationContext {
 impl ValidationContext {
     pub fn load(database: &Database) -> AppResult<Self> {
         let known_meridians = database.with_connection(|connection| {
-            let mut stmt = connection.prepare(
-                "SELECT name FROM knowledge_items WHERE type IN ('经络','meridian')"
-            )?;
+            let mut stmt = connection
+                .prepare("SELECT name FROM knowledge_items WHERE type IN ('经络','meridian')")?;
             let names = stmt
                 .query_map([], |row| row.get::<_, String>(0))?
                 .collect::<Result<HashSet<_>, _>>()?;

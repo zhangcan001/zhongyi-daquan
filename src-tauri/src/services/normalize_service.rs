@@ -15,9 +15,8 @@ impl NormalizeCache {
         let mut terms = HashMap::new();
 
         database.with_connection(|connection| {
-            let mut stmt = connection.prepare(
-                "SELECT term_type, standard_name, aliases FROM standard_terms"
-            )?;
+            let mut stmt = connection
+                .prepare("SELECT term_type, standard_name, aliases FROM standard_terms")?;
 
             let rows = stmt.query_map([], |row| {
                 Ok((

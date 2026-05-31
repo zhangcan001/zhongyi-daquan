@@ -5,9 +5,9 @@ use crate::models::search::{
     SearchRequest, SearchResponse, SearchSeedOptions, SearchSeedResponse,
 };
 use crate::repositories::{performance_repository, search_repository};
-use std::time::Instant;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 pub fn rebuild_search_index(database: &Database) -> AppResult<RebuildSearchIndexResponse> {
     let started_at = Instant::now();
@@ -266,7 +266,6 @@ mod tests {
     }
 }
 
-
 /// 重建单个条目的搜索索引（用于版本回滚后同步）
 pub fn rebuild_item_index(database: &Database, item_id: i64) -> AppResult<()> {
     // 先删除旧索引
@@ -303,8 +302,11 @@ pub fn search_with_cache(database: &Database, request: SearchRequest) -> AppResu
     {
         let cache = SEARCH_CACHE.lock().unwrap();
         if let Some((cached_response, cached_time)) = cache.get(&cache_key) {
-            if cached_time.elapsed().unwrap_or(std::time::Duration::from_secs(301))
-                < std::time::Duration::from_secs(300) {
+            if cached_time
+                .elapsed()
+                .unwrap_or(std::time::Duration::from_secs(301))
+                < std::time::Duration::from_secs(300)
+            {
                 return Ok(cached_response.clone());
             }
         }
@@ -321,9 +323,11 @@ pub fn search_with_cache(database: &Database, request: SearchRequest) -> AppResu
         // 限制缓存大小
         if cache.len() > 100 {
             // 移除最旧的条目
-            if let Some(oldest_key) = cache.iter()
+            if let Some(oldest_key) = cache
+                .iter()
                 .min_by_key(|(_, (_, time))| time)
-                .map(|(k, _)| k.clone()) {
+                .map(|(k, _)| k.clone())
+            {
                 cache.remove(&oldest_key);
             }
         }
@@ -335,13 +339,12 @@ pub fn search_with_cache(database: &Database, request: SearchRequest) -> AppResu
 pub fn get_hot_search_terms(limit: usize) -> Vec<HotSearchTerm> {
     let stats = SEARCH_STATS.lock().unwrap();
 
-    let mut terms: Vec<(String, usize)> = stats.iter()
-        .map(|(k, v)| (k.clone(), *v))
-        .collect();
+    let mut terms: Vec<(String, usize)> = stats.iter().map(|(k, v)| (k.clone(), *v)).collect();
 
     terms.sort_by(|a, b| b.1.cmp(&a.1));
 
-    terms.into_iter()
+    terms
+        .into_iter()
         .take(limit)
         .map(|(term, count)| HotSearchTerm { term, count })
         .collect()

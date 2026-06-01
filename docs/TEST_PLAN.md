@@ -44,6 +44,15 @@ cargo test --manifest-path src-tauri/Cargo.toml
   - 多个可导入文件指向同一 `target` 时生成重复风险 warning。
   - 文件夹里只有 PDF 时拒绝直接导入，并提示先转换为标准 `import_manifest` 数据包。
   - 文件夹导入确认后会重建搜索索引，可搜索新导入条目。
+- Smart Import Center V1：
+  - `import_intent` 可由 manifest 或旧 `import_profile` 推断。
+  - 可生成 `ImportPlan`，统计 create、skip、merge、attach annotation、needs review。
+  - `annotation_enrichment` 对同名中药自动写入 `knowledge_annotations`。
+  - `primary_seed` 对冲突重复项不覆盖已有内容。
+  - `classic_text` 对同 source_note 条文自动跳过。
+  - `knowledge_annotations` 内容进入搜索索引。
+  - AI 未启用时返回本地规则处理提示，不阻塞导入计划。
+  - `generic_csv` / `unknown` 仍进入字段映射。
 
 前端检查：
 

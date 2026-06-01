@@ -1,10 +1,10 @@
 use crate::errors::AppResult;
 use crate::models::data_pipeline::{
-    ConfirmImportResult, CreateImportRequest, FieldMappingTemplate, ImportBatchSummary,
-    ImportPackageDescriptor, ImportParsedPreview, ImportQualityReport, RollbackImportResult,
-    SaveMappingTemplateRequest, StagingPage,
+    ConfirmImportResult, CreateImportRequest, ExecuteImportPlanResult, FieldMappingTemplate,
+    ImportBatchSummary, ImportPackageDescriptor, ImportParsedPreview, ImportPlan,
+    ImportQualityReport, RollbackImportResult, SaveMappingTemplateRequest, StagingPage,
 };
-use crate::services::{field_mapping_service, import_project_service};
+use crate::services::{field_mapping_service, import_orchestrator_service, import_project_service};
 use crate::AppState;
 use tauri::State;
 
@@ -72,6 +72,22 @@ pub fn import_package_folder(
     folder_path: String,
 ) -> AppResult<ImportBatchSummary> {
     import_project_service::import_package_folder(&state.database, &folder_path)
+}
+
+#[tauri::command]
+pub fn preview_import_plan(
+    state: State<'_, AppState>,
+    package_path: String,
+) -> AppResult<ImportPlan> {
+    import_orchestrator_service::preview_import_plan(&state.database, &package_path)
+}
+
+#[tauri::command]
+pub fn execute_import_plan(
+    state: State<'_, AppState>,
+    plan: ImportPlan,
+) -> AppResult<ExecuteImportPlanResult> {
+    import_orchestrator_service::execute_import_plan(&state.database, plan)
 }
 
 #[tauri::command]

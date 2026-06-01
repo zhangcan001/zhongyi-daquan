@@ -1,4 +1,5 @@
 pub mod ai_draft_service;
+pub mod ai_import_assist_service;
 pub mod ai_placeholder_service;
 pub mod ai_provider_service;
 pub mod ai_safety_service;
@@ -15,6 +16,7 @@ pub mod export_service;
 pub mod field_mapping_service;
 pub mod grid_edit_service;
 pub mod import_engine_service;
+pub mod import_orchestrator_service;
 pub mod import_project_service;
 pub mod knowledge_service;
 pub mod maintenance_service;

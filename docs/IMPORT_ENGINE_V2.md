@@ -2,6 +2,8 @@
 
 Import Engine V2 用于解决 v0.1-alpha-package 中“先手工映射所有字段”的导入体验问题。新的流程先识别数据类型，再决定是否直接适配，只有普通 CSV 或未知 JSON 才进入字段评分映射。
 
+Smart Import Center V1 在 Import Engine V2 之上增加导入计划编排：标准 ZIP / 已解压文件夹会先生成 `ImportPlan`，自动处理重复、补空字段和注解附加；只有 `generic_csv` / `unknown` 继续进入字段映射。详见 `docs/SMART_IMPORT_CENTER.md`。
+
 ## 支持的数据类型
 
 | 类型 | 识别条件 | 处理方式 |
@@ -96,6 +98,8 @@ Import Engine V2 用于解决 v0.1-alpha-package 中“先手工映射所有字�
 ```
 
 `primary` 表示本次导入的主数据文件。推荐每个标准数据包只设置一个 `primary: true` 的主知识文件；主文件默认 `auto_stage: true`，系统会自动暂存。`primary: false` 的文件默认 `auto_stage: false`，会显示为辅助文件，不自动暂存。
+
+Smart Import manifest 可选声明 `import_intent`、`duplicate_policy`、`ai_assist`。旧 manifest 会按 `import_profile` 和主数据类型推断：`classics_curated_v1` 为 `classic_text`，`pdf_herb_notes_private_v1` 为 `annotation_enrichment`，普通 `knowledge_items_v1` 为 `primary_seed`。
 
 `role` 与 `description` 用于解释文件用途，不影响识别；未知 `role` 不会报错。常见 `auxiliary_export` 表示辅助导出文件，例如 `herb_items_import.json` 可能是主知识文件中的中药子集或备用导出。为避免与 `knowledge_items_import.json` 重复入库，系统会保留展示但默认不导入。即使非主文件声明 `auto_stage: true`，当前版本也先显示为“可手动选择”，不会自动暂存。
 

@@ -793,10 +793,10 @@ fn import_rows_from_bytes(
     import_preparsed_rows(database, import_type, request, rows)
 }
 
-struct ParsedImportPackage {
-    descriptor: ImportPackageDescriptor,
-    rows: Vec<Map<String, Value>>,
-    import_type: String,
+pub(crate) struct ParsedImportPackage {
+    pub descriptor: ImportPackageDescriptor,
+    pub rows: Vec<Map<String, Value>>,
+    pub import_type: String,
 }
 
 trait ImportPackageReader {
@@ -919,9 +919,33 @@ fn parse_zip_import_package(file_name: &str, content: &[u8]) -> AppResult<Parsed
     read_import_package(&mut reader)
 }
 
-fn parse_folder_import_package(folder_path: &str) -> AppResult<ParsedImportPackage> {
+pub(crate) fn parse_folder_import_package(folder_path: &str) -> AppResult<ParsedImportPackage> {
     let mut reader = FolderImportPackageReader::new(folder_path)?;
     read_import_package(&mut reader)
+}
+
+pub(crate) fn parse_path_import_package(package_path: &str) -> AppResult<ParsedImportPackage> {
+    let path = Path::new(package_path);
+    if path.is_dir() {
+        parse_folder_import_package(package_path)
+    } else if path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.eq_ignore_ascii_case("zip"))
+        .unwrap_or(false)
+    {
+        let bytes = std::fs::read(path)?;
+        parse_zip_import_package(
+            path.file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or(package_path),
+            &bytes,
+        )
+    } else {
+        Err(AppError::InvalidInput(
+            "Smart Import Center 当前只支持标准 ZIP 数据包或已解压文件夹。".to_string(),
+        ))
+    }
 }
 
 fn read_import_package<R: ImportPackageReader>(reader: &mut R) -> AppResult<ParsedImportPackage> {
@@ -963,6 +987,15 @@ fn read_manifest_import_package<R: ImportPackageReader>(
         .get("import_profile")
         .and_then(Value::as_str)
         .map(ToString::to_string);
+    let import_intent = manifest_value
+        .get("import_intent")
+        .and_then(Value::as_str)
+        .map(ToString::to_string);
+    let duplicate_policy = manifest_value
+        .get("duplicate_policy")
+        .and_then(Value::as_str)
+        .map(ToString::to_string);
+    let ai_assist = manifest_value.get("ai_assist").and_then(Value::as_bool);
     let import_order = manifest_value
         .get("import_order")
         .and_then(Value::as_array)
@@ -1091,6 +1124,9 @@ fn read_manifest_import_package<R: ImportPackageReader>(
         package_root,
         package_name,
         import_profile,
+        import_intent,
+        duplicate_policy,
+        ai_assist,
         manifest_found: true,
         manifest_path: Some("import_manifest.json".to_string()),
         primary_files,
@@ -1139,6 +1175,9 @@ fn read_auto_import_package<R: ImportPackageReader>(
                 package_root,
                 package_name: None,
                 import_profile: None,
+                import_intent: None,
+                duplicate_policy: None,
+                ai_assist: None,
                 manifest_found: false,
                 manifest_path: None,
                 files: vec![ImportPackageFile {

@@ -104,6 +104,9 @@ pub struct ImportPackageDescriptor {
     pub package_root: String,
     pub package_name: Option<String>,
     pub import_profile: Option<String>,
+    pub import_intent: Option<String>,
+    pub duplicate_policy: Option<String>,
+    pub ai_assist: Option<bool>,
     pub manifest_found: bool,
     pub manifest_path: Option<String>,
     pub files: Vec<ImportPackageFile>,
@@ -291,4 +294,54 @@ pub struct RollbackImportResult {
     pub deleted_items: i64,
     pub deleted_search_terms: i64,
     pub summary: ImportBatchSummary,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportPlan {
+    pub plan_id: String,
+    pub package_path: String,
+    pub package_name: Option<String>,
+    pub import_intent: String,
+    pub duplicate_policy: String,
+    pub total_records: i64,
+    pub create_count: i64,
+    pub update_count: i64,
+    pub attach_annotation_count: i64,
+    pub skip_duplicate_count: i64,
+    pub needs_review_count: i64,
+    pub reject_invalid_count: i64,
+    pub warnings: Vec<String>,
+    pub actions: Vec<ImportPlanAction>,
+    pub ai_message: Option<String>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportPlanAction {
+    pub row_index: i64,
+    pub action_type: String,
+    pub item_type: Option<String>,
+    pub name: Option<String>,
+    pub existing_item_id: Option<i64>,
+    pub confidence: f64,
+    pub reason: String,
+    pub draft_json: serde_json::Value,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecuteImportPlanResult {
+    pub plan_id: String,
+    pub created_count: i64,
+    pub merged_count: i64,
+    pub attached_annotation_count: i64,
+    pub skipped_count: i64,
+    pub needs_review_count: i64,
+    pub rejected_count: i64,
+    pub search_index_rebuilt: bool,
+    pub warnings: Vec<String>,
 }

@@ -557,6 +557,15 @@ fn load_indexable_item(
 }
 
 fn upsert_fts_tx(connection: &Connection, item: &IndexableKnowledgeItem) -> AppResult<()> {
+    let annotation_text = annotation_search_text(connection, item.id)?;
+    let content = [
+        item.content.as_deref().unwrap_or_default(),
+        annotation_text.as_str(),
+    ]
+    .into_iter()
+    .filter(|value| !value.trim().is_empty())
+    .collect::<Vec<_>>()
+    .join("\n");
     connection.execute(
         "DELETE FROM knowledge_fts WHERE rowid = ?1",
         params![item.id],
@@ -573,7 +582,7 @@ fn upsert_fts_tx(connection: &Connection, item: &IndexableKnowledgeItem) -> AppR
             item.pinyin,
             item.category,
             item.summary,
-            item.content,
+            content,
             item.tags
         ],
     )?;
@@ -792,6 +801,31 @@ pub fn build_terms_from_item(item: &IndexableKnowledgeItem) -> Vec<SearchTerm> {
     push_split_terms(&mut terms, &mut seen, item.tags.as_deref(), "tags", 45);
     push_known_normalized_terms(&mut terms, &mut seen, item);
     terms
+}
+
+fn annotation_search_text(connection: &Connection, item_id: i64) -> AppResult<String> {
+    let mut statement = connection.prepare(
+        "SELECT source_title, source_note, content, tags_json
+         FROM knowledge_annotations
+         WHERE knowledge_item_id = ?1",
+    )?;
+    let rows = statement.query_map(params![item_id], |row| {
+        Ok([
+            row.get::<_, Option<String>>(0)?,
+            row.get::<_, Option<String>>(1)?,
+            row.get::<_, Option<String>>(2)?,
+            row.get::<_, Option<String>>(3)?,
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join(" "))
+    })?;
+    let mut values = Vec::new();
+    for row in rows {
+        values.push(row?);
+    }
+    Ok(values.join(" "))
 }
 
 fn push_optional(

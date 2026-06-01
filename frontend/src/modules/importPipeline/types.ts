@@ -128,3 +128,44 @@ export type FieldMappingTemplate = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type ImportPlanAction = {
+  rowIndex: number;
+  actionType: string;
+  itemType?: string | null;
+  name?: string | null;
+  existingItemId?: number | null;
+  confidence: number;
+  reason: string;
+  draftJson: Record<string, unknown> | null;
+};
+
+export type ImportPlan = {
+  planId: string;
+  packagePath: string;
+  packageName?: string | null;
+  importIntent: string;
+  duplicatePolicy: string;
+  totalRecords: number;
+  createCount: number;
+  updateCount: number;
+  attachAnnotationCount: number;
+  skipDuplicateCount: number;
+  needsReviewCount: number;
+  rejectInvalidCount: number;
+  warnings: string[];
+  actions: ImportPlanAction[];
+  aiMessage?: string | null;
+};
+
+export type ExecuteImportPlanResult = {
+  planId: string;
+  createdCount: number;
+  mergedCount: number;
+  attachedAnnotationCount: number;
+  skippedCount: number;
+  needsReviewCount: number;
+  rejectedCount: number;
+  searchIndexRebuilt: boolean;
+  warnings: string[];
+};

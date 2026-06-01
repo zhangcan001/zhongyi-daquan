@@ -78,6 +78,8 @@ pub fn run() {
             commands::import_commands::import_zip_to_staging,
             commands::import_commands::preview_package_folder_import,
             commands::import_commands::import_package_folder,
+            commands::import_commands::preview_import_plan,
+            commands::import_commands::execute_import_plan,
             commands::import_commands::save_field_mapping_template,
             commands::import_commands::list_field_mapping_templates,
             commands::import_commands::get_import_staging_page,

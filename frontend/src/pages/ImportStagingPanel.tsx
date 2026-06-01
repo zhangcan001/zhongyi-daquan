@@ -4,9 +4,11 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type {
   FieldMappingSuggestion,
   FieldMappingTemplate,
+  ExecuteImportPlanResult,
   ImportBatchSummary,
   ImportPackageDescriptor,
   ImportParsedPreview,
+  ImportPlan,
   ImportQualityReport,
   Mapping,
   StagingPage,
@@ -49,6 +51,8 @@ export function ImportStagingPanel() {
   const [staging, setStaging] = useState<StagingPage | null>(null);
   const [preview, setPreview] = useState<ImportParsedPreview | null>(null);
   const [packageDescriptor, setPackageDescriptor] = useState<ImportPackageDescriptor | null>(null);
+  const [importPlan, setImportPlan] = useState<ImportPlan | null>(null);
+  const [importReport, setImportReport] = useState<ExecuteImportPlanResult | null>(null);
   const [qualityReport, setQualityReport] = useState<ImportQualityReport | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -98,12 +102,43 @@ export function ImportStagingPanel() {
       setBinaryContent(null);
       setContent("已选择数据包文件夹，内容不在文本框中展开。");
       setPreview(null);
+      setImportPlan(null);
+      setImportReport(null);
       const descriptor = await invoke<ImportPackageDescriptor>("preview_package_folder_import", { folderPath: selected });
       setPackageDescriptor(descriptor);
+      const plan = await invoke<ImportPlan>("preview_import_plan", { packagePath: selected });
+      setImportPlan(plan);
       setTargetType("mixed");
-      setMessage("已识别数据包文件夹，可导入暂存区。");
+      setMessage("已生成 Smart Import 导入计划。");
     } catch (cause) {
       setPackageDescriptor(null);
+      setError(String(cause));
+    }
+  }
+
+  async function chooseSmartZipPackage() {
+    setError("");
+    setMessage("");
+    try {
+      const selected = await open({
+        directory: false,
+        multiple: false,
+        title: "选择 Smart Import ZIP 数据包",
+        filters: [{ name: "ZIP 数据包", extensions: ["zip"] }],
+      });
+      if (!selected || Array.isArray(selected)) return;
+      setImportType("zip");
+      setFileName(selected.split(/[\\/]/).filter(Boolean).pop() ?? "smart-import.zip");
+      setPackageFolderPath(selected);
+      setContent("已选择 Smart Import ZIP 数据包，内容不在文本框中展开。");
+      setBinaryContent(null);
+      setPreview(null);
+      setPackageDescriptor(null);
+      const plan = await invoke<ImportPlan>("preview_import_plan", { packagePath: selected });
+      setImportPlan(plan);
+      setMessage("已生成 Smart Import 导入计划。");
+    } catch (cause) {
+      setImportPlan(null);
       setError(String(cause));
     }
   }
@@ -209,6 +244,19 @@ export function ImportStagingPanel() {
     setMessage(`确认入库完成：导入 ${result.importedCount} 行，跳过 ${result.skippedCount} 行。`);
   }
 
+  async function executeSmartImport() {
+    if (!importPlan) return;
+    setError("");
+    setMessage("");
+    try {
+      const report = await invoke<ExecuteImportPlanResult>("execute_import_plan", { plan: importPlan });
+      setImportReport(report);
+      setMessage(`Smart Import 完成：新增 ${report.createdCount}，补空字段 ${report.mergedCount}，附加注解 ${report.attachedAnnotationCount}，跳过 ${report.skippedCount}。`);
+    } catch (cause) {
+      setError(String(cause));
+    }
+  }
+
   async function loadQualityReport(id = batchId) {
     if (!id) return;
     setError("");
@@ -307,9 +355,12 @@ export function ImportStagingPanel() {
       <div className="import-actions">
         <button type="button" onClick={() => importType === "zip" ? previewZip() : previewTextImport()}>识别文件</button>
         <button type="button" onClick={choosePackageFolder}>导入数据包文件夹</button>
+        <button type="button" onClick={chooseSmartZipPackage}>导入 Smart ZIP</button>
       </div>
 
       {packageDescriptor ? <PackageDescriptorPanel descriptor={packageDescriptor} /> : null}
+      {importPlan ? <ImportPlanPanel plan={importPlan} /> : null}
+      {importReport ? <ImportReportPanel report={importReport} /> : null}
 
       {preview ? (
         <div className="preview-panel">
@@ -342,6 +393,7 @@ export function ImportStagingPanel() {
 
       <div className="import-actions">
         <button type="button" onClick={importToStaging}>导入暂存区</button>
+        <button type="button" disabled={!importPlan} onClick={executeSmartImport}>开始 Smart Import</button>
         <button
           type="button"
           onClick={() => {
@@ -540,6 +592,47 @@ function ManifestFileGroup({ title, files, fallbackStatus }: { title: string; fi
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function ImportPlanPanel({ plan }: { plan: ImportPlan }) {
+  return (
+    <div className="preview-panel">
+      <div className="summary-grid">
+        <Metric label="导入意图" value={plan.importIntent} />
+        <Metric label="重复策略" value={plan.duplicatePolicy} />
+        <Metric label="总记录" value={plan.totalRecords} />
+        <Metric label="需确认" value={plan.needsReviewCount} />
+      </div>
+      <div className="summary-grid">
+        <Metric label="新增" value={plan.createCount} />
+        <Metric label="补空字段" value={plan.updateCount} />
+        <Metric label="附加注解" value={plan.attachAnnotationCount} />
+        <Metric label="跳过重复" value={plan.skipDuplicateCount} />
+      </div>
+      {plan.aiMessage ? <p className="ai-message">{plan.aiMessage}</p> : null}
+      {plan.warnings.length ? <p className="error-text">{plan.warnings.join("；")}</p> : null}
+    </div>
+  );
+}
+
+function ImportReportPanel({ report }: { report: ExecuteImportPlanResult }) {
+  return (
+    <div className="preview-panel">
+      <div className="summary-grid">
+        <Metric label="新增" value={report.createdCount} />
+        <Metric label="补空字段" value={report.mergedCount} />
+        <Metric label="附加注解" value={report.attachedAnnotationCount} />
+        <Metric label="跳过" value={report.skippedCount} />
+      </div>
+      <div className="summary-grid">
+        <Metric label="需确认" value={report.needsReviewCount} />
+        <Metric label="无效拒绝" value={report.rejectedCount} />
+        <Metric label="搜索索引" value={report.searchIndexRebuilt ? "已重建" : "未重建"} />
+        <Metric label="计划" value={report.planId} />
+      </div>
+      {report.warnings.length ? <p className="error-text">{report.warnings.join("；")}</p> : null}
     </div>
   );
 }

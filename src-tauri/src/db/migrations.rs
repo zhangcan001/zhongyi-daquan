@@ -43,6 +43,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "smart_import_center_v1",
         sql: include_str!("../../migrations/007_smart_import_center_v1.sql"),
     },
+    Migration {
+        version: 8,
+        name: "import_runs_v1",
+        sql: include_str!("../../migrations/008_import_runs_v1.sql"),
+    },
 ];
 
 pub fn run(connection: &Connection) -> AppResult<()> {

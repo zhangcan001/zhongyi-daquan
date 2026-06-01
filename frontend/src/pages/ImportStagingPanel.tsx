@@ -2,491 +2,375 @@ import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import type {
-  FieldMappingSuggestion,
-  FieldMappingTemplate,
   ExecuteImportPlanResult,
-  ImportBatchSummary,
-  ImportPackageDescriptor,
   ImportParsedPreview,
   ImportPlan,
-  ImportQualityReport,
-  Mapping,
-  StagingPage,
+  ImportRunReport,
+  ImportRunSummary,
+  RollbackImportRunResult,
 } from "../modules/importPipeline/types";
 
+type ImportStep = "pick" | "analyze" | "plan" | "report";
+
 const sampleJson = JSON.stringify(
-  [
-    { code: " st36 ", name: " 足三里 ", type: "穴位", meridians: "胃经", tags: "常用，保健" },
-    { code: "bad code", name: "", type: "穴位", meridians: "未知经" },
-  ],
+  [{ type: "herb", name: "黄耆", content: "黄耆测试资料", tags: "中药" }],
   null,
   2,
 );
-const sampleCsv = "code,name,type,meridians,tags\r\n st36 , 足三里 ,穴位,胃经,常用;保健\r\nbad code,,穴位,未知经,\r\n";
-
-const knowledgeTypes = [
-  { value: "mixed", label: "自动识别 / 混合类型" },
-  { value: "中药", label: "中药" },
-  { value: "方剂", label: "方剂" },
-  { value: "经络", label: "经络" },
-  { value: "穴位", label: "穴位" },
-  { value: "证型", label: "证型" },
-  { value: "病症", label: "病症" },
-];
-
-type ImportSourceType = "json" | "csv" | "zip" | "folder";
+const sampleCsv = "type,name,content,tags\r\nherb,黄耆,黄耆测试资料,中药\r\n";
 
 export function ImportStagingPanel() {
-  const [importType, setImportType] = useState<ImportSourceType>("json");
-  const [targetType, setTargetType] = useState("穴位");
-  const [fileName, setFileName] = useState("manual-import.json");
-  const [packageFolderPath, setPackageFolderPath] = useState("");
-  const [content, setContent] = useState(sampleJson);
-  const [binaryContent, setBinaryContent] = useState<number[] | null>(null);
-  const [mappingText, setMappingText] = useState("");
-  const [templateName, setTemplateName] = useState("默认导入映射");
-  const [templates, setTemplates] = useState<FieldMappingTemplate[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState("");
-  const [summary, setSummary] = useState<ImportBatchSummary | null>(null);
-  const [staging, setStaging] = useState<StagingPage | null>(null);
-  const [preview, setPreview] = useState<ImportParsedPreview | null>(null);
-  const [packageDescriptor, setPackageDescriptor] = useState<ImportPackageDescriptor | null>(null);
-  const [importPlan, setImportPlan] = useState<ImportPlan | null>(null);
-  const [importReport, setImportReport] = useState<ExecuteImportPlanResult | null>(null);
-  const [qualityReport, setQualityReport] = useState<ImportQualityReport | null>(null);
+  const [step, setStep] = useState<ImportStep>("pick");
+  const [packagePath, setPackagePath] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [plan, setPlan] = useState<ImportPlan | null>(null);
+  const [report, setReport] = useState<ExecuteImportPlanResult | null>(null);
+  const [runReport, setRunReport] = useState<ImportRunReport | null>(null);
+  const [runs, setRuns] = useState<ImportRunSummary[]>([]);
+  const [advancedContent, setAdvancedContent] = useState(sampleJson);
+  const [advancedKind, setAdvancedKind] = useState<"json" | "csv">("json");
+  const [advancedPreview, setAdvancedPreview] = useState<ImportParsedPreview | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const batchId = summary?.batch.id ?? staging?.summary.batch.id;
-  const sourceHeaders = useMemo(() => readSourceHeaders(content, importType), [content, importType]);
+  const packageTitle = useMemo(() => {
+    if (plan?.packageName?.includes("shennong_bencao") || plan?.packageName?.includes("ni_notes")) {
+      return "本草注解增强包";
+    }
+    return readableIntent(plan?.importIntent);
+  }, [plan?.importIntent, plan?.packageName]);
 
   useEffect(() => {
-    invoke<FieldMappingTemplate[]>("list_field_mapping_templates", { targetType })
-      .then(setTemplates)
-      .catch((cause) => setError(String(cause)));
-  }, [targetType, summary?.batch.id]);
+    refreshRuns();
+  }, []);
 
-  async function loadFile(file: File | null) {
-    if (!file) return;
-    setFileName(file.name);
-    const lowerName = file.name.toLowerCase();
-    const nextType = lowerName.endsWith(".zip") ? "zip" : lowerName.endsWith(".csv") ? "csv" : "json";
-    setImportType(nextType);
-    if (nextType === "zip") {
-      const bytes = Array.from(new Uint8Array(await file.arrayBuffer()));
-      setBinaryContent(bytes);
-      setContent("ZIP 数据包已读取，内容不在文本框中展开。");
-      setPackageDescriptor(null);
-      await previewZip(file.name, bytes);
-    } else {
-      setBinaryContent(null);
-      setPackageDescriptor(null);
-      const text = await file.text();
-      setContent(text);
-      await previewTextImport(nextType, text);
-    }
-    if (file.name.includes("knowledge_items_import") || file.name.includes("curated")) {
-      setTargetType("mixed");
+  async function refreshRuns() {
+    try {
+      setRuns(await invoke<ImportRunSummary[]>("list_import_runs"));
+    } catch {
+      setRuns([]);
     }
   }
 
-  async function choosePackageFolder() {
+  async function choosePackage(kind: "zip" | "folder") {
     setError("");
     setMessage("");
-    try {
-      const selected = await open({ directory: true, multiple: false, title: "选择已解压数据包文件夹" });
-      if (!selected || Array.isArray(selected)) return;
-      setImportType("folder");
-      setPackageFolderPath(selected);
-      setFileName(selected.split(/[\\/]/).filter(Boolean).pop() ?? "package-folder");
-      setBinaryContent(null);
-      setContent("已选择数据包文件夹，内容不在文本框中展开。");
-      setPreview(null);
-      setImportPlan(null);
-      setImportReport(null);
-      const descriptor = await invoke<ImportPackageDescriptor>("preview_package_folder_import", { folderPath: selected });
-      setPackageDescriptor(descriptor);
-      const plan = await invoke<ImportPlan>("preview_import_plan", { packagePath: selected });
-      setImportPlan(plan);
-      setTargetType("mixed");
-      setMessage("已生成 Smart Import 导入计划。");
-    } catch (cause) {
-      setPackageDescriptor(null);
-      setError(String(cause));
-    }
-  }
-
-  async function chooseSmartZipPackage() {
-    setError("");
-    setMessage("");
-    try {
-      const selected = await open({
-        directory: false,
-        multiple: false,
-        title: "选择 Smart Import ZIP 数据包",
-        filters: [{ name: "ZIP 数据包", extensions: ["zip"] }],
-      });
-      if (!selected || Array.isArray(selected)) return;
-      setImportType("zip");
-      setFileName(selected.split(/[\\/]/).filter(Boolean).pop() ?? "smart-import.zip");
-      setPackageFolderPath(selected);
-      setContent("已选择 Smart Import ZIP 数据包，内容不在文本框中展开。");
-      setBinaryContent(null);
-      setPreview(null);
-      setPackageDescriptor(null);
-      const plan = await invoke<ImportPlan>("preview_import_plan", { packagePath: selected });
-      setImportPlan(plan);
-      setMessage("已生成 Smart Import 导入计划。");
-    } catch (cause) {
-      setImportPlan(null);
-      setError(String(cause));
-    }
-  }
-
-  async function previewTextImport(nextType: ImportSourceType = importType, nextContent = content) {
-    if (nextType === "zip" || nextType === "folder") return;
-    try {
-      const command = nextType === "json" ? "preview_json_import" : "preview_csv_import";
-      setPreview(await invoke<ImportParsedPreview>(command, { content: nextContent }));
-    } catch (cause) {
-      setPreview(null);
-      setError(String(cause));
-    }
-  }
-
-  async function previewZip(nextFileName = fileName, bytes = binaryContent) {
-    if (!bytes) return;
-    try {
-      setPreview(await invoke<ImportParsedPreview>("preview_zip_import", { fileName: nextFileName, content: bytes }));
-    } catch (cause) {
-      setPreview(null);
-      setError(String(cause));
-    }
-  }
-
-  async function importToStaging() {
-    setError("");
-    setMessage("");
-    try {
-      const mapping = mappingText.trim() ? (JSON.parse(mappingText) as Mapping) : undefined;
-      const request = {
-        fileName,
-        targetType: preview?.directImportReady ? "mixed" : targetType,
-        content,
-        mapping,
-        templateId: selectedTemplateId ? Number(selectedTemplateId) : null,
-      };
-      const result = importType === "folder"
-        ? await invoke<ImportBatchSummary>("import_package_folder", { folderPath: packageFolderPath })
-        : importType === "zip"
-          ? await invoke<ImportBatchSummary>("import_zip_to_staging", { request, content: binaryContent ?? [] })
-          : await invoke<ImportBatchSummary>(importType === "json" ? "import_json_to_staging" : "import_csv_to_staging", { request });
-      setSummary(result);
-      await loadStaging(result.batch.id);
-      setQualityReport(null);
-      setMessage("已导入暂存区，未写入正式知识库。");
-    } catch (cause) {
-      setError(String(cause));
-    }
-  }
-
-  async function loadStaging(id = batchId) {
-    if (!id) return;
-    const result = await invoke<StagingPage>("get_import_staging_page", {
-      batchId: id,
-      page: 1,
-      pageSize: 50,
+    setReport(null);
+    setRunReport(null);
+    setStep("pick");
+    const selected = await open({
+      directory: kind === "folder",
+      multiple: false,
+      title: kind === "folder" ? "选择已解压数据包文件夹" : "选择 ZIP 数据包",
+      filters: kind === "zip" ? [{ name: "标准数据包", extensions: ["zip"] }] : undefined,
     });
-    setStaging(result);
-    setSummary(result.summary);
+    if (!selected || Array.isArray(selected)) return;
+    await analyzePackage(selected);
   }
 
-  async function saveTemplate() {
+  async function chooseAdvancedFile(file: File | null) {
+    if (!file) return;
     setError("");
+    setMessage("");
+    setFileName(file.name);
+    const kind = file.name.toLowerCase().endsWith(".csv") ? "csv" : "json";
+    const content = await file.text();
+    setAdvancedKind(kind);
+    setAdvancedContent(content);
+    await previewAdvancedContent(kind, content);
+  }
+
+  async function previewAdvancedContent(kind = advancedKind, content = advancedContent) {
     try {
-      const mapping = mappingText.trim() ? (JSON.parse(mappingText) as Mapping) : Object.fromEntries(sourceHeaders.map((header) => [header, header]));
-      await invoke("save_field_mapping_template", {
-        request: { name: templateName, targetType, sourceHeaders, mapping },
-      });
-      setMessage("字段映射模板已保存。");
-      setTemplates(await invoke<FieldMappingTemplate[]>("list_field_mapping_templates", { targetType }));
+      const command = kind === "csv" ? "preview_csv_import" : "preview_json_import";
+      const preview = await invoke<ImportParsedPreview>(command, { content });
+      setAdvancedPreview(preview);
+      setMessage(
+        preview.directImportReady
+          ? "已自动识别标准单文件，可继续使用 Smart Import 数据包方式导入。"
+          : "该文件需要高级导入确认，字段映射详情已保持折叠。",
+      );
     } catch (cause) {
+      setAdvancedPreview(null);
       setError(String(cause));
     }
   }
 
-  async function runClean(stepType: string) {
-    if (!batchId) return;
-    setError("");
+  async function analyzePackage(selectedPath: string) {
+    setPackagePath(selectedPath);
+    setFileName(selectedPath.split(/[\\/]/).filter(Boolean).pop() ?? "标准数据包");
+    setStep("analyze");
     try {
-      const result = await invoke<{ affectedRows: number }>("apply_import_clean_step", {
-        request: { batchId, stepType, params: null },
-      });
-      await loadStaging(batchId);
-      setMessage(`清洗完成，影响 ${result.affectedRows} 行。`);
+      const nextPlan = await invoke<ImportPlan>("preview_import_plan", { packagePath: selectedPath });
+      setPlan(nextPlan);
+      setStep(nextPlan.actions.some((action) => action.actionType === "needs_review") ? "plan" : "plan");
+      setMessage("分析完成，系统已生成导入计划。");
     } catch (cause) {
+      setPlan(null);
       setError(String(cause));
+      setStep("pick");
     }
   }
 
-  async function undoClean() {
-    if (!batchId) return;
-    const result = await invoke<{ affectedRows: number }>("undo_last_import_clean_step", { batchId });
-    await loadStaging(batchId);
-    setMessage(`已撤销上一步清洗，影响 ${result.affectedRows} 行。`);
-  }
-
-  async function confirmImport() {
-    if (!batchId) return;
-    const result = await invoke<{ importedCount: number; skippedCount: number }>("confirm_import_batch", { batchId });
-    await loadStaging(batchId);
-    await loadQualityReport(batchId);
-    setMessage(`确认入库完成：导入 ${result.importedCount} 行，跳过 ${result.skippedCount} 行。`);
-  }
-
-  async function executeSmartImport() {
-    if (!importPlan) return;
+  async function executePlan() {
+    if (!plan) return;
     setError("");
     setMessage("");
     try {
-      const report = await invoke<ExecuteImportPlanResult>("execute_import_plan", { plan: importPlan });
-      setImportReport(report);
-      setMessage(`Smart Import 完成：新增 ${report.createdCount}，补空字段 ${report.mergedCount}，附加注解 ${report.attachedAnnotationCount}，跳过 ${report.skippedCount}。`);
+      const result = await invoke<ExecuteImportPlanResult>("execute_import_plan", { plan });
+      setReport(result);
+      setStep("report");
+      setMessage("导入完成，搜索索引已重建。");
+      await refreshRuns();
+      if (result.importRunId) {
+        setRunReport(await invoke<ImportRunReport>("get_import_run_report", { importRunId: result.importRunId }));
+      }
     } catch (cause) {
       setError(String(cause));
     }
   }
 
-  async function loadQualityReport(id = batchId) {
-    if (!id) return;
+  async function rollbackCurrentRun() {
+    if (!report?.importRunId) return;
+    if (!window.confirm("确认回滚本次导入？系统只撤销本批次记录的新增、注解和补空字段。")) return;
     setError("");
     try {
-      setQualityReport(await invoke<ImportQualityReport>("get_import_quality_report", { batchId: id }));
+      const result = await invoke<RollbackImportRunResult>("rollback_import_run", {
+        importRunId: report.importRunId,
+      });
+      setMessage(
+        `回滚完成：撤销 ${result.rolledBackChanges} 项，跳过 ${result.skippedChanges} 项。搜索索引已重建。`,
+      );
+      if (result.warnings.length) {
+        setError(result.warnings.join("；"));
+      }
+      await refreshRuns();
+      setRunReport(await invoke<ImportRunReport>("get_import_run_report", { importRunId: report.importRunId }));
     } catch (cause) {
       setError(String(cause));
     }
   }
 
-  async function rollbackImport() {
-    if (!batchId) return;
-    if (!window.confirm("确认回滚本批次已入库数据？此操作会删除本批次写入的知识条目并重建搜索索引。")) return;
+  function cancelImport() {
+    setStep("pick");
+    setPlan(null);
+    setReport(null);
+    setRunReport(null);
+    setPackagePath("");
+    setFileName("");
+    setMessage("");
     setError("");
-    try {
-      const result = await invoke<{ deletedItems: number; deletedSearchTerms: number }>("rollback_import_batch", { batchId });
-      await loadStaging(batchId);
-      setQualityReport(null);
-      setMessage(`已回滚本批次：删除 ${result.deletedItems} 条知识、${result.deletedSearchTerms} 条搜索词。`);
-    } catch (cause) {
-      setError(String(cause));
-    }
   }
 
   return (
     <section className="section-band import-panel">
       <div className="section-heading">
         <div>
-          <h2>批量导入与暂存区</h2>
-          <p>JSON / CSV 先进入暂存区，完成映射、清洗和校验后再确认入库。</p>
+          <h2>智能导入中心</h2>
+          <p>选择标准数据包，系统会自动识别、去重、合并和生成导入计划。</p>
         </div>
-        <div className="status-pill muted">{batchId ? `批次 #${batchId}` : "未创建批次"}</div>
+        <div className="status-pill muted">{stepLabel(step)}</div>
       </div>
 
-      <div className="import-grid">
-        <label>
-          文件
-          <input type="file" accept=".json,.csv,.zip,application/json,text/csv,application/zip" onChange={(event) => loadFile(event.target.files?.[0] ?? null)} />
-        </label>
-        <label>
-          格式
-          <select
-            value={importType}
-            onChange={(event) => {
-              const nextType = event.target.value as ImportSourceType;
-              setImportType(nextType);
-              setBinaryContent(null);
-              setPreview(null);
-              setPackageDescriptor(null);
-              setFileName(nextType === "json" ? "manual-import.json" : nextType === "csv" ? "manual-import.csv" : nextType === "zip" ? "manual-import.zip" : "package-folder");
-              setContent(nextType === "json" ? sampleJson : nextType === "csv" ? sampleCsv : nextType === "zip" ? "请选择 ZIP 数据包。" : "请选择已解压数据包文件夹。");
-            }}
-          >
-            <option value="json">JSON</option>
-            <option value="csv">CSV</option>
-            <option value="zip">ZIP 数据包</option>
-            <option value="folder">已解压数据包文件夹</option>
-          </select>
-        </label>
-        <label>
-          知识类型
-          <select value={targetType} onChange={(event) => setTargetType(event.target.value)}>
-            {knowledgeTypes.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          套用模板
-          <select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}>
-            <option value="">自动映射</option>
-            {templates.map((template) => (
-              <option key={template.id} value={template.id}>
-                {template.name}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="summary-strip">
+        <span>1. 选择数据包</span>
+        <span>2. 自动分析</span>
+        <span>3. 确认导入计划</span>
+        <span>4. 查看报告 / 一键回滚</span>
       </div>
-
-      <label className="stacked-field">
-        导入内容
-        <textarea
-          value={content}
-          onChange={(event) => {
-            setContent(event.target.value);
-            setPreview(null);
-          }}
-          rows={7}
-          disabled={importType === "zip" || importType === "folder"}
-        />
-      </label>
 
       <div className="import-actions">
-        <button type="button" onClick={() => importType === "zip" ? previewZip() : previewTextImport()}>识别文件</button>
-        <button type="button" onClick={choosePackageFolder}>导入数据包文件夹</button>
-        <button type="button" onClick={chooseSmartZipPackage}>导入 Smart ZIP</button>
+        <button type="button" onClick={() => choosePackage("zip")}>选择 ZIP 数据包</button>
+        <button type="button" onClick={() => choosePackage("folder")}>选择已解压数据包文件夹</button>
+        <label className="file-button">
+          选择单个 JSON / CSV 文件，高级入口
+          <input type="file" accept=".json,.csv,application/json,text/csv" onChange={(event) => chooseAdvancedFile(event.target.files?.[0] ?? null)} />
+        </label>
       </div>
 
-      {packageDescriptor ? <PackageDescriptorPanel descriptor={packageDescriptor} /> : null}
-      {importPlan ? <ImportPlanPanel plan={importPlan} /> : null}
-      {importReport ? <ImportReportPanel report={importReport} /> : null}
-
-      {preview ? (
+      {plan ? (
         <div className="preview-panel">
           <div className="summary-grid">
-            <Metric label="识别类型" value={preview.detection.detectedType} />
-            <Metric label="置信度" value={`${Math.round(preview.detection.confidence * 100)}%`} />
-            <Metric label="记录数" value={preview.detection.recordCount} />
-            <Metric label="导入方式" value={preview.directImportReady ? "可直接导入" : "需映射确认"} />
+            <Metric label="数据包名称" value={plan.packageName ?? (fileName || "未命名数据包")} />
+            <Metric label="数据包类型" value={packageTitle} />
+            <Metric label="导入意图" value={readableIntent(plan.importIntent)} />
+            <Metric label="主数据数量" value={plan.totalRecords} />
           </div>
-          <p className="ai-message">{preview.detection.reason}</p>
-          {preview.warnings.length ? <p className="error-text">{preview.warnings.join("；")}</p> : null}
-          {!preview.directImportReady && preview.mappingSuggestions.length ? <MappingSuggestionTable suggestions={preview.mappingSuggestions} /> : null}
+          <div className="summary-grid">
+            <Metric label="是否可直接导入" value={plan.needsReviewCount > 0 ? "含待确认项" : "可直接导入"} />
+            <Metric label="AI 辅助状态" value="未启用，本地规则处理" />
+            <Metric label="新增条目" value={plan.createCount} />
+            <Metric label="附加注解" value={plan.attachAnnotationCount} />
+          </div>
+          {packageTitle === "本草注解增强包" ? (
+            <p className="ai-message">系统会把已存在药物的内容作为注解资料附加，避免创建重复药物条目。</p>
+          ) : null}
         </div>
       ) : null}
 
-      <div className="mapping-row">
-        <label>
-          模板名称
-          <input value={templateName} onChange={(event) => setTemplateName(event.target.value)} />
-        </label>
-        <label>
-          人工映射 JSON
-          <input
-            placeholder='{"穴位编号":"code","穴名":"name","归经":"meridians"}'
-            value={mappingText}
-            onChange={(event) => setMappingText(event.target.value)}
+      {plan ? (
+        <div className="preview-panel">
+          <h3>导入计划摘要</h3>
+          <div className="summary-grid">
+            <Metric label="新增条目数" value={plan.createCount} />
+            <Metric label="附加注解数" value={plan.attachAnnotationCount} />
+            <Metric label="跳过重复数" value={plan.skipDuplicateCount} />
+            <Metric label="合并补全数" value={plan.updateCount} />
+            <Metric label="待确认数" value={plan.needsReviewCount} />
+            <Metric label="错误数" value={plan.rejectInvalidCount} />
+          </div>
+          <p className="ai-message">AI 辅助：未启用。当前使用本地规则自动处理。</p>
+          {plan.needsReviewCount > 0 ? <p className="error-text">存在待确认项，本次不会自动执行这些记录。</p> : null}
+        </div>
+      ) : null}
+
+      <div className="import-actions primary-actions">
+        <button type="button" disabled={!plan || Boolean(report)} onClick={executePlan}>开始导入</button>
+        <button type="button" onClick={cancelImport}>取消</button>
+      </div>
+
+      {report ? (
+        <div className="preview-panel">
+          <h3>导入报告</h3>
+          <div className="summary-grid">
+            <Metric label="导入成功数量" value={report.createdCount + report.mergedCount + report.attachedAnnotationCount} />
+            <Metric label="跳过数量" value={report.skippedCount} />
+            <Metric label="附加注解数量" value={report.attachedAnnotationCount} />
+            <Metric label="失败数量" value={readNumber(report.reportJson.failed_count) + report.rejectedCount} />
+            <Metric label="导入批次号" value={report.importRunId ? `#${report.importRunId}` : "未记录"} />
+            <Metric label="搜索索引" value={report.searchIndexRebuilt ? "已重建" : "未重建"} />
+          </div>
+          <div className="import-actions">
+            <button type="button" disabled={!report.importRunId} onClick={rollbackCurrentRun}>一键回滚本次导入</button>
+          </div>
+          {runReport ? (
+            <details className="advanced-details">
+              <summary>查看报告</summary>
+              <pre>{JSON.stringify(runReport.summary, null, 2)}</pre>
+            </details>
+          ) : null}
+        </div>
+      ) : null}
+
+      <details className="advanced-details">
+        <summary>高级详情</summary>
+        <p>字段映射、manifest 路径、动作明细和技术字段只在这里查看。标准数据包默认不会进入字段映射。</p>
+        <dl>
+          <dt>当前路径</dt>
+          <dd>{packagePath || "未选择"}</dd>
+          <dt>计划编号</dt>
+          <dd>{plan?.planId ?? "未生成"}</dd>
+          <dt>重复策略</dt>
+          <dd>{plan?.duplicatePolicy ?? "未生成"}</dd>
+        </dl>
+        {plan?.warnings.length ? <p className="error-text">{plan.warnings.join("；")}</p> : null}
+        {plan?.actions.length ? (
+          <div className="staging-table-wrap compact">
+            <table className="staging-table">
+              <thead>
+                <tr>
+                  <th>行</th>
+                  <th>动作</th>
+                  <th>名称</th>
+                  <th>原因</th>
+                </tr>
+              </thead>
+              <tbody>
+                {plan.actions.slice(0, 40).map((action) => (
+                  <tr key={`${action.rowIndex}-${action.actionType}-${action.name ?? ""}`}>
+                    <td>{action.rowIndex}</td>
+                    <td>{action.actionType}</td>
+                    <td>{action.name ?? "-"}</td>
+                    <td>{action.reason}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </details>
+
+      <details className="advanced-details">
+        <summary>高级导入（JSON / CSV）</summary>
+        <p>仅 generic_csv、generic_json 或 unknown 数据需要进入这里。系统会先自动识别，只有失败时才需要处理字段映射。</p>
+        <label className="stacked-field">
+          文件内容
+          <textarea
+            value={advancedContent}
+            rows={6}
+            onChange={(event) => {
+              setAdvancedContent(event.target.value);
+              setAdvancedPreview(null);
+            }}
           />
         </label>
-      </div>
-
-      <div className="import-actions">
-        <button type="button" onClick={importToStaging}>导入暂存区</button>
-        <button type="button" disabled={!importPlan} onClick={executeSmartImport}>开始 Smart Import</button>
-        <button
-          type="button"
-          onClick={() => {
-            setImportType("json");
-            setFileName("manual-import.json");
-            setPackageFolderPath("");
-            setContent(sampleJson);
-            setBinaryContent(null);
-            setPreview(null);
-            setPackageDescriptor(null);
-          }}
-        >
-          载入 JSON 示例
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setImportType("csv");
-            setFileName("manual-import.csv");
-            setPackageFolderPath("");
-            setContent(sampleCsv);
-            setBinaryContent(null);
-            setPreview(null);
-            setPackageDescriptor(null);
-          }}
-        >
-          载入 CSV 示例
-        </button>
-        <button type="button" onClick={saveTemplate}>保存映射模板</button>
-        <button type="button" disabled={!batchId} onClick={() => runClean("normalize_all")}>标准化清洗</button>
-        <button type="button" disabled={!batchId} onClick={undoClean}>撤销清洗</button>
-        <button type="button" disabled={!batchId} onClick={confirmImport}>确认入库</button>
-        <button type="button" disabled={!batchId} onClick={() => loadQualityReport()}>质量报告</button>
-        <button type="button" disabled={!batchId || summary?.batch.status !== "imported"} onClick={rollbackImport}>回滚批次</button>
-      </div>
-
-      {summary ? (
-        <div className="summary-grid">
-          <Metric label="总行数" value={summary.totalRows} />
-          <Metric label="可导入数" value={summary.importableRows} />
-          <Metric label="警告数" value={summary.warningRows} />
-          <Metric label="错误数" value={summary.errorRows} />
+        <div className="import-actions">
+          <button
+            type="button"
+            onClick={() => {
+              setAdvancedKind("json");
+              setAdvancedContent(sampleJson);
+              setAdvancedPreview(null);
+            }}
+          >
+            JSON 示例
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAdvancedKind("csv");
+              setAdvancedContent(sampleCsv);
+              setAdvancedPreview(null);
+            }}
+          >
+            CSV 示例
+          </button>
+          <button type="button" onClick={() => previewAdvancedContent()}>预览当前内容</button>
         </div>
-      ) : null}
+        {advancedPreview ? (
+          <div className="summary-grid">
+            <Metric label="识别类型" value={advancedPreview.detection.detectedType} />
+            <Metric label="记录数" value={advancedPreview.detection.recordCount} />
+            <Metric label="导入方式" value={advancedPreview.directImportReady ? "标准导入" : "高级确认"} />
+            <Metric label="格式" value={advancedKind.toUpperCase()} />
+          </div>
+        ) : null}
+      </details>
 
-      {qualityReport ? <ImportQualityReportPanel report={qualityReport} /> : null}
+      {runs.length ? (
+        <details className="advanced-details">
+          <summary>最近导入批次</summary>
+          <div className="staging-table-wrap compact">
+            <table className="staging-table">
+              <thead>
+                <tr>
+                  <th>批次</th>
+                  <th>数据包</th>
+                  <th>类型</th>
+                  <th>状态</th>
+                  <th>时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                {runs.map((run) => (
+                  <tr key={run.id}>
+                    <td>#{run.id}</td>
+                    <td>{run.packageName ?? "未命名"}</td>
+                    <td>{readableIntent(run.importIntent)}</td>
+                    <td>{run.rolledBackAt ? "已回滚" : run.status}</td>
+                    <td>{run.completedAt ?? run.createdAt}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      ) : null}
 
       {message ? <p className="ai-message">{message}</p> : null}
       {error ? <p className="error-text">{error}</p> : null}
-
-      {staging?.rows.length ? (
-        <div className="staging-table-wrap">
-          <table className="staging-table">
-            <thead>
-              <tr>
-                <th>行</th>
-                <th>状态</th>
-                <th>名称</th>
-                <th>类型</th>
-                <th>编号</th>
-                <th>摘要 / 内容</th>
-                <th>原始字段</th>
-                <th>映射后字段</th>
-                <th>错误原因</th>
-                <th>修正建议</th>
-              </tr>
-            </thead>
-            <tbody>
-              {staging.rows.map((row) => (
-                <tr key={row.id}>
-                  <td>{row.rowIndex}</td>
-                  <td>{row.status}</td>
-                  <td>{String(row.normalized.name ?? "")}</td>
-                  <td>{String(row.normalized.type ?? "")}</td>
-                  <td>{String(row.normalized.code ?? "")}</td>
-                  <td>{previewText(row.normalized.summary ?? row.normalized.content)}</td>
-                  <td>{Object.keys(row.raw ?? {}).slice(0, 8).join("，")}</td>
-                  <td>{Object.keys(row.mapped ?? {}).slice(0, 8).join("，")}</td>
-                  <td>{row.issues.map((issue) => issue.message).join("；")}</td>
-                  <td>{row.issues.map((issue) => issue.suggestion).filter(Boolean).join("；")}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
     </section>
   );
-}
-
-function previewText(value: unknown) {
-  const text = typeof value === "string" ? value : value == null ? "" : JSON.stringify(value);
-  return text.length > 80 ? `${text.slice(0, 80)}...` : text;
 }
 
 function Metric({ label, value }: { label: string; value: number | string }) {
@@ -498,185 +382,40 @@ function Metric({ label, value }: { label: string; value: number | string }) {
   );
 }
 
-function MappingSuggestionTable({ suggestions }: { suggestions: FieldMappingSuggestion[] }) {
-  return (
-    <div className="staging-table-wrap compact">
-      <table className="staging-table">
-        <thead>
-          <tr>
-            <th>原始字段</th>
-            <th>建议目标</th>
-            <th>置信度</th>
-            <th>处理</th>
-            <th>原因</th>
-          </tr>
-        </thead>
-        <tbody>
-          {suggestions.map((suggestion) => (
-            <tr key={suggestion.sourceField}>
-              <td>{suggestion.sourceField}</td>
-              <td>{suggestion.targetField ?? "不自动映射"}</td>
-              <td>{Math.round(suggestion.confidence * 100)}%</td>
-              <td>{suggestion.decision === "auto" ? "自动勾选" : suggestion.decision === "confirm" ? "需确认" : "忽略"}</td>
-              <td>{suggestion.reason}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function PackageDescriptorPanel({ descriptor }: { descriptor: ImportPackageDescriptor }) {
-  const primaryFiles = descriptor.files.filter((file) => file.primary);
-  const auxiliaryFiles = descriptor.auxiliaryFiles.length ? descriptor.auxiliaryFiles : descriptor.files.filter((file) => !file.primary);
-  return (
-    <div className="preview-panel">
-      <div className="summary-grid">
-        <Metric label="package_name" value={descriptor.packageName ?? "未声明"} />
-        <Metric label="import_profile" value={descriptor.importProfile ?? "未声明"} />
-        <Metric label="manifest" value={descriptor.manifestFound ? "已找到" : "未找到"} />
-        <Metric label="主数据文件" value={descriptor.primaryFiles.join("，") || "未识别"} />
-      </div>
-      <div className="summary-grid">
-        <Metric label="记录数" value={descriptor.recordCount} />
-        <Metric label="识别类型" value={descriptor.detectedType} />
-        <Metric label="导入方式" value={descriptor.directImportReady ? "可直接导入" : "需映射确认"} />
-        <Metric label="文件数" value={descriptor.files.length} />
-      </div>
-      {primaryFiles.length ? (
-        <ManifestFileGroup
-          title="主数据文件"
-          files={primaryFiles}
-          fallbackStatus="系统将自动暂存并导入该文件。"
-        />
-      ) : null}
-      {auxiliaryFiles.length ? (
-        <ManifestFileGroup
-          title="辅助文件"
-          files={auxiliaryFiles}
-          fallbackStatus="该文件已识别，但不是主数据文件。它通常是主数据的子集或备用导出文件。为避免重复导入，系统默认不自动暂存。"
-        />
-      ) : null}
-      {descriptor.warnings.length ? <p className="ai-message">{descriptor.warnings.join("；")}</p> : null}
-      {descriptor.errors.length ? <p className="error-text">{descriptor.errors.join("；")}</p> : null}
-    </div>
-  );
-}
-
-function ManifestFileGroup({ title, files, fallbackStatus }: { title: string; files: ImportPackageDescriptor["files"]; fallbackStatus: string }) {
-  return (
-    <div className="staging-table-wrap compact">
-      <table className="staging-table">
-        <thead>
-          <tr>
-            <th>{title}</th>
-            <th>类型</th>
-            <th>role</th>
-            <th>记录</th>
-            <th>处理策略</th>
-          </tr>
-        </thead>
-        <tbody>
-          {files.map((file) => (
-            <tr key={file.path}>
-              <td>{file.path}</td>
-              <td>{file.importType}</td>
-              <td>{file.role ?? "未声明"}</td>
-              <td>{file.recordCount ?? "-"}</td>
-              <td>
-                {file.skipReason ?? file.description ?? fallbackStatus}
-                {file.description && file.skipReason ? ` ${file.description}` : ""}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function ImportPlanPanel({ plan }: { plan: ImportPlan }) {
-  return (
-    <div className="preview-panel">
-      <div className="summary-grid">
-        <Metric label="导入意图" value={plan.importIntent} />
-        <Metric label="重复策略" value={plan.duplicatePolicy} />
-        <Metric label="总记录" value={plan.totalRecords} />
-        <Metric label="需确认" value={plan.needsReviewCount} />
-      </div>
-      <div className="summary-grid">
-        <Metric label="新增" value={plan.createCount} />
-        <Metric label="补空字段" value={plan.updateCount} />
-        <Metric label="附加注解" value={plan.attachAnnotationCount} />
-        <Metric label="跳过重复" value={plan.skipDuplicateCount} />
-      </div>
-      {plan.aiMessage ? <p className="ai-message">{plan.aiMessage}</p> : null}
-      {plan.warnings.length ? <p className="error-text">{plan.warnings.join("；")}</p> : null}
-    </div>
-  );
-}
-
-function ImportReportPanel({ report }: { report: ExecuteImportPlanResult }) {
-  return (
-    <div className="preview-panel">
-      <div className="summary-grid">
-        <Metric label="新增" value={report.createdCount} />
-        <Metric label="补空字段" value={report.mergedCount} />
-        <Metric label="附加注解" value={report.attachedAnnotationCount} />
-        <Metric label="跳过" value={report.skippedCount} />
-      </div>
-      <div className="summary-grid">
-        <Metric label="需确认" value={report.needsReviewCount} />
-        <Metric label="无效拒绝" value={report.rejectedCount} />
-        <Metric label="搜索索引" value={report.searchIndexRebuilt ? "已重建" : "未重建"} />
-        <Metric label="计划" value={report.planId} />
-      </div>
-      {report.warnings.length ? <p className="error-text">{report.warnings.join("；")}</p> : null}
-    </div>
-  );
-}
-
-function ImportQualityReportPanel({ report }: { report: ImportQualityReport }) {
-  const keywordEntries = Object.entries(report.searchableKeywordsChecked);
-  return (
-    <div className="preview-panel">
-      <div className="summary-grid">
-        <Metric label="质量批次" value={`#${report.batchId}`} />
-        <Metric label="识别类型" value={report.detectedType} />
-        <Metric label="重复指纹" value={report.duplicateFingerprintCount} />
-        <Metric label="导入搜索词" value={report.searchTermsImportedCount} />
-      </div>
-      <div className="summary-grid">
-        <Metric label="content 覆盖" value={formatCoverage(report.fieldCoverage.content)} />
-        <Metric label="source_note 覆盖" value={formatCoverage(report.fieldCoverage.source_note)} />
-        <Metric label="tags 覆盖" value={formatCoverage(report.fieldCoverage.tags)} />
-        <Metric label="错误行" value={report.errorRows} />
-      </div>
-      {keywordEntries.length ? (
-        <p className="ai-message">
-          搜索抽检：{keywordEntries.map(([keyword, hit]) => `${keyword}${hit ? "命中" : "未命中"}`).join("，")}
-        </p>
-      ) : null}
-      {report.suggestions.length ? <p className="error-text">{report.suggestions.join("；")}</p> : null}
-    </div>
-  );
-}
-
-function formatCoverage(value?: number) {
-  return `${Math.round((value ?? 0) * 100)}%`;
-}
-
-function readSourceHeaders(content: string, importType: ImportSourceType) {
-  try {
-    if (importType === "zip" || importType === "folder") return [];
-    if (importType === "csv") {
-      return content.split(/\r?\n/)[0]?.split(",").map((header) => header.trim()).filter(Boolean) ?? [];
-    }
-    const parsed = JSON.parse(content) as unknown;
-    const first = Array.isArray(parsed) ? parsed[0] : parsed && typeof parsed === "object" && "rows" in parsed ? (parsed as { rows?: unknown[] }).rows?.[0] : parsed;
-    return first && typeof first === "object" ? Object.keys(first) : [];
-  } catch {
-    return [];
+function readableIntent(intent?: string | null) {
+  switch (intent) {
+    case "primary_seed":
+      return "初始知识数据包";
+    case "classic_text":
+      return "原典文本数据包";
+    case "annotation_enrichment":
+      return "注解增强数据包";
+    case "relation_enrichment":
+      return "关系增强数据包";
+    case "search_terms":
+      return "搜索词增强数据包";
+    case "incremental_update":
+      return "增量更新数据包";
+    case "backup_restore":
+      return "备份恢复数据包";
+    default:
+      return "标准数据包";
   }
+}
+
+function stepLabel(step: ImportStep) {
+  switch (step) {
+    case "pick":
+      return "选择数据包";
+    case "analyze":
+      return "正在分析";
+    case "plan":
+      return "确认导入计划";
+    case "report":
+      return "查看导入报告";
+  }
+}
+
+function readNumber(value: unknown) {
+  return typeof value === "number" ? value : 0;
 }

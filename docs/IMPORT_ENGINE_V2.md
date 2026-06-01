@@ -2,7 +2,7 @@
 
 Import Engine V2 用于解决 v0.1-alpha-package 中“先手工映射所有字段”的导入体验问题。新的流程先识别数据类型，再决定是否直接适配，只有普通 CSV 或未知 JSON 才进入字段评分映射。
 
-Smart Import Center V1 在 Import Engine V2 之上增加导入计划编排：标准 ZIP / 已解压文件夹会先生成 `ImportPlan`，自动处理重复、补空字段和注解附加；只有 `generic_csv` / `unknown` 继续进入字段映射。详见 `docs/SMART_IMPORT_CENTER.md`。
+Smart Import Center V1 在 Import Engine V2 之上增加导入计划编排：标准 ZIP / 已解压文件夹会先生成 `ImportPlan`，自动处理重复、补空字段和注解附加；只有 `generic_csv` / `generic_json` / `unknown` 继续进入高级字段映射。普通用户界面默认不显示字段映射、manifest 技术路径和重复明细。详见 `docs/SMART_IMPORT_CENTER.md`。
 
 ## 支持的数据类型
 
@@ -30,7 +30,7 @@ Smart Import Center V1 在 Import Engine V2 之上增加导入计划编排：标
 - 空字段不会导致整批失败。
 - 确认入库后会重建搜索索引。
 - 确认入库后会生成导入质量报告，可查看字段覆盖率、批内重复指纹、搜索抽检结果。
-- 已确认入库的批次可按批次回滚，回滚会删除本批次写入条目并重建搜索索引。
+- Smart Import 执行后会生成导入批次和变更日志，可一键回滚本次新增条目、附加注解和补空字段，并重建搜索索引。
 
 ## ClassicPassagesAdapter
 
@@ -143,7 +143,7 @@ README_导入说明.md
 - 经典关键词抽检命中情况。
 - 可执行修复建议。
 
-如果导入批次明显错误，可点击“回滚批次”。系统只回滚该批次确认入库时创建的知识条目，并同步清理搜索词、知识指纹和搜索索引。详见 `docs/IMPORT_QUALITY_V1.md`。
+如果 Smart Import 执行明显错误，可点击“一键回滚本次导入”。系统通过 `import_run_changes` 只撤销本批次创建或修改过的实体：新增知识条目、附加注解和补空字段。已跳过、待确认、失败项不处理；导入后被用户手动修改过的字段会提示风险并跳过。详见 `docs/IMPORT_ROLLBACK.md`。
 
 ## 常见错误
 

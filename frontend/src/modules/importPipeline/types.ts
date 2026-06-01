@@ -160,6 +160,7 @@ export type ImportPlan = {
 
 export type ExecuteImportPlanResult = {
   planId: string;
+  importRunId?: number | null;
   createdCount: number;
   mergedCount: number;
   attachedAnnotationCount: number;
@@ -167,5 +168,39 @@ export type ExecuteImportPlanResult = {
   needsReviewCount: number;
   rejectedCount: number;
   searchIndexRebuilt: boolean;
+  reportJson: Record<string, unknown>;
+  canRollback: boolean;
   warnings: string[];
+};
+
+export type ImportRunSummary = {
+  id: number;
+  packageName?: string | null;
+  importIntent: string;
+  packagePath?: string | null;
+  status: string;
+  totalRecords: number;
+  createCount: number;
+  updateCount: number;
+  attachAnnotationCount: number;
+  skipDuplicateCount: number;
+  failedCount: number;
+  createdAt: string;
+  completedAt?: string | null;
+  rolledBackAt?: string | null;
+};
+
+export type ImportRunReport = {
+  importRun: ImportRunSummary;
+  summary: Record<string, unknown>;
+  warnings: string[];
+  errors: string[];
+};
+
+export type RollbackImportRunResult = {
+  importRunId: number;
+  rolledBackChanges: number;
+  skippedChanges: number;
+  warnings: string[];
+  searchIndexRebuilt: boolean;
 };

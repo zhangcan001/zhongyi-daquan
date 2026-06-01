@@ -2,7 +2,8 @@ use crate::errors::AppResult;
 use crate::models::data_pipeline::{
     ConfirmImportResult, CreateImportRequest, ExecuteImportPlanResult, FieldMappingTemplate,
     ImportBatchSummary, ImportPackageDescriptor, ImportParsedPreview, ImportPlan,
-    ImportQualityReport, RollbackImportResult, SaveMappingTemplateRequest, StagingPage,
+    ImportQualityReport, ImportRunReport, ImportRunSummary, RollbackImportResult,
+    RollbackImportRunResult, SaveMappingTemplateRequest, StagingPage,
 };
 use crate::services::{field_mapping_service, import_orchestrator_service, import_project_service};
 use crate::AppState;
@@ -88,6 +89,27 @@ pub fn execute_import_plan(
     plan: ImportPlan,
 ) -> AppResult<ExecuteImportPlanResult> {
     import_orchestrator_service::execute_import_plan(&state.database, plan)
+}
+
+#[tauri::command]
+pub fn list_import_runs(state: State<'_, AppState>) -> AppResult<Vec<ImportRunSummary>> {
+    import_orchestrator_service::list_import_runs(&state.database)
+}
+
+#[tauri::command]
+pub fn get_import_run_report(
+    state: State<'_, AppState>,
+    import_run_id: i64,
+) -> AppResult<ImportRunReport> {
+    import_orchestrator_service::get_import_run_report(&state.database, import_run_id)
+}
+
+#[tauri::command]
+pub fn rollback_import_run(
+    state: State<'_, AppState>,
+    import_run_id: i64,
+) -> AppResult<RollbackImportRunResult> {
+    import_orchestrator_service::rollback_import_run(&state.database, import_run_id)
 }
 
 #[tauri::command]

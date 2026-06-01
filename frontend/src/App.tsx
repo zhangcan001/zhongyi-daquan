@@ -4,11 +4,12 @@ import { DashboardPage } from "./pages/DashboardPage";
 import type { AppStatus } from "./modules/app/types";
 import { KnowledgeWorkspace } from "./pages/KnowledgeWorkspace";
 import { GridEntryPage } from "./pages/GridEntryPage";
+import { ImportStagingPanel } from "./pages/ImportStagingPanel";
 
 export function App() {
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<"dashboard" | "knowledge" | "grid">("dashboard");
+  const [activeView, setActiveView] = useState<"dashboard" | "knowledge" | "grid" | "import">("dashboard");
 
   useEffect(() => {
     invoke<AppStatus>("get_app_status")
@@ -26,6 +27,7 @@ export function App() {
       />
       {activeView === "knowledge" ? <KnowledgeWorkspace /> : null}
       {activeView === "grid" ? <GridEntryPage /> : null}
+      {activeView === "import" ? <ImportStagingPanel /> : null}
     </main>
   );
 }

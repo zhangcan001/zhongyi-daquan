@@ -1,11 +1,10 @@
 import type { AppStatus } from "../modules/app/types";
 import { AiSettingsPanel } from "./AiSettingsPanel";
-import { ImportStagingPanel } from "./ImportStagingPanel";
 import { RelationReviewPanel } from "./RelationReviewPanel";
 import { SearchPanel } from "./SearchPanel";
 import { TaskCenterPanel } from "./TaskCenterPanel";
 
-type AppView = "dashboard" | "knowledge" | "grid";
+type AppView = "dashboard" | "knowledge" | "grid" | "import";
 
 type DashboardPageProps = {
   status: AppStatus | null;
@@ -42,6 +41,13 @@ export function DashboardPage({ status, error, activeView, onNavigate }: Dashboa
           onClick={() => onNavigate("grid")}
         >
           表格录入
+        </button>
+        <button
+          className={activeView === "import" ? "active" : ""}
+          type="button"
+          onClick={() => onNavigate("import")}
+        >
+          智能导入中心
         </button>
         <button
           className={activeView === "dashboard" ? "active" : ""}
@@ -85,6 +91,10 @@ export function DashboardPage({ status, error, activeView, onNavigate }: Dashboa
           <section className="section-band">
             <h2>数据录入中心</h2>
             <div className="action-grid">
+              <button type="button" onClick={() => onNavigate("import")}>
+                智能导入中心
+                <small>导入标准数据包，系统自动识别、去重、合并并生成导入报告。</small>
+              </button>
               {entryActions.map((action) => (
                 <button key={action} type="button" disabled>
                   {action}
@@ -93,7 +103,6 @@ export function DashboardPage({ status, error, activeView, onNavigate }: Dashboa
             </div>
           </section>
 
-          <ImportStagingPanel />
           <RelationReviewPanel />
           <TaskCenterPanel />
           <AiSettingsPanel />

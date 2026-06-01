@@ -336,6 +336,7 @@ pub struct ImportPlanAction {
 #[serde(rename_all = "camelCase")]
 pub struct ExecuteImportPlanResult {
     pub plan_id: String,
+    pub import_run_id: Option<i64>,
     pub created_count: i64,
     pub merged_count: i64,
     pub attached_annotation_count: i64,
@@ -343,5 +344,48 @@ pub struct ExecuteImportPlanResult {
     pub needs_review_count: i64,
     pub rejected_count: i64,
     pub search_index_rebuilt: bool,
+    pub report_json: serde_json::Value,
+    pub can_rollback: bool,
     pub warnings: Vec<String>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportRunSummary {
+    pub id: i64,
+    pub package_name: Option<String>,
+    pub import_intent: String,
+    pub package_path: Option<String>,
+    pub status: String,
+    pub total_records: i64,
+    pub create_count: i64,
+    pub update_count: i64,
+    pub attach_annotation_count: i64,
+    pub skip_duplicate_count: i64,
+    pub failed_count: i64,
+    pub created_at: String,
+    pub completed_at: Option<String>,
+    pub rolled_back_at: Option<String>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportRunReport {
+    pub import_run: ImportRunSummary,
+    pub summary: serde_json::Value,
+    pub warnings: Vec<String>,
+    pub errors: Vec<String>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RollbackImportRunResult {
+    pub import_run_id: i64,
+    pub rolled_back_changes: i64,
+    pub skipped_changes: i64,
+    pub warnings: Vec<String>,
+    pub search_index_rebuilt: bool,
 }

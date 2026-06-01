@@ -1,6 +1,9 @@
 use crate::db::connection::Database;
 use crate::errors::AppResult;
-use crate::models::data_pipeline::{ExecuteImportPlanResult, ImportPlan, ImportPlanAction};
+use crate::models::data_pipeline::{
+    ExecuteImportPlanResult, ImportPlan, ImportPlanAction, ImportRunReport, ImportRunSummary,
+    RollbackImportRunResult,
+};
 use crate::repositories::search_repository;
 use crate::services::{
     ai_import_assist_service, import_engine_service, import_project_service, normalize_service,
@@ -8,7 +11,7 @@ use crate::services::{
 };
 use chrono::Utc;
 use rusqlite::{params, OptionalExtension};
-use serde_json::{Map, Value};
+use serde_json::{json, Map, Value};
 
 pub fn preview_import_plan(database: &Database, package_path: &str) -> AppResult<ImportPlan> {
     let parsed = import_project_service::parse_path_import_package(package_path)?;
@@ -80,6 +83,7 @@ pub fn execute_import_plan(
     database: &Database,
     plan: ImportPlan,
 ) -> AppResult<ExecuteImportPlanResult> {
+    let import_run_id = insert_import_run(database, &plan)?;
     let mut created_count = 0;
     let mut merged_count = 0;
     let mut attached_annotation_count = 0;
@@ -87,31 +91,129 @@ pub fn execute_import_plan(
     let mut needs_review_count = 0;
     let mut rejected_count = 0;
     let mut warnings = Vec::new();
+    let mut failed_count = 0;
 
     database.with_connection(|connection| {
         let transaction = connection.unchecked_transaction()?;
         for action in &plan.actions {
             let draft = action.draft_json.as_object().cloned().unwrap_or_default();
             match action.action_type.as_str() {
-                "create_new" => {
-                    insert_knowledge_item_tx(&transaction, &draft)?;
-                    created_count += 1;
-                }
+                "create_new" => match insert_knowledge_item_tx(&transaction, &draft) {
+                    Ok(item_id) => {
+                        let after_json = load_item_snapshot_tx(&transaction, item_id)?;
+                        record_change_tx(
+                            &transaction,
+                            import_run_id,
+                            action,
+                            "knowledge_item",
+                            Some(item_id),
+                            None,
+                            None,
+                            Some(after_json),
+                            "delete_created_item",
+                            "applied",
+                        )?;
+                        created_count += 1;
+                    }
+                    Err(err) => {
+                        failed_count += 1;
+                        warnings.push(format!("第 {} 行新增失败: {err}", action.row_index));
+                        record_failed_change_tx(
+                            &transaction,
+                            import_run_id,
+                            action,
+                            &err.to_string(),
+                        )?;
+                    }
+                },
                 "merge_empty_fields" => {
                     if let Some(item_id) = action.existing_item_id {
+                        let before_json = load_item_snapshot_tx(&transaction, item_id)?;
                         merge_empty_fields_tx(&transaction, item_id, &draft)?;
+                        let after_json = load_item_snapshot_tx(&transaction, item_id)?;
+                        record_change_tx(
+                            &transaction,
+                            import_run_id,
+                            action,
+                            "knowledge_item",
+                            Some(item_id),
+                            Some(item_id),
+                            Some(before_json),
+                            Some(after_json),
+                            "restore_empty_fields",
+                            "applied",
+                        )?;
                         merged_count += 1;
                     }
                 }
                 "attach_annotation" => {
                     if let Some(item_id) = action.existing_item_id {
-                        insert_annotation_tx(&transaction, item_id, &draft)?;
+                        let annotation_id = insert_annotation_tx(&transaction, item_id, &draft)?;
+                        let after_json = json!({
+                            "id": annotation_id,
+                            "knowledge_item_id": item_id,
+                            "draft": Value::Object(draft.clone())
+                        });
+                        record_change_tx(
+                            &transaction,
+                            import_run_id,
+                            action,
+                            "knowledge_annotation",
+                            Some(annotation_id),
+                            Some(item_id),
+                            None,
+                            Some(after_json),
+                            "delete_created_annotation",
+                            "applied",
+                        )?;
                         attached_annotation_count += 1;
                     }
                 }
-                "skip_duplicate" => skipped_count += 1,
-                "needs_review" => needs_review_count += 1,
-                "reject_invalid" => rejected_count += 1,
+                "skip_duplicate" => {
+                    record_change_tx(
+                        &transaction,
+                        import_run_id,
+                        action,
+                        "knowledge_item",
+                        None,
+                        action.existing_item_id,
+                        None,
+                        Some(json!({ "reason": action.reason })),
+                        "none",
+                        "skipped",
+                    )?;
+                    skipped_count += 1;
+                }
+                "needs_review" => {
+                    record_change_tx(
+                        &transaction,
+                        import_run_id,
+                        action,
+                        "knowledge_item",
+                        None,
+                        action.existing_item_id,
+                        None,
+                        Some(json!({ "reason": action.reason })),
+                        "none",
+                        "pending_review",
+                    )?;
+                    needs_review_count += 1;
+                }
+                "reject_invalid" => {
+                    record_change_tx(
+                        &transaction,
+                        import_run_id,
+                        action,
+                        "knowledge_item",
+                        None,
+                        None,
+                        None,
+                        Some(json!({ "reason": action.reason })),
+                        "none",
+                        "rejected",
+                    )?;
+                    rejected_count += 1;
+                }
                 other => warnings.push(format!("未知导入计划动作，已跳过: {other}")),
             }
         }
@@ -120,8 +222,37 @@ pub fn execute_import_plan(
     })?;
 
     search_index_service::rebuild_search_index(database)?;
+    let report_json = json!({
+        "package_name": plan.package_name,
+        "import_run_id": import_run_id,
+        "plan_id": plan.plan_id,
+        "import_intent": plan.import_intent,
+        "total_records": plan.total_records,
+        "created_count": created_count,
+        "merged_count": merged_count,
+        "attached_annotation_count": attached_annotation_count,
+        "skipped_count": skipped_count,
+        "needs_review_count": needs_review_count,
+        "rejected_count": rejected_count,
+        "failed_count": failed_count,
+        "search_index_rebuilt": true,
+        "can_rollback": true,
+        "rollback_note": "回滚会撤销本次新增条目、附加注解和补空字段；已跳过、待确认和失败项不会修改。"
+    });
+    complete_import_run(
+        database,
+        import_run_id,
+        created_count,
+        merged_count,
+        attached_annotation_count,
+        skipped_count,
+        failed_count,
+        &report_json,
+    )?;
+    insert_import_report(database, import_run_id, &report_json, &warnings, &[])?;
     Ok(ExecuteImportPlanResult {
         plan_id: plan.plan_id,
+        import_run_id: Some(import_run_id),
         created_count,
         merged_count,
         attached_annotation_count,
@@ -129,7 +260,183 @@ pub fn execute_import_plan(
         needs_review_count,
         rejected_count,
         search_index_rebuilt: true,
+        report_json,
+        can_rollback: true,
         warnings,
+    })
+}
+
+pub fn list_import_runs(database: &Database) -> AppResult<Vec<ImportRunSummary>> {
+    database.with_connection(|connection| {
+        let mut statement = connection.prepare(
+            "SELECT id, package_name, import_intent, package_path, status, total_records,
+                    create_count, update_count, attach_annotation_count, skip_duplicate_count,
+                    failed_count, created_at, completed_at, rolled_back_at
+             FROM import_runs
+             ORDER BY id DESC
+             LIMIT 50",
+        )?;
+        let rows = statement.query_map([], map_import_run_summary)?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    })
+}
+
+pub fn get_import_run_report(
+    database: &Database,
+    import_run_id: i64,
+) -> AppResult<ImportRunReport> {
+    database.with_connection(|connection| {
+        let import_run = import_run_summary_tx(connection, import_run_id)?;
+        let report = connection
+            .query_row(
+                "SELECT summary_json, warnings_json, errors_json
+                 FROM import_reports
+                 WHERE import_run_id = ?1
+                 ORDER BY id DESC
+                 LIMIT 1",
+                [import_run_id],
+                |row| {
+                    let summary_json: String = row.get(0)?;
+                    let warnings_json: String = row.get(1)?;
+                    let errors_json: String = row.get(2)?;
+                    Ok((summary_json, warnings_json, errors_json))
+                },
+            )
+            .optional()?;
+        let (summary_json, warnings_json, errors_json) = report.unwrap_or_else(|| {
+            (
+                import_run_summary_json(&import_run).to_string(),
+                "[]".to_string(),
+                "[]".to_string(),
+            )
+        });
+        Ok(ImportRunReport {
+            import_run,
+            summary: serde_json::from_str(&summary_json).unwrap_or(Value::Null),
+            warnings: serde_json::from_str(&warnings_json).unwrap_or_default(),
+            errors: serde_json::from_str(&errors_json).unwrap_or_default(),
+        })
+    })
+}
+
+pub fn rollback_import_run(
+    database: &Database,
+    import_run_id: i64,
+) -> AppResult<RollbackImportRunResult> {
+    let mut rolled_back_changes = 0;
+    let mut skipped_changes = 0;
+    let mut warnings = Vec::new();
+
+    database.with_connection(|connection| {
+        let run_status: (String, Option<String>) = connection.query_row(
+            "SELECT status, rolled_back_at FROM import_runs WHERE id = ?1",
+            [import_run_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        if run_status.1.is_some() {
+            warnings.push("该导入批次已经回滚过，未重复执行。".to_string());
+            return Ok(());
+        }
+        if run_status.0 != "completed" {
+            warnings.push("该导入批次尚未完成，不能回滚。".to_string());
+            return Ok(());
+        }
+
+        let transaction = connection.unchecked_transaction()?;
+        let changes = {
+            let mut statement = transaction.prepare(
+                "SELECT id, action_type, entity_type, entity_id, before_json, after_json,
+                        rollback_action, status
+                 FROM import_run_changes
+                 WHERE import_run_id = ?1
+                 ORDER BY id DESC",
+            )?;
+            let rows = statement.query_map([import_run_id], |row| {
+                Ok(ImportRunChangeRow {
+                    id: row.get(0)?,
+                    action_type: row.get(1)?,
+                    entity_type: row.get(2)?,
+                    entity_id: row.get(3)?,
+                    before_json: row.get(4)?,
+                    after_json: row.get(5)?,
+                    rollback_action: row.get(6)?,
+                    status: row.get(7)?,
+                })
+            })?;
+            rows.collect::<Result<Vec<_>, _>>()?
+        };
+
+        let now = Utc::now().to_rfc3339();
+        for change in changes {
+            if change.status != "applied" {
+                skipped_changes += 1;
+                continue;
+            }
+            match change.rollback_action.as_str() {
+                "delete_created_item" => {
+                    if let Some(item_id) = change.entity_id {
+                        rollback_created_item_tx(&transaction, item_id)?;
+                        mark_change_rolled_back_tx(&transaction, change.id, &now)?;
+                        rolled_back_changes += 1;
+                    }
+                }
+                "delete_created_annotation" => {
+                    if let Some(annotation_id) = change.entity_id {
+                        rollback_created_annotation_tx(&transaction, annotation_id)?;
+                        mark_change_rolled_back_tx(&transaction, change.id, &now)?;
+                        rolled_back_changes += 1;
+                    }
+                }
+                "restore_empty_fields" => {
+                    if let Some(item_id) = change.entity_id {
+                        if item_changed_after_import_tx(
+                            &transaction,
+                            item_id,
+                            change.after_json.as_deref(),
+                        )? {
+                            skipped_changes += 1;
+                            warnings.push(format!(
+                                "条目 #{item_id} 在导入后被修改过，已跳过自动恢复。"
+                            ));
+                        } else {
+                            rollback_merge_empty_fields_tx(
+                                &transaction,
+                                item_id,
+                                change.before_json.as_deref(),
+                            )?;
+                            mark_change_rolled_back_tx(&transaction, change.id, &now)?;
+                            rolled_back_changes += 1;
+                        }
+                    }
+                }
+                _ => skipped_changes += 1,
+            }
+        }
+        transaction.execute(
+            "UPDATE import_runs
+             SET status = 'rolled_back', rolled_back_at = ?2
+             WHERE id = ?1",
+            params![import_run_id, now],
+        )?;
+        transaction.commit()?;
+        Ok(())
+    })?;
+
+    search_index_service::rebuild_search_index(database)?;
+    let summary = json!({
+        "import_run_id": import_run_id,
+        "rolled_back_changes": rolled_back_changes,
+        "skipped_changes": skipped_changes,
+        "search_index_rebuilt": true,
+        "warnings": warnings
+    });
+    insert_import_report(database, import_run_id, &summary, &warnings, &[])?;
+    Ok(RollbackImportRunResult {
+        import_run_id,
+        rolled_back_changes,
+        skipped_changes,
+        warnings,
+        search_index_rebuilt: true,
     })
 }
 
@@ -501,7 +808,7 @@ fn insert_annotation_tx(
     transaction: &rusqlite::Transaction<'_>,
     item_id: i64,
     draft: &Map<String, Value>,
-) -> AppResult<()> {
+) -> AppResult<i64> {
     let now = Utc::now().to_rfc3339();
     transaction.execute(
         "INSERT INTO knowledge_annotations
@@ -519,7 +826,316 @@ fn insert_annotation_tx(
             now
         ],
     )?;
+    Ok(transaction.last_insert_rowid())
+}
+
+#[derive(Debug)]
+struct ImportRunChangeRow {
+    id: i64,
+    #[allow(dead_code)]
+    action_type: String,
+    #[allow(dead_code)]
+    entity_type: String,
+    entity_id: Option<i64>,
+    before_json: Option<String>,
+    after_json: Option<String>,
+    rollback_action: String,
+    status: String,
+}
+
+fn insert_import_run(database: &Database, plan: &ImportPlan) -> AppResult<i64> {
+    let now = Utc::now().to_rfc3339();
+    database.with_connection(|connection| {
+        connection.execute(
+            "INSERT INTO import_runs
+             (package_name, import_intent, package_path, status, total_records, created_at)
+             VALUES (?1, ?2, ?3, 'running', ?4, ?5)",
+            params![
+                plan.package_name,
+                plan.import_intent,
+                plan.package_path,
+                plan.total_records,
+                now
+            ],
+        )?;
+        Ok(connection.last_insert_rowid())
+    })
+}
+
+fn complete_import_run(
+    database: &Database,
+    import_run_id: i64,
+    create_count: i64,
+    update_count: i64,
+    attach_annotation_count: i64,
+    skip_duplicate_count: i64,
+    failed_count: i64,
+    report_json: &Value,
+) -> AppResult<()> {
+    let now = Utc::now().to_rfc3339();
+    database.with_connection(|connection| {
+        connection.execute(
+            "UPDATE import_runs
+             SET status = 'completed',
+                 create_count = ?2,
+                 update_count = ?3,
+                 attach_annotation_count = ?4,
+                 skip_duplicate_count = ?5,
+                 failed_count = ?6,
+                 report_json = ?7,
+                 completed_at = ?8
+             WHERE id = ?1",
+            params![
+                import_run_id,
+                create_count,
+                update_count,
+                attach_annotation_count,
+                skip_duplicate_count,
+                failed_count,
+                report_json.to_string(),
+                now
+            ],
+        )?;
+        Ok(())
+    })
+}
+
+fn insert_import_report(
+    database: &Database,
+    import_run_id: i64,
+    summary: &Value,
+    warnings: &[String],
+    errors: &[String],
+) -> AppResult<()> {
+    let now = Utc::now().to_rfc3339();
+    database.with_connection(|connection| {
+        connection.execute(
+            "INSERT INTO import_reports
+             (import_run_id, summary_json, warnings_json, errors_json, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                import_run_id,
+                summary.to_string(),
+                serde_json::to_string(warnings)?,
+                serde_json::to_string(errors)?,
+                now
+            ],
+        )?;
+        Ok(())
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn record_change_tx(
+    transaction: &rusqlite::Transaction<'_>,
+    import_run_id: i64,
+    action: &ImportPlanAction,
+    entity_type: &str,
+    entity_id: Option<i64>,
+    target_existing_id: Option<i64>,
+    before_json: Option<Value>,
+    after_json: Option<Value>,
+    rollback_action: &str,
+    status: &str,
+) -> AppResult<()> {
+    transaction.execute(
+        "INSERT INTO import_run_changes
+         (import_run_id, action_type, entity_type, entity_id, target_existing_id,
+          before_json, after_json, rollback_action, status, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        params![
+            import_run_id,
+            action.action_type,
+            entity_type,
+            entity_id,
+            target_existing_id,
+            before_json.map(|value| value.to_string()),
+            after_json.map(|value| value.to_string()),
+            rollback_action,
+            status,
+            Utc::now().to_rfc3339()
+        ],
+    )?;
     Ok(())
+}
+
+fn record_failed_change_tx(
+    transaction: &rusqlite::Transaction<'_>,
+    import_run_id: i64,
+    action: &ImportPlanAction,
+    error: &str,
+) -> AppResult<()> {
+    record_change_tx(
+        transaction,
+        import_run_id,
+        action,
+        "knowledge_item",
+        None,
+        action.existing_item_id,
+        None,
+        Some(json!({ "reason": action.reason, "error": error })),
+        "none",
+        "failed",
+    )
+}
+
+fn load_item_snapshot_tx(
+    transaction: &rusqlite::Transaction<'_>,
+    item_id: i64,
+) -> AppResult<Value> {
+    transaction
+        .query_row(
+            "SELECT id, type, code, name, alias, pinyin, category, summary, content, source_note,
+                    tags, updated_at
+             FROM knowledge_items
+             WHERE id = ?1",
+            [item_id],
+            |row| {
+                Ok(json!({
+                    "id": row.get::<_, i64>(0)?,
+                    "type": row.get::<_, String>(1)?,
+                    "code": row.get::<_, Option<String>>(2)?,
+                    "name": row.get::<_, String>(3)?,
+                    "alias": row.get::<_, Option<String>>(4)?,
+                    "pinyin": row.get::<_, Option<String>>(5)?,
+                    "category": row.get::<_, Option<String>>(6)?,
+                    "summary": row.get::<_, Option<String>>(7)?,
+                    "content": row.get::<_, Option<String>>(8)?,
+                    "source_note": row.get::<_, Option<String>>(9)?,
+                    "tags": row.get::<_, Option<String>>(10)?,
+                    "updated_at": row.get::<_, String>(11)?,
+                }))
+            },
+        )
+        .map_err(Into::into)
+}
+
+fn rollback_created_item_tx(
+    transaction: &rusqlite::Transaction<'_>,
+    item_id: i64,
+) -> AppResult<()> {
+    transaction.execute("DELETE FROM knowledge_items WHERE id = ?1", [item_id])?;
+    Ok(())
+}
+
+fn rollback_created_annotation_tx(
+    transaction: &rusqlite::Transaction<'_>,
+    annotation_id: i64,
+) -> AppResult<()> {
+    transaction.execute(
+        "DELETE FROM knowledge_annotations WHERE id = ?1",
+        [annotation_id],
+    )?;
+    Ok(())
+}
+
+fn rollback_merge_empty_fields_tx(
+    transaction: &rusqlite::Transaction<'_>,
+    item_id: i64,
+    before_json: Option<&str>,
+) -> AppResult<()> {
+    let before: Value = before_json
+        .and_then(|text| serde_json::from_str(text).ok())
+        .unwrap_or(Value::Null);
+    transaction.execute(
+        "UPDATE knowledge_items
+         SET summary = ?2, content = ?3, source_note = ?4, tags = ?5, updated_at = ?6
+         WHERE id = ?1",
+        params![
+            item_id,
+            before.get("summary").and_then(value_to_text),
+            before.get("content").and_then(value_to_text),
+            before.get("source_note").and_then(value_to_text),
+            before.get("tags").and_then(value_to_text),
+            Utc::now().to_rfc3339()
+        ],
+    )?;
+    Ok(())
+}
+
+fn item_changed_after_import_tx(
+    transaction: &rusqlite::Transaction<'_>,
+    item_id: i64,
+    after_json: Option<&str>,
+) -> AppResult<bool> {
+    let expected: Value = after_json
+        .and_then(|text| serde_json::from_str(text).ok())
+        .unwrap_or(Value::Null);
+    if expected.is_null() {
+        return Ok(false);
+    }
+    let current = load_item_snapshot_tx(transaction, item_id)?;
+    for field in ["summary", "content", "source_note", "tags"] {
+        if current.get(field) != expected.get(field) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn mark_change_rolled_back_tx(
+    transaction: &rusqlite::Transaction<'_>,
+    change_id: i64,
+    rolled_back_at: &str,
+) -> AppResult<()> {
+    transaction.execute(
+        "UPDATE import_run_changes
+         SET status = 'rolled_back', rolled_back_at = ?2
+         WHERE id = ?1",
+        params![change_id, rolled_back_at],
+    )?;
+    Ok(())
+}
+
+fn import_run_summary_tx(
+    connection: &rusqlite::Connection,
+    import_run_id: i64,
+) -> AppResult<ImportRunSummary> {
+    connection
+        .query_row(
+            "SELECT id, package_name, import_intent, package_path, status, total_records,
+                    create_count, update_count, attach_annotation_count, skip_duplicate_count,
+                    failed_count, created_at, completed_at, rolled_back_at
+             FROM import_runs
+             WHERE id = ?1",
+            [import_run_id],
+            map_import_run_summary,
+        )
+        .map_err(Into::into)
+}
+
+fn map_import_run_summary(row: &rusqlite::Row<'_>) -> rusqlite::Result<ImportRunSummary> {
+    Ok(ImportRunSummary {
+        id: row.get(0)?,
+        package_name: row.get(1)?,
+        import_intent: row.get(2)?,
+        package_path: row.get(3)?,
+        status: row.get(4)?,
+        total_records: row.get(5)?,
+        create_count: row.get(6)?,
+        update_count: row.get(7)?,
+        attach_annotation_count: row.get(8)?,
+        skip_duplicate_count: row.get(9)?,
+        failed_count: row.get(10)?,
+        created_at: row.get(11)?,
+        completed_at: row.get(12)?,
+        rolled_back_at: row.get(13)?,
+    })
+}
+
+fn import_run_summary_json(import_run: &ImportRunSummary) -> Value {
+    json!({
+        "import_run_id": import_run.id,
+        "package_name": import_run.package_name,
+        "import_intent": import_run.import_intent,
+        "total_records": import_run.total_records,
+        "created_count": import_run.create_count,
+        "merged_count": import_run.update_count,
+        "attached_annotation_count": import_run.attach_annotation_count,
+        "skipped_count": import_run.skip_duplicate_count,
+        "failed_count": import_run.failed_count,
+        "can_rollback": import_run.rolled_back_at.is_none()
+    })
 }
 
 fn has_empty_field_to_merge(existing: &ExistingItem, draft: &Map<String, Value>) -> bool {
@@ -669,6 +1285,63 @@ mod tests {
         }).unwrap()
     }
 
+    fn knowledge_item_count(database: &Database, name: &str) -> i64 {
+        database
+            .with_connection(|connection| {
+                connection
+                    .query_row(
+                        "SELECT COUNT(1) FROM knowledge_items WHERE name = ?1",
+                        [name],
+                        |row| row.get(0),
+                    )
+                    .map_err(Into::into)
+            })
+            .unwrap()
+    }
+
+    fn import_change_count(database: &Database, import_run_id: i64, action_type: &str) -> i64 {
+        database
+            .with_connection(|connection| {
+                connection
+                    .query_row(
+                        "SELECT COUNT(1) FROM import_run_changes WHERE import_run_id = ?1 AND action_type = ?2",
+                        params![import_run_id, action_type],
+                        |row| row.get(0),
+                    )
+                    .map_err(Into::into)
+            })
+            .unwrap()
+    }
+
+    fn import_change_json_count(database: &Database, import_run_id: i64) -> i64 {
+        database
+            .with_connection(|connection| {
+                connection
+                    .query_row(
+                        "SELECT COUNT(1) FROM import_run_changes
+                         WHERE import_run_id = ?1 AND before_json IS NOT NULL AND after_json IS NOT NULL",
+                        [import_run_id],
+                        |row| row.get(0),
+                    )
+                    .map_err(Into::into)
+            })
+            .unwrap()
+    }
+
+    fn item_content(database: &Database, item_id: i64) -> String {
+        database
+            .with_connection(|connection| {
+                connection
+                    .query_row(
+                        "SELECT COALESCE(content, '') FROM knowledge_items WHERE id = ?1",
+                        [item_id],
+                        |row| row.get(0),
+                    )
+                    .map_err(Into::into)
+            })
+            .unwrap()
+    }
+
     #[test]
     fn import_intent_is_inferred_from_legacy_profile() {
         assert_eq!(
@@ -800,6 +1473,125 @@ mod tests {
             .unwrap_or_default()
             .contains("AI 导入辅助当前未启用"));
         assert_eq!(plan.create_count, 1);
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn create_new_records_change_and_can_rollback_item() {
+        let (data_dir, database) = temp_database("rollback-create");
+        let package = data_dir.join("package");
+        write_package(
+            &package,
+            "primary_seed",
+            r#"[{"type":"herb","name":"附子","content":"附子测试资料"}]"#,
+        );
+        let plan = preview_import_plan(&database, package.to_str().unwrap()).unwrap();
+        assert_eq!(plan.create_count, 1);
+        let result = execute_import_plan(&database, plan).unwrap();
+        let import_run_id = result.import_run_id.unwrap();
+        assert_eq!(
+            import_change_count(&database, import_run_id, "create_new"),
+            1
+        );
+        assert_eq!(knowledge_item_count(&database, "附子"), 1);
+
+        let rollback = rollback_import_run(&database, import_run_id).unwrap();
+        assert_eq!(rollback.rolled_back_changes, 1);
+        assert!(rollback.search_index_rebuilt);
+        assert_eq!(knowledge_item_count(&database, "附子"), 0);
+
+        let response = search_index_service::search(
+            &database,
+            SearchRequest {
+                query: "附子".to_string(),
+                item_type: None,
+                page: Some(1),
+                page_size: Some(10),
+            },
+        )
+        .unwrap();
+        assert!(response.results.is_empty());
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn attach_annotation_records_change_and_can_rollback_annotation() {
+        let (data_dir, database) = temp_database("rollback-annotation");
+        seed_herb(&database, "甘草", "甘草，味甘。", "seed");
+        let package = data_dir.join("package");
+        write_package(
+            &package,
+            "annotation_enrichment",
+            r#"[{"type":"herb","name":"甘草","content":"倪注：调和诸药。","source_note":"倪注"}]"#,
+        );
+        let plan = preview_import_plan(&database, package.to_str().unwrap()).unwrap();
+        assert_eq!(plan.attach_annotation_count, 1);
+        let result = execute_import_plan(&database, plan).unwrap();
+        let import_run_id = result.import_run_id.unwrap();
+        assert_eq!(
+            import_change_count(&database, import_run_id, "attach_annotation"),
+            1
+        );
+        assert_eq!(annotation_count(&database).unwrap(), 1);
+
+        let rollback = rollback_import_run(&database, import_run_id).unwrap();
+        assert_eq!(rollback.rolled_back_changes, 1);
+        assert_eq!(annotation_count(&database).unwrap(), 0);
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn merge_empty_fields_records_before_after_and_rolls_back() {
+        let (data_dir, database) = temp_database("rollback-merge");
+        let item_id = seed_herb(&database, "半夏", "", "");
+        let package = data_dir.join("package");
+        write_package(
+            &package,
+            "primary_seed",
+            r#"[{"type":"herb","name":"半夏","content":"半夏新增内容","source_note":"测试包"}]"#,
+        );
+        let plan = preview_import_plan(&database, package.to_str().unwrap()).unwrap();
+        assert_eq!(plan.update_count, 1);
+        let result = execute_import_plan(&database, plan).unwrap();
+        let import_run_id = result.import_run_id.unwrap();
+        assert_eq!(
+            import_change_count(&database, import_run_id, "merge_empty_fields"),
+            1
+        );
+        assert_eq!(import_change_json_count(&database, import_run_id), 1);
+        assert_eq!(item_content(&database, item_id), "半夏新增内容");
+
+        let rollback = rollback_import_run(&database, import_run_id).unwrap();
+        assert_eq!(rollback.rolled_back_changes, 1);
+        assert_eq!(item_content(&database, item_id), "");
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn import_run_history_and_report_are_available() {
+        let (data_dir, database) = temp_database("history-report");
+        let package = data_dir.join("package");
+        write_package(
+            &package,
+            "primary_seed",
+            r#"[{"type":"herb","name":"大黄","content":"大黄测试资料"}]"#,
+        );
+        let plan = preview_import_plan(&database, package.to_str().unwrap()).unwrap();
+        let result = execute_import_plan(&database, plan).unwrap();
+        let import_run_id = result.import_run_id.unwrap();
+
+        let runs = list_import_runs(&database).unwrap();
+        assert!(runs.iter().any(|run| run.id == import_run_id));
+        let report = get_import_run_report(&database, import_run_id).unwrap();
+        assert_eq!(report.import_run.id, import_run_id);
+        assert_eq!(
+            report
+                .summary
+                .get("can_rollback")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+            true
+        );
         let _ = fs::remove_dir_all(data_dir);
     }
 }

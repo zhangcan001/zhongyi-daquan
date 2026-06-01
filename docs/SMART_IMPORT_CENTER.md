@@ -21,6 +21,9 @@ Smart Import Center V1 是《中医大全》的商业化导入中心。它把“
 4. 用户查看摘要并点击“开始 Smart Import”。
 5. 系统执行可自动处理的动作，跳过重复项，需要人工判断的内容保留为待确认。
 6. 执行后重建搜索索引并生成导入报告。
+7. 如发现导入错误，可在报告中一键回滚本次导入。
+
+普通用户界面只保留“选择数据包、自动分析、确认导入计划、查看导入报告 / 一键回滚”四步。`primary`、`auxiliary`、`auto_stage`、`target`、manifest 路径、动作明细和字段映射表默认隐藏在“高级详情”折叠区。
 
 ## ImportPlan
 
@@ -130,3 +133,16 @@ AI 只用于低置信度资料整理问题的辅助任务：
 - `anomaly_detection`
 
 当前不真实调用 AI。如果 AI 未启用，返回：`AI 导入辅助当前未启用，系统使用本地规则处理。`
+
+## 导入回滚
+
+每次执行 `ImportPlan` 都会创建 `import_runs` 批次，并把 `create_new`、`attach_annotation`、`merge_empty_fields`、`skip_duplicate`、`needs_review`、`reject_invalid` 和失败项记录到 `import_run_changes`。
+
+回滚支持：
+
+- 删除本次 `create_new` 创建的知识条目。
+- 删除本次 `attach_annotation` 创建的注解。
+- 用 `before_json` 恢复本次 `merge_empty_fields` 补空字段前的值。
+- 回滚后重建搜索索引。
+
+回滚不会处理未写入数据的跳过项、待确认项、失败项；如果补空字段的条目在导入后被用户修改过，会提示风险并跳过恢复。详细说明见 `docs/IMPORT_ROLLBACK.md`。

@@ -45,6 +45,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
   - 文件夹里只有 PDF 时拒绝直接导入，并提示先转换为标准 `import_manifest` 数据包。
   - 文件夹导入确认后会重建搜索索引，可搜索新导入条目。
 - Smart Import Center V1：
+  - 标准 manifest ZIP / 文件夹不进入字段映射，UI 只显示计划摘要和报告摘要。
   - `import_intent` 可由 manifest 或旧 `import_profile` 推断。
   - 可生成 `ImportPlan`，统计 create、skip、merge、attach annotation、needs review。
   - `annotation_enrichment` 对同名中药自动写入 `knowledge_annotations`。
@@ -53,6 +54,14 @@ cargo test --manifest-path src-tauri/Cargo.toml
   - `knowledge_annotations` 内容进入搜索索引。
   - AI 未启用时返回本地规则处理提示，不阻塞导入计划。
   - `generic_csv` / `unknown` 仍进入字段映射。
+  - `create_new`、`attach_annotation` 和 `merge_empty_fields` 会记录 `import_run_changes`。
+  - `merge_empty_fields` 会记录 `before_json` / `after_json`。
+  - `rollback_import_run` 可删除本次新增知识条目。
+  - `rollback_import_run` 可删除本次新增注解。
+  - `rollback_import_run` 可恢复本次补空字段。
+  - 回滚后搜索索引重建。
+  - `list_import_runs` 返回最近导入历史。
+  - `get_import_run_report` 返回导入报告。
 
 前端检查：
 
@@ -129,9 +138,11 @@ npm --prefix frontend run build
 ## 手工回归重点
 
 - 可新增黄芪、足阳明胃经、足三里。
-- 可导入 CSV/JSON 并进入暂存区。
-- 可点击“导入数据包文件夹”选择已解压标准数据包，并看到 package_name、import_profile、manifest、主数据文件、记录数和导入方式。
-- 数据包概览按主数据文件和辅助文件分组；辅助文件应显示 role、description 与不自动暂存原因。
+- 首页可进入“智能导入中心”，入口文案为“导入标准数据包，系统自动识别、去重、合并并生成导入报告。”
+- 标准 ZIP / 已解压文件夹只显示四步导入流程，不默认展示字段映射、primary、auxiliary、target、manifest 路径或重复明细。
+- 单个 JSON / CSV 仅作为高级入口；只有 `generic_csv` / `generic_json` / `unknown` 才需要字段映射确认。
+- 导入报告显示成功、跳过、附加注解、失败、导入批次号、查看报告和一键回滚。
+- 回滚后再次搜索本次新增条目，应不再命中；回滚本次新增注解后，注解来源关键词应不再通过该注解命中。
 - PDF 原始资料文件夹不能直接导入，错误文案应明确说明先用外部工具转换为标准数据包。
 - 可显示错误行和校验问题。
 - 可检测重复候选。

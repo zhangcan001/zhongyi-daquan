@@ -75,12 +75,31 @@ Import Engine V2 用于解决 v0.1-alpha-package 中“先手工映射所有字�
       "path": "json/knowledge_items_import_curated.json",
       "type": "knowledge_items_v1",
       "target": "knowledge_items",
-      "primary": true
+      "primary": true,
+      "role": "main_knowledge_items",
+      "auto_stage": true,
+      "description": "主知识条目文件，系统将自动暂存并导入该文件。"
+    },
+    {
+      "path": "json/herb_items_import.json",
+      "type": "knowledge_items_v1",
+      "target": "knowledge_items",
+      "primary": false,
+      "required": false,
+      "role": "auxiliary_export",
+      "auto_stage": false,
+      "description": "中药条目辅助导出文件，通常已包含在主知识文件中，默认不自动导入，避免重复。"
     }
   ],
   "import_order": ["knowledge_items", "search_terms"]
 }
 ```
+
+`primary` 表示本次导入的主数据文件。推荐每个标准数据包只设置一个 `primary: true` 的主知识文件；主文件默认 `auto_stage: true`，系统会自动暂存。`primary: false` 的文件默认 `auto_stage: false`，会显示为辅助文件，不自动暂存。
+
+`role` 与 `description` 用于解释文件用途，不影响识别；未知 `role` 不会报错。常见 `auxiliary_export` 表示辅助导出文件，例如 `herb_items_import.json` 可能是主知识文件中的中药子集或备用导出。为避免与 `knowledge_items_import.json` 重复入库，系统会保留展示但默认不导入。即使非主文件声明 `auto_stage: true`，当前版本也先显示为“可手动选择”，不会自动暂存。
+
+如果 manifest 中多个可直接导入文件的 `type` 与 `target` 相同，但只有一个 `primary`，系统会提示：`检测到多个可导入文件指向同一目标表，系统仅自动暂存 primary 主文件，其余文件作为辅助文件保留，避免重复导入。`
 
 如果 ZIP 或文件夹只有普通 `manifest.json`，系统会把它当作包说明，再自动查找 `json/knowledge_items_import.json`、`json/knowledge_items_import_curated.json`、`json/classic_passages_curated.json` 等已知文件。
 

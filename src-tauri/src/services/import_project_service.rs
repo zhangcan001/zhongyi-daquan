@@ -982,16 +982,21 @@ fn read_manifest_import_package<R: ImportPackageReader>(
 
     let mut package_files = Vec::new();
     let mut primary_files = Vec::new();
+    let mut auto_stage_files = Vec::new();
     let mut candidates = Vec::new();
     let mut primary_path = None;
     let mut primary_import_type = "zip_manifest".to_string();
     let mut package_search_terms = Vec::new();
     let mut warnings = Vec::new();
+    let has_duplicate_direct_targets = has_duplicate_direct_import_targets(&file_entries);
 
     if let Some(name) = package_name.as_deref() {
         warnings.push(format!("数据包: {}", name));
     }
     warnings.push(format!("manifest 文件数: {}", file_entries.len()));
+    if has_duplicate_direct_targets {
+        warnings.push("检测到多个可导入文件指向同一目标表，系统仅自动暂存 primary 主文件，其余文件作为辅助文件保留，避免重复导入。".to_string());
+    }
 
     for file in &file_entries {
         let exists = reader.exists(&file.path);
@@ -1010,24 +1015,40 @@ fn read_manifest_import_package<R: ImportPackageReader>(
         ));
 
         let mut record_count = None;
+        let mut skip_reason = None;
         if file.import_type == "search_terms_v1" {
             let rows = read_package_rows(reader, &file.path)?;
             record_count = Some(rows.len() as i64);
             warnings.push(format!("已读取搜索词文件 {}：{} 条", file.path, rows.len()));
             package_search_terms.extend(rows);
-        } else if is_direct_package_import_type(&file.import_type) && file.primary {
+            if !file.primary {
+                skip_reason = Some(
+                    "搜索词辅助文件不会单独暂存；确认主知识文件后会按包内搜索词规则追加。"
+                        .to_string(),
+                );
+            }
+        } else if should_auto_stage_manifest_file(file) {
             let rows = read_package_rows(reader, &file.path)?;
             record_count = Some(rows.len() as i64);
             primary_path = Some(file.path.clone());
             primary_import_type = "zip_manifest".to_string();
             candidates.extend(rows);
             primary_files.push(file.path.clone());
+            auto_stage_files.push(file.path.clone());
         } else if is_direct_package_import_type(&file.import_type) {
+            let rows = read_package_rows(reader, &file.path)?;
+            record_count = Some(rows.len() as i64);
+            skip_reason = Some(skip_reason_for_manifest_file(
+                file,
+                has_duplicate_direct_targets,
+            ));
             warnings.push(format!(
-                "已识别 {}，但它不是 primary 主数据文件；当前 manifest 导入只自动暂存主知识文件。",
-                file.path
+                "已识别 {}，但它不是 primary 主数据文件；{}",
+                file.path,
+                skip_reason.as_deref().unwrap_or_default()
             ));
         } else {
+            skip_reason = Some("当前版本暂不直接导入该 manifest 文件。".to_string());
             warnings.push(format!(
                 "已识别 manifest 文件 {}，当前版本暂不直接导入目标 {}",
                 file.path,
@@ -1040,6 +1061,10 @@ fn read_manifest_import_package<R: ImportPackageReader>(
             import_type: file.import_type.clone(),
             target: file.target.clone(),
             primary: file.primary,
+            role: file.role.clone(),
+            auto_stage: file.auto_stage,
+            description: file.description.clone(),
+            skip_reason,
             required: file.required,
             exists,
             record_count,
@@ -1068,8 +1093,19 @@ fn read_manifest_import_package<R: ImportPackageReader>(
         import_profile,
         manifest_found: true,
         manifest_path: Some("import_manifest.json".to_string()),
-        files: package_files,
         primary_files,
+        auxiliary_files: package_files
+            .iter()
+            .filter(|file| !file.primary)
+            .cloned()
+            .collect(),
+        auto_stage_files,
+        skipped_manifest_files: package_files
+            .iter()
+            .filter(|file| file.skip_reason.is_some())
+            .cloned()
+            .collect(),
+        files: package_files,
         detected_type: detected,
         record_count: candidates.len() as i64,
         direct_import_ready,
@@ -1110,11 +1146,18 @@ fn read_auto_import_package<R: ImportPackageReader>(
                     import_type: detected_type.clone(),
                     target: Some("knowledge_items".to_string()),
                     primary: true,
+                    role: Some("auto_discovered_primary".to_string()),
+                    auto_stage: true,
+                    description: None,
+                    skip_reason: None,
                     required: true,
                     exists: true,
                     record_count: Some(rows.len() as i64),
                 }],
                 primary_files: vec![(*path).to_string()],
+                auxiliary_files: Vec::new(),
+                auto_stage_files: vec![(*path).to_string()],
+                skipped_manifest_files: Vec::new(),
                 detected_type,
                 record_count: rows.len() as i64,
                 direct_import_ready,
@@ -1147,6 +1190,9 @@ struct ManifestFileEntry {
     import_type: String,
     target: Option<String>,
     primary: bool,
+    role: Option<String>,
+    auto_stage: bool,
+    description: Option<String>,
     required: bool,
 }
 
@@ -1155,6 +1201,15 @@ fn manifest_file_from_value(value: &Value) -> AppResult<ManifestFileEntry> {
         .get("path")
         .and_then(Value::as_str)
         .ok_or_else(|| AppError::InvalidInput("manifest 文件项缺少 path".to_string()))?;
+    let primary = value
+        .get("primary")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let auto_stage = value
+        .get("auto_stage")
+        .or_else(|| value.get("autoStage"))
+        .and_then(Value::as_bool)
+        .unwrap_or(primary);
     Ok(ManifestFileEntry {
         path: normalize_package_path(path),
         import_type: value
@@ -1166,15 +1221,60 @@ fn manifest_file_from_value(value: &Value) -> AppResult<ManifestFileEntry> {
             .get("target")
             .and_then(Value::as_str)
             .map(ToString::to_string),
-        primary: value
-            .get("primary")
-            .and_then(Value::as_bool)
-            .unwrap_or(false),
+        primary,
+        role: value
+            .get("role")
+            .and_then(Value::as_str)
+            .map(ToString::to_string),
+        auto_stage,
+        description: value
+            .get("description")
+            .and_then(Value::as_str)
+            .map(ToString::to_string),
         required: value
             .get("required")
             .and_then(Value::as_bool)
             .unwrap_or(true),
     })
+}
+
+fn should_auto_stage_manifest_file(file: &ManifestFileEntry) -> bool {
+    file.primary && file.auto_stage && is_direct_package_import_type(&file.import_type)
+}
+
+fn skip_reason_for_manifest_file(
+    file: &ManifestFileEntry,
+    has_duplicate_direct_targets: bool,
+) -> String {
+    if !file.primary && file.auto_stage {
+        return "该文件声明 auto_stage: true，但不是 primary 主数据文件；当前版本先显示为可手动选择，不自动暂存，避免重复导入。".to_string();
+    }
+    if has_duplicate_direct_targets {
+        return "非 primary 主数据文件，默认不自动暂存，避免重复导入。".to_string();
+    }
+    "该文件已识别为可导入数据，但不是 primary 主数据文件；系统默认不自动暂存。".to_string()
+}
+
+fn has_duplicate_direct_import_targets(files: &[ManifestFileEntry]) -> bool {
+    let mut target_counts: BTreeMap<String, (usize, usize)> = BTreeMap::new();
+    for file in files
+        .iter()
+        .filter(|file| is_direct_package_import_type(&file.import_type))
+    {
+        let key = format!(
+            "{}|{}",
+            file.import_type,
+            file.target.as_deref().unwrap_or("未声明")
+        );
+        let entry = target_counts.entry(key).or_default();
+        entry.0 += 1;
+        if file.primary {
+            entry.1 += 1;
+        }
+    }
+    target_counts
+        .values()
+        .any(|(total_count, primary_count)| *total_count > 1 && *primary_count == 1)
 }
 
 fn manifest_order_index(file: &ManifestFileEntry, import_order: &[String]) -> usize {
@@ -1957,7 +2057,7 @@ fn effective_target_type(target_type: &str, object: &Map<String, Value>) -> Stri
 mod tests {
     use super::{
         confirm_import, import_csv, import_json, import_package_folder, import_quality_report,
-        import_zip, preview_package_folder, rollback_import_batch,
+        import_zip, preview_package_folder, preview_zip, rollback_import_batch,
     };
     use crate::db::connection::Database;
     use crate::models::data_pipeline::CreateImportRequest;
@@ -2015,6 +2115,54 @@ mod tests {
               "import_order": ["knowledge_items"]
             }}"#
         )
+    }
+
+    fn folder_manifest_with_auxiliary(auto_stage: bool) -> String {
+        format!(
+            r#"{{
+              "package_name": "folder_classics_package",
+              "schema_version": "1.0",
+              "import_profile": "classics_curated_v1",
+              "files": [
+                {{
+                  "path": "json/knowledge_items_import.json",
+                  "type": "knowledge_items_v1",
+                  "target": "knowledge_items",
+                  "primary": true,
+                  "role": "main_knowledge_items",
+                  "auto_stage": true
+                }},
+                {{
+                  "path": "json/herb_items_import.json",
+                  "type": "knowledge_items_v1",
+                  "target": "knowledge_items",
+                  "primary": false,
+                  "required": false,
+                  "role": "auxiliary_export",
+                  "auto_stage": {auto_stage},
+                  "description": "中药条目辅助导出文件，通常已包含在主知识文件中，默认不自动导入，避免重复。"
+                }}
+              ],
+              "import_order": ["knowledge_items"]
+            }}"#
+        )
+    }
+
+    fn write_auxiliary_herb_file(root: &std::path::Path) {
+        fs::write(
+            root.join("json/herb_items_import.json"),
+            r#"[
+              {
+                "type": "herb",
+                "code": "FOLDER-HERB-001",
+                "name": "文件夹甘草",
+                "content": "甘草辅助导出文件，用于验证非主文件不自动暂存。",
+                "source_note": "神农本草经",
+                "tags": ["中药", "辅助导出"]
+              }
+            ]"#,
+        )
+        .expect("write auxiliary herb file");
     }
 
     #[test]
@@ -2258,7 +2406,7 @@ mod tests {
             writer.start_file("import_manifest.json", options).unwrap();
             writer
                 .write_all(
-                    br#"{
+                    r#"{
                 "package_name": "zhongyi_classics_curated_v0_3",
                 "schema_version": "1.0",
                 "import_profile": "classics_curated_v1",
@@ -2267,11 +2415,24 @@ mod tests {
                     "path": "json/knowledge_items_import_curated.json",
                     "type": "knowledge_items_v1",
                     "target": "knowledge_items",
-                    "primary": true
+                    "primary": true,
+                    "role": "main_knowledge_items",
+                    "auto_stage": true
+                  },
+                  {
+                    "path": "json/herb_items_import.json",
+                    "type": "knowledge_items_v1",
+                    "target": "knowledge_items",
+                    "primary": false,
+                    "required": false,
+                    "role": "auxiliary_export",
+                    "auto_stage": false,
+                    "description": "中药条目辅助导出文件，通常已包含在主知识文件中，默认不自动导入，避免重复。"
                   }
                 ],
                 "import_order": ["knowledge_items"]
-            }"#,
+            }"#
+                    .as_bytes(),
                 )
                 .unwrap();
             writer
@@ -2289,6 +2450,24 @@ mod tests {
                 "tags": ["方剂", "伤寒论"],
                 "data_status": "validated",
                 "detail": {"composition": "桂枝,芍药,甘草,生姜,大枣"}
+              }
+            ]"#
+                    .as_bytes(),
+                )
+                .unwrap();
+            writer
+                .start_file("json/herb_items_import.json", options)
+                .unwrap();
+            writer
+                .write_all(
+                    r#"[
+              {
+                "type": "herb",
+                "code": "GC-001",
+                "name": "甘草",
+                "content": "甘草辅助导出文件，不应自动暂存。",
+                "source_note": "神农本草经",
+                "tags": ["中药", "辅助导出"]
               }
             ]"#
                     .as_bytes(),
@@ -2313,6 +2492,17 @@ mod tests {
             writer.finish().unwrap();
         }
         let bytes = buffer.into_inner();
+
+        let preview =
+            preview_zip("zhongyi_classics_curated_v0_3_manifest.zip", &bytes).expect("preview zip");
+        assert!(preview
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("检测到多个可导入文件指向同一目标表")));
+        assert!(preview
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("json/herb_items_import.json")));
 
         let summary = import_zip(
             &database,
@@ -2533,6 +2723,85 @@ mod tests {
         );
         assert_eq!(descriptor.record_count, 1);
         assert!(descriptor.direct_import_ready);
+
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn manifest_auxiliary_files_are_read_but_not_auto_staged() {
+        let (data_dir, _database) = temp_database("folder-auxiliary-manifest");
+        let package_dir = data_dir.join("folder_package");
+        write_folder_package(
+            &package_dir,
+            Some(&folder_manifest_with_auxiliary(false)),
+            "json/knowledge_items_import.json",
+        );
+        write_auxiliary_herb_file(&package_dir);
+
+        let descriptor = preview_package_folder(package_dir.to_str().unwrap())
+            .expect("preview package folder with auxiliary");
+        assert_eq!(
+            descriptor.primary_files,
+            vec!["json/knowledge_items_import.json".to_string()]
+        );
+        assert_eq!(
+            descriptor.auto_stage_files,
+            vec!["json/knowledge_items_import.json".to_string()]
+        );
+        assert_eq!(descriptor.record_count, 1);
+        assert_eq!(descriptor.auxiliary_files.len(), 1);
+        let auxiliary = &descriptor.auxiliary_files[0];
+        assert_eq!(auxiliary.path, "json/herb_items_import.json");
+        assert_eq!(auxiliary.role.as_deref(), Some("auxiliary_export"));
+        assert!(!auxiliary.auto_stage);
+        assert_eq!(auxiliary.record_count, Some(1));
+        assert!(auxiliary
+            .description
+            .as_deref()
+            .unwrap_or_default()
+            .contains("中药条目辅助导出文件"));
+        assert!(auxiliary
+            .skip_reason
+            .as_deref()
+            .unwrap_or_default()
+            .contains("非 primary 主数据文件"));
+        assert_eq!(descriptor.skipped_manifest_files.len(), 1);
+        assert!(descriptor
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("检测到多个可导入文件指向同一目标表")));
+
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn manifest_auxiliary_auto_stage_true_is_manual_only_for_now() {
+        let (data_dir, _database) = temp_database("folder-auxiliary-manual");
+        let package_dir = data_dir.join("folder_package");
+        write_folder_package(
+            &package_dir,
+            Some(&folder_manifest_with_auxiliary(true)),
+            "json/knowledge_items_import.json",
+        );
+        write_auxiliary_herb_file(&package_dir);
+
+        let descriptor = preview_package_folder(package_dir.to_str().unwrap())
+            .expect("preview package folder with manual auxiliary");
+        assert_eq!(
+            descriptor.auto_stage_files,
+            vec!["json/knowledge_items_import.json".to_string()]
+        );
+        let auxiliary = descriptor
+            .auxiliary_files
+            .iter()
+            .find(|file| file.path == "json/herb_items_import.json")
+            .expect("auxiliary file");
+        assert!(auxiliary.auto_stage);
+        assert!(auxiliary
+            .skip_reason
+            .as_deref()
+            .unwrap_or_default()
+            .contains("可手动选择"));
 
         let _ = fs::remove_dir_all(data_dir);
     }

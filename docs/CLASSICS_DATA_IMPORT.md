@@ -62,6 +62,10 @@
 
 `zhongyi_classics_curated_v0_3_manifest.zip` 基于 v0.2 数据包增加根目录 `import_manifest.json`。也可以把 ZIP 解压为文件夹后直接选择文件夹导入。manifest 声明包名、schema、文件列表、主数据文件和导入顺序。当前 v0.1 会自动暂存 `primary: true` 的 `knowledge_items_import_curated.json` 或 `knowledge_items_import.json`，其他文件显示在数据包概览中但不自动混入同一批次。确认入库后可查看质量报告，重点检查 `content`、`source_note`、`tags` 覆盖率，以及关键词搜索抽检。
 
+`primary: true` 表示主数据文件。标准数据包推荐只设置一个主知识文件，并设置 `role: "main_knowledge_items"`、`auto_stage: true`。非主文件默认作为辅助文件展示，不自动暂存，避免与主文件重复导入。
+
+`role: "auxiliary_export"` 适合 `json/herb_items_import.json` 这类辅助导出文件。它通常是 `knowledge_items_import.json` 的中药子集或备用导出，系统会显示其 `description` 与跳过原因：非 primary 主数据文件默认不自动暂存，避免重复导入。如果多个 `knowledge_items_v1` 文件同时指向 `knowledge_items`，页面会提示重复风险。
+
 标准文件夹结构示例：
 
 ```text
@@ -82,6 +86,7 @@ README_导入说明.md
 仓库内提供示例：
 
 - `data-seed/classics/import_manifest.example.json`
+- `data-seed/private-samples/shennong_bencao_manifest.example.json`
 
 导入后搜索验收关键词：
 

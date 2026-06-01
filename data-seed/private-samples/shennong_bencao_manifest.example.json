@@ -1,0 +1,28 @@
+{
+  "package_name": "shennong_bencao_ni_notes_private_import",
+  "schema_version": "1.0",
+  "import_profile": "classics_curated_v1",
+  "files": [
+    {
+      "path": "json/knowledge_items_import.json",
+      "type": "knowledge_items_v1",
+      "target": "knowledge_items",
+      "primary": true,
+      "required": true,
+      "role": "main_knowledge_items",
+      "auto_stage": true,
+      "description": "主知识条目文件，系统将自动暂存并导入该文件。"
+    },
+    {
+      "path": "json/herb_items_import.json",
+      "type": "knowledge_items_v1",
+      "target": "knowledge_items",
+      "primary": false,
+      "required": false,
+      "role": "auxiliary_export",
+      "auto_stage": false,
+      "description": "中药条目辅助导出文件，通常已包含在主知识文件中，默认不自动导入，避免重复。"
+    }
+  ],
+  "import_order": ["knowledge_items"]
+}

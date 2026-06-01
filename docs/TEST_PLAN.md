@@ -39,6 +39,9 @@ cargo test --manifest-path src-tauri/Cargo.toml
   - manifest 可指向 `json/knowledge_items_import.json`。
   - manifest 指向文件不存在时返回明确错误。
   - 没有 manifest 但存在 `json/knowledge_items_import.json` 时可按 `knowledge_items_v1` 识别。
+  - manifest 非主文件支持读取 `role`、`auto_stage`、`description`。
+  - `primary: false` 的辅助文件不会自动暂存，并返回 `skip_reason`。
+  - 多个可导入文件指向同一 `target` 时生成重复风险 warning。
   - 文件夹里只有 PDF 时拒绝直接导入，并提示先转换为标准 `import_manifest` 数据包。
   - 文件夹导入确认后会重建搜索索引，可搜索新导入条目。
 
@@ -119,6 +122,7 @@ npm --prefix frontend run build
 - 可新增黄芪、足阳明胃经、足三里。
 - 可导入 CSV/JSON 并进入暂存区。
 - 可点击“导入数据包文件夹”选择已解压标准数据包，并看到 package_name、import_profile、manifest、主数据文件、记录数和导入方式。
+- 数据包概览按主数据文件和辅助文件分组；辅助文件应显示 role、description 与不自动暂存原因。
 - PDF 原始资料文件夹不能直接导入，错误文案应明确说明先用外部工具转换为标准数据包。
 - 可显示错误行和校验问题。
 - 可检测重复候选。

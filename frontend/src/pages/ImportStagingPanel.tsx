@@ -476,6 +476,8 @@ function MappingSuggestionTable({ suggestions }: { suggestions: FieldMappingSugg
 }
 
 function PackageDescriptorPanel({ descriptor }: { descriptor: ImportPackageDescriptor }) {
+  const primaryFiles = descriptor.files.filter((file) => file.primary);
+  const auxiliaryFiles = descriptor.auxiliaryFiles.length ? descriptor.auxiliaryFiles : descriptor.files.filter((file) => !file.primary);
   return (
     <div className="preview-panel">
       <div className="summary-grid">
@@ -490,8 +492,54 @@ function PackageDescriptorPanel({ descriptor }: { descriptor: ImportPackageDescr
         <Metric label="导入方式" value={descriptor.directImportReady ? "可直接导入" : "需映射确认"} />
         <Metric label="文件数" value={descriptor.files.length} />
       </div>
+      {primaryFiles.length ? (
+        <ManifestFileGroup
+          title="主数据文件"
+          files={primaryFiles}
+          fallbackStatus="系统将自动暂存并导入该文件。"
+        />
+      ) : null}
+      {auxiliaryFiles.length ? (
+        <ManifestFileGroup
+          title="辅助文件"
+          files={auxiliaryFiles}
+          fallbackStatus="该文件已识别，但不是主数据文件。它通常是主数据的子集或备用导出文件。为避免重复导入，系统默认不自动暂存。"
+        />
+      ) : null}
       {descriptor.warnings.length ? <p className="ai-message">{descriptor.warnings.join("；")}</p> : null}
       {descriptor.errors.length ? <p className="error-text">{descriptor.errors.join("；")}</p> : null}
+    </div>
+  );
+}
+
+function ManifestFileGroup({ title, files, fallbackStatus }: { title: string; files: ImportPackageDescriptor["files"]; fallbackStatus: string }) {
+  return (
+    <div className="staging-table-wrap compact">
+      <table className="staging-table">
+        <thead>
+          <tr>
+            <th>{title}</th>
+            <th>类型</th>
+            <th>role</th>
+            <th>记录</th>
+            <th>处理策略</th>
+          </tr>
+        </thead>
+        <tbody>
+          {files.map((file) => (
+            <tr key={file.path}>
+              <td>{file.path}</td>
+              <td>{file.importType}</td>
+              <td>{file.role ?? "未声明"}</td>
+              <td>{file.recordCount ?? "-"}</td>
+              <td>
+                {file.skipReason ?? file.description ?? fallbackStatus}
+                {file.description && file.skipReason ? ` ${file.description}` : ""}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

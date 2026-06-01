@@ -30,6 +30,10 @@ export type ImportPackageFile = {
   importType: string;
   target?: string | null;
   primary: boolean;
+  role?: string | null;
+  autoStage: boolean;
+  description?: string | null;
+  skipReason?: string | null;
   required: boolean;
   exists: boolean;
   recordCount?: number | null;
@@ -43,6 +47,9 @@ export type ImportPackageDescriptor = {
   manifestPath?: string | null;
   files: ImportPackageFile[];
   primaryFiles: string[];
+  auxiliaryFiles: ImportPackageFile[];
+  autoStageFiles: string[];
+  skippedManifestFiles: ImportPackageFile[];
   detectedType: string;
   recordCount: number;
   directImportReady: boolean;

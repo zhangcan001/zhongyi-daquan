@@ -295,6 +295,7 @@ fn adapt_knowledge_item(raw: &Map<String, Value>) -> Map<String, Value> {
     if let Some(Value::Object(detail)) = get_alias(raw, &["detail", "详情", "扩展字段"]) {
         merge_detail_into_output(&mut output, detail);
     }
+    preserve_private_fields(raw, &mut output);
     preserve_context_fields(raw, &mut output);
     output
         .entry("type".to_string())
@@ -356,6 +357,7 @@ fn adapt_classic_passage(raw: &Map<String, Value>) -> Map<String, Value> {
     );
     output.insert("symptoms".to_string(), Value::String(original_text));
     output.insert("notes".to_string(), Value::String(detail_notes(raw)));
+    preserve_private_fields(raw, &mut output);
     preserve_context_fields(raw, &mut output);
     output
 }
@@ -529,6 +531,14 @@ fn preserve_context_fields(raw: &Map<String, Value>, output: &mut Map<String, Va
             "source_note".to_string(),
             Value::String(source_parts.join(" / ")),
         );
+    }
+}
+
+fn preserve_private_fields(raw: &Map<String, Value>, output: &mut Map<String, Value>) {
+    for (key, value) in raw {
+        if key.starts_with('_') {
+            output.insert(key.clone(), value.clone());
+        }
     }
 }
 

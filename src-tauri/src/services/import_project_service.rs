@@ -2,8 +2,8 @@ use crate::db::connection::Database;
 use crate::errors::{AppError, AppResult};
 use crate::models::data_pipeline::{
     CleanStepRequest, CleanStepResult, ConfirmImportResult, CreateImportRequest,
-    ImportBatchSummary, ImportParsedPreview, ImportQualityReport, RollbackImportResult,
-    StagingIssue, StagingPage, StagingRowView,
+    ImportBatchSummary, ImportDiffReport, ImportParsedPreview, ImportQualityReport,
+    RollbackImportResult, StagingIssue, StagingPage, StagingRowView,
 };
 use crate::repositories::{import_repository, search_repository, validation_repository};
 use crate::services::{
@@ -386,6 +386,24 @@ pub fn import_quality_report(database: &Database, batch_id: i64) -> AppResult<Im
         )?;
         Ok(count)
     })?;
+    let confirmed_item_ids = import_repository::confirmed_item_ids(database, batch_id)?;
+    let duplicate_warning_rows = database.with_connection(|connection| {
+        let count: i64 = connection.query_row(
+            "SELECT COUNT(DISTINCT row_id)
+             FROM data_validation_issues
+             WHERE batch_id = ?1 AND issue_code = 'possible_existing_duplicate'",
+            params![batch_id],
+            |row| row.get(0),
+        )?;
+        Ok(count)
+    })?;
+    let mut affected_types = BTreeMap::new();
+    for row in &rows {
+        let value = parse_optional_json(row.normalized_json.clone())?;
+        let object = value.as_object().cloned().unwrap_or_default();
+        let kind = text(&object, "type").unwrap_or_else(|| "unknown".to_string());
+        *affected_types.entry(kind).or_default() += 1;
+    }
     let checked = search_keywords(database, &["桂枝汤", "太阳病", "上古天真论", "神农本草经"])?;
     let mut suggestions = Vec::new();
     if summary.error_rows > 0 {
@@ -404,6 +422,11 @@ pub fn import_quality_report(database: &Database, batch_id: i64) -> AppResult<Im
     {
         suggestions.push("source_note 覆盖率偏低，建议补充出处信息。".to_string());
     }
+    if duplicate_warning_rows > 0 {
+        suggestions.push(format!(
+            "有 {duplicate_warning_rows} 行与正式库疑似重复，建议导入前先确认是否合并。"
+        ));
+    }
 
     Ok(ImportQualityReport {
         batch_id,
@@ -416,6 +439,13 @@ pub fn import_quality_report(database: &Database, batch_id: i64) -> AppResult<Im
         empty_field_counts: empty_counts,
         duplicate_fingerprint_count,
         search_terms_imported_count,
+        import_diff: ImportDiffReport {
+            inserted_items: confirmed_item_ids.len() as i64,
+            skipped_rows: summary.total_rows - confirmed_item_ids.len() as i64,
+            duplicate_warning_rows,
+            imported_search_terms: search_terms_imported_count,
+            affected_types,
+        },
         searchable_keywords_checked: checked,
         suggestions,
     })
@@ -555,7 +585,8 @@ fn import_preparsed_rows(
         .enumerate()
     {
         let effective_type = effective_target_type(target_type, normalized);
-        let issues = validation_service::validate_row(database, &effective_type, normalized)?;
+        let mut issues = validation_service::validate_row(database, &effective_type, normalized)?;
+        issues.extend(existing_duplicate_warnings(database, normalized)?);
         let (status, error_message, warning_message) =
             validation_service::status_from_issues(&issues);
 
@@ -760,6 +791,7 @@ fn parse_zip_import_rows(
             warnings.push(format!("数据包: {}", package_name));
         }
         warnings.push(format!("manifest 文件数: {}", files.len()));
+        let mut package_search_terms = Vec::new();
         for file in files {
             let path = file
                 .get("path")
@@ -790,7 +822,32 @@ fn parse_zip_import_rows(
                 },
                 can_direct_import
             ));
-            if can_direct_import && primary {
+            if import_type == "search_terms_v1" {
+                match read_zip_text(&mut archive, path)? {
+                    Some(text) => {
+                        let rows = if path.to_ascii_lowercase().ends_with(".csv") {
+                            parse_csv_rows(&text)?
+                        } else {
+                            parse_json_rows(&text)?
+                        };
+                        warnings.push(format!("已读取搜索词文件 {}：{} 条", path, rows.len()));
+                        package_search_terms.extend(rows);
+                    }
+                    None => {
+                        if file
+                            .get("required")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false)
+                        {
+                            return Err(AppError::InvalidInput(format!(
+                                "manifest 指向的必需搜索词文件不存在: {}",
+                                path
+                            )));
+                        }
+                        warnings.push(format!("可选搜索词文件不存在，已跳过: {}", path));
+                    }
+                }
+            } else if can_direct_import && primary {
                 if import_type != "knowledge_items_v1" && import_type != "classic_passages_v1" {
                     warnings.push(format!(
                         "已跳过 {}：当前 v0.1 只直接导入 knowledge_items_v1 与 classic_passages_v1",
@@ -819,11 +876,15 @@ fn parse_zip_import_rows(
                 ));
             }
         }
+        if package_search_terms.is_empty() {
+            package_search_terms = read_standard_package_search_terms(&mut archive, &mut warnings)?;
+        }
         if candidates.is_empty() {
             return Err(AppError::InvalidInput(
                 "manifest 中没有可导入到 knowledge_items 的文件".to_string(),
             ));
         }
+        attach_package_search_terms(&mut candidates, &package_search_terms);
         return Ok((candidates, "zip_manifest".to_string(), warnings));
     }
 
@@ -856,6 +917,29 @@ fn parse_zip_import_rows(
     ))
 }
 
+fn read_standard_package_search_terms<R: Read + std::io::Seek>(
+    archive: &mut ZipArchive<R>,
+    warnings: &mut Vec<String>,
+) -> AppResult<Vec<Map<String, Value>>> {
+    for path in [
+        "json/search_terms_curated.json",
+        "json/search_terms.json",
+        "csv/search_terms_curated.csv",
+        "csv/search_terms.csv",
+    ] {
+        if let Some(text) = read_zip_text(archive, path)? {
+            let rows = if path.ends_with(".csv") {
+                parse_csv_rows(&text)?
+            } else {
+                parse_json_rows(&text)?
+            };
+            warnings.push(format!("已自动读取搜索词文件 {}：{} 条", path, rows.len()));
+            return Ok(rows);
+        }
+    }
+    Ok(Vec::new())
+}
+
 fn strip_json_bom(content: &str) -> &str {
     content.trim_start_matches('\u{feff}')
 }
@@ -876,6 +960,58 @@ fn read_zip_text<R: Read + std::io::Seek>(
         }
     }
     Ok(None)
+}
+
+fn attach_package_search_terms(
+    rows: &mut [Map<String, Value>],
+    search_terms: &[Map<String, Value>],
+) {
+    if search_terms.is_empty() {
+        return;
+    }
+    let mut by_code: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+    let mut by_name: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+    for term in search_terms {
+        let value = Value::Object(term.clone());
+        if let Some(code) = text(term, "item_code").or_else(|| text(term, "code")) {
+            by_code.entry(code).or_default().push(value.clone());
+        }
+        if let Some(name) = text(term, "item_name").or_else(|| text(term, "name")) {
+            by_name.entry(name).or_default().push(value);
+        }
+    }
+
+    for row in rows {
+        let mut attached = Vec::new();
+        if let Some(code) = text(row, "code") {
+            if let Some(values) = by_code.get(&code) {
+                attached.extend(values.clone());
+            }
+        }
+        if let Some(name) = text(row, "name") {
+            if let Some(values) = by_name.get(&name) {
+                attached.extend(values.clone());
+            }
+        }
+        if !attached.is_empty() {
+            row.insert(
+                "_package_search_terms".to_string(),
+                Value::Array(dedup_search_term_values(attached)),
+            );
+        }
+    }
+}
+
+fn dedup_search_term_values(values: Vec<Value>) -> Vec<Value> {
+    let mut seen = HashSet::new();
+    let mut deduped = Vec::new();
+    for value in values {
+        let key = value.to_string();
+        if seen.insert(key) {
+            deduped.push(value);
+        }
+    }
+    deduped
 }
 
 fn preview_from_rows(
@@ -1163,24 +1299,32 @@ fn import_search_terms_for_items(
             let object = value.as_object().cloned().unwrap_or_default();
             let mut seen = HashSet::new();
             let mut terms = Vec::new();
+            for package_term in package_search_terms(&object) {
+                terms.push(package_term);
+            }
             for field in ["name", "code", "category", "tags"] {
                 if let Some(value) = text(&object, field) {
-                    terms.extend(split_search_terms(&value));
+                    terms.extend(
+                        split_search_terms(&value)
+                            .into_iter()
+                            .map(|term| (term, "imported_package".to_string(), 80)),
+                    );
                 }
             }
-            for term in terms {
+            for (term, term_type, weight) in terms {
                 let normalized = search_repository::normalize_for_search(&term);
-                if normalized.is_empty() || !seen.insert(normalized.clone()) {
+                let dedup_key = format!("{normalized}|{term_type}");
+                if normalized.is_empty() || !seen.insert(dedup_key) {
                     continue;
                 }
                 transaction.execute(
                     "INSERT INTO search_terms (item_id, term, term_type, weight)
-                     SELECT ?1, ?2, 'imported_package', 80
+                     SELECT ?1, ?2, ?3, ?4
                      WHERE NOT EXISTS (
                        SELECT 1 FROM search_terms
-                       WHERE item_id = ?1 AND term = ?2 AND term_type = 'imported_package'
+                       WHERE item_id = ?1 AND term = ?2 AND term_type = ?3
                      )",
-                    params![item_id, normalized],
+                    params![item_id, normalized, term_type, weight],
                 )?;
                 if transaction.changes() > 0 {
                     imported += 1;
@@ -1209,7 +1353,7 @@ fn set_search_terms_imported_count(
 fn should_import_package_terms(import_type: &str) -> bool {
     matches!(
         import_type,
-        "classics_curated_v1" | "knowledge_items_v1" | "classic_passages_v1"
+        "zip_manifest" | "classics_curated_v1" | "knowledge_items_v1" | "classic_passages_v1"
     )
 }
 
@@ -1220,6 +1364,101 @@ fn split_search_terms(value: &str) -> Vec<String> {
         .filter(|part| !part.is_empty())
         .map(ToString::to_string)
         .collect()
+}
+
+fn package_search_terms(object: &Map<String, Value>) -> Vec<(String, String, i64)> {
+    object
+        .get("_package_search_terms")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_object)
+        .filter_map(|term| {
+            let value = text(term, "term")?;
+            let term_type =
+                text(term, "term_type").unwrap_or_else(|| "imported_package".to_string());
+            let weight = term
+                .get("weight")
+                .and_then(Value::as_i64)
+                .or_else(|| text(term, "weight").and_then(|value| value.parse::<i64>().ok()))
+                .unwrap_or(80)
+                .clamp(1, 200);
+            Some((value, format!("package_{term_type}"), weight))
+        })
+        .collect()
+}
+
+fn existing_duplicate_warnings(
+    database: &Database,
+    row: &Map<String, Value>,
+) -> AppResult<Vec<StagingIssue>> {
+    let item_type = text(row, "type").unwrap_or_default();
+    let code = text(row, "code");
+    let name = text(row, "name");
+    if item_type.is_empty() || (code.is_none() && name.is_none()) {
+        return Ok(Vec::new());
+    }
+
+    let duplicate = database.with_connection(|connection| {
+        let mut duplicate = None;
+        if let Some(code) = code.as_deref() {
+            duplicate = connection
+                .query_row(
+                    "SELECT id, name FROM knowledge_items
+                     WHERE type = ?1 AND upper(replace(replace(COALESCE(code, ''), ' ', ''), '-', '')) = ?2
+                     LIMIT 1",
+                    params![item_type, normalize_code_for_duplicate(code)],
+                    |row| {
+                        Ok((
+                            row.get::<_, i64>(0)?,
+                            row.get::<_, String>(1)?,
+                            "code".to_string(),
+                        ))
+                    },
+                )
+                .optional()?;
+        }
+        if duplicate.is_none() {
+            if let Some(name) = name.as_deref() {
+                duplicate = connection
+                    .query_row(
+                        "SELECT id, name FROM knowledge_items
+                         WHERE type = ?1 AND lower(replace(COALESCE(name, ''), ' ', '')) = ?2
+                         LIMIT 1",
+                        params![item_type, normalize_name_for_duplicate(name)],
+                        |row| {
+                            Ok((
+                                row.get::<_, i64>(0)?,
+                                row.get::<_, String>(1)?,
+                                "name".to_string(),
+                            ))
+                        },
+                    )
+                    .optional()?;
+            }
+        }
+        Ok(duplicate)
+    })?;
+
+    Ok(duplicate
+        .map(|(id, name, field_name)| {
+            vec![StagingIssue {
+                severity: "warning".to_string(),
+                issue_code: "possible_existing_duplicate".to_string(),
+                field_name: Some(field_name),
+                message: format!("正式库中存在疑似重复条目 #{id}: {name}"),
+                suggestion: Some("确认是否需要跳过、合并或保留为新版本后再入库".to_string()),
+            }]
+        })
+        .unwrap_or_default())
+}
+
+fn normalize_code_for_duplicate(code: &str) -> String {
+    code.replace([' ', '-'], "").to_ascii_uppercase()
+}
+
+fn normalize_name_for_duplicate(name: &str) -> String {
+    name.replace(' ', "").to_lowercase()
 }
 
 fn row_fingerprint(object: &Map<String, Value>) -> String {
@@ -1679,6 +1918,22 @@ mod tests {
                     .as_bytes(),
                 )
                 .unwrap();
+            writer
+                .start_file("json/search_terms_curated.json", options)
+                .unwrap();
+            writer
+                .write_all(
+                    r#"[
+              {
+                "item_code": "GZT-001",
+                "term": "营卫不和",
+                "term_type": "keyword",
+                "weight": 120
+              }
+            ]"#
+                    .as_bytes(),
+                )
+                .unwrap();
             writer.finish().unwrap();
         }
         let bytes = buffer.into_inner();
@@ -1730,6 +1985,13 @@ mod tests {
                     |row| row.get(0),
                 )?;
                 assert!(imported_terms >= 3);
+
+                let package_keyword: i64 = connection.query_row(
+                    "SELECT COUNT(1) FROM search_terms WHERE term = '营卫不和' AND term_type = 'package_keyword'",
+                    [],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(package_keyword, 1);
                 Ok(())
             })
             .expect("inspect import quality fields");
@@ -1745,6 +2007,63 @@ mod tests {
         )
         .expect("search zip import");
         assert!(!response.results.is_empty());
+
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn import_staging_warns_when_existing_item_has_same_type_and_code() {
+        let (data_dir, database) = temp_database("duplicate-warning");
+        let first = r#"
+        [
+          {
+            "type": "formula",
+            "code": "DUP-GZT-001",
+            "name": "重复预警桂枝汤",
+            "content": "第一次导入。",
+            "source_note": "测试"
+          }
+        ]
+        "#;
+        let first_summary = import_json(
+            &database,
+            CreateImportRequest {
+                file_name: "knowledge_items_import_curated.json".to_string(),
+                target_type: "mixed".to_string(),
+                content: first.to_string(),
+                mapping: None,
+                template_id: None,
+            },
+        )
+        .expect("stage first item");
+        confirm_import(&database, first_summary.batch.id.unwrap()).expect("confirm first item");
+
+        let second_summary = import_json(
+            &database,
+            CreateImportRequest {
+                file_name: "knowledge_items_import_curated.json".to_string(),
+                target_type: "mixed".to_string(),
+                content: first.to_string(),
+                mapping: None,
+                template_id: None,
+            },
+        )
+        .expect("stage duplicate item");
+
+        assert_eq!(second_summary.warning_rows, 1);
+        database
+            .with_connection(|connection| {
+                let issue_count: i64 = connection.query_row(
+                    "SELECT COUNT(1)
+                     FROM data_validation_issues
+                     WHERE batch_id = ?1 AND issue_code = 'possible_existing_duplicate'",
+                    [second_summary.batch.id.unwrap()],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(issue_count, 1);
+                Ok(())
+            })
+            .expect("inspect duplicate warning");
 
         let _ = fs::remove_dir_all(data_dir);
     }

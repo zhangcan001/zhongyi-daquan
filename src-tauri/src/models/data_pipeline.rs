@@ -229,8 +229,20 @@ pub struct ImportQualityReport {
     pub empty_field_counts: std::collections::BTreeMap<String, i64>,
     pub duplicate_fingerprint_count: i64,
     pub search_terms_imported_count: i64,
+    pub import_diff: ImportDiffReport,
     pub searchable_keywords_checked: std::collections::BTreeMap<String, bool>,
     pub suggestions: Vec<String>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportDiffReport {
+    pub inserted_items: i64,
+    pub skipped_rows: i64,
+    pub duplicate_warning_rows: i64,
+    pub imported_search_terms: i64,
+    pub affected_types: std::collections::BTreeMap<String, i64>,
 }
 
 #[allow(dead_code)]

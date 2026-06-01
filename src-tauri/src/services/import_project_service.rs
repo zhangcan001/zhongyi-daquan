@@ -2,8 +2,9 @@ use crate::db::connection::Database;
 use crate::errors::{AppError, AppResult};
 use crate::models::data_pipeline::{
     CleanStepRequest, CleanStepResult, ConfirmImportResult, CreateImportRequest,
-    ImportBatchSummary, ImportDiffReport, ImportParsedPreview, ImportQualityReport,
-    RollbackImportResult, StagingIssue, StagingPage, StagingRowView,
+    ImportBatchSummary, ImportDiffReport, ImportPackageDescriptor, ImportPackageFile,
+    ImportParsedPreview, ImportQualityReport, RollbackImportResult, StagingIssue, StagingPage,
+    StagingRowView,
 };
 use crate::repositories::{import_repository, search_repository, validation_repository};
 use crate::services::{
@@ -16,6 +17,7 @@ use rusqlite::{params, OptionalExtension};
 use serde_json::{Map, Value};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::io::{Cursor, Read};
+use std::path::{Path, PathBuf};
 use zip::ZipArchive;
 
 pub fn preview_json(content: &str) -> AppResult<ImportParsedPreview> {
@@ -65,16 +67,14 @@ pub fn import_excel(
 }
 
 pub fn preview_zip(file_name: &str, content: &[u8]) -> AppResult<ImportParsedPreview> {
-    let (rows, import_type, warnings) = parse_zip_import_rows(content)?;
-    let mut preview = preview_from_rows(file_name, &import_type, rows, "mixed");
-    if import_type == "zip_manifest" {
-        preview.detection.detected_type = "classics_curated_v1".to_string();
-        preview.detection.confidence = 0.99;
-        preview.detection.reason =
-            "检测到 import_manifest.json，按 manifest 驱动的经典精校数据包导入".to_string();
-        preview.direct_import_ready = true;
-    }
-    preview.warnings.extend(warnings);
+    let parsed = parse_zip_import_package(file_name, content)?;
+    let mut preview = preview_from_rows(
+        &primary_file_name(&parsed.descriptor, file_name),
+        &parsed.import_type,
+        parsed.rows,
+        "mixed",
+    );
+    apply_package_descriptor_to_preview(&mut preview, &parsed.descriptor);
     Ok(preview)
 }
 
@@ -83,8 +83,35 @@ pub fn import_zip(
     request: CreateImportRequest,
     bytes: &[u8],
 ) -> AppResult<ImportBatchSummary> {
-    let (rows, import_type, _warnings) = parse_zip_import_rows(bytes)?;
+    let parsed = parse_zip_import_package(&request.file_name, bytes)?;
+    let rows = parsed.rows;
+    let import_type = parsed.import_type;
     import_preparsed_rows(database, &import_type, request, rows)
+}
+
+pub fn preview_package_folder(folder_path: &str) -> AppResult<ImportPackageDescriptor> {
+    let parsed = parse_folder_import_package(folder_path)?;
+    Ok(parsed.descriptor)
+}
+
+pub fn import_package_folder(
+    database: &Database,
+    folder_path: &str,
+) -> AppResult<ImportBatchSummary> {
+    let parsed = parse_folder_import_package(folder_path)?;
+    let folder_name = Path::new(folder_path)
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("package-folder")
+        .to_string();
+    let request = CreateImportRequest {
+        file_name: folder_name,
+        target_type: "mixed".to_string(),
+        content: String::new(),
+        mapping: None,
+        template_id: None,
+    };
+    import_preparsed_rows(database, &parsed.import_type, request, parsed.rows)
 }
 
 pub fn staging_page(
@@ -766,173 +793,404 @@ fn import_rows_from_bytes(
     import_preparsed_rows(database, import_type, request, rows)
 }
 
-fn parse_zip_import_rows(
-    content: &[u8],
-) -> AppResult<(Vec<Map<String, Value>>, String, Vec<String>)> {
+struct ParsedImportPackage {
+    descriptor: ImportPackageDescriptor,
+    rows: Vec<Map<String, Value>>,
+    import_type: String,
+}
+
+trait ImportPackageReader {
+    fn package_root(&self) -> String;
+    fn read_text(&mut self, path: &str) -> AppResult<Option<String>>;
+    fn exists(&self, path: &str) -> bool;
+    fn contains_raw_source_files(&self) -> bool;
+}
+
+struct ZipImportPackageReader<R: Read + std::io::Seek> {
+    archive: ZipArchive<R>,
+    names: Vec<String>,
+    package_root: String,
+}
+
+impl<R: Read + std::io::Seek> ZipImportPackageReader<R> {
+    fn new(reader: R, package_root: String) -> AppResult<Self> {
+        let mut archive = ZipArchive::new(reader)
+            .map_err(|error| AppError::InvalidInput(format!("无法读取 ZIP 数据包: {}", error)))?;
+        let mut names = Vec::new();
+        for index in 0..archive.len() {
+            let file = archive.by_index(index).map_err(|error| {
+                AppError::InvalidInput(format!("无法读取 ZIP 文件项: {}", error))
+            })?;
+            names.push(normalize_package_path(file.name()));
+        }
+        Ok(Self {
+            archive,
+            names,
+            package_root,
+        })
+    }
+}
+
+impl<R: Read + std::io::Seek> ImportPackageReader for ZipImportPackageReader<R> {
+    fn package_root(&self) -> String {
+        self.package_root.clone()
+    }
+
+    fn read_text(&mut self, path: &str) -> AppResult<Option<String>> {
+        let normalized = normalize_package_path(path);
+        for index in 0..self.archive.len() {
+            let mut file = self.archive.by_index(index).map_err(|error| {
+                AppError::InvalidInput(format!("无法读取 ZIP 文件项: {}", error))
+            })?;
+            if normalize_package_path(file.name()).ends_with(&normalized) {
+                let mut text = String::new();
+                file.read_to_string(&mut text)?;
+                return Ok(Some(text));
+            }
+        }
+        Ok(None)
+    }
+
+    fn exists(&self, path: &str) -> bool {
+        let normalized = normalize_package_path(path);
+        self.names.iter().any(|name| name.ends_with(&normalized))
+    }
+
+    fn contains_raw_source_files(&self) -> bool {
+        self.names.iter().any(|name| is_raw_source_path(name))
+    }
+}
+
+struct FolderImportPackageReader {
+    root: PathBuf,
+    files: Vec<String>,
+}
+
+impl FolderImportPackageReader {
+    fn new(folder_path: &str) -> AppResult<Self> {
+        let root = PathBuf::from(folder_path);
+        if !root.exists() {
+            return Err(AppError::InvalidInput(format!(
+                "数据包文件夹不存在: {}",
+                folder_path
+            )));
+        }
+        if !root.is_dir() {
+            return Err(AppError::InvalidInput(format!(
+                "数据包路径不是文件夹: {}",
+                folder_path
+            )));
+        }
+        let mut files = Vec::new();
+        collect_folder_files(&root, &root, &mut files)?;
+        Ok(Self { root, files })
+    }
+
+    fn path_for(&self, path: &str) -> PathBuf {
+        self.root.join(normalize_package_path(path))
+    }
+}
+
+impl ImportPackageReader for FolderImportPackageReader {
+    fn package_root(&self) -> String {
+        self.root.to_string_lossy().to_string()
+    }
+
+    fn read_text(&mut self, path: &str) -> AppResult<Option<String>> {
+        let path = self.path_for(path);
+        if !path.exists() {
+            return Ok(None);
+        }
+        Ok(Some(std::fs::read_to_string(path)?))
+    }
+
+    fn exists(&self, path: &str) -> bool {
+        self.path_for(path).is_file()
+    }
+
+    fn contains_raw_source_files(&self) -> bool {
+        self.files.iter().any(|name| is_raw_source_path(name))
+    }
+}
+
+fn parse_zip_import_package(file_name: &str, content: &[u8]) -> AppResult<ParsedImportPackage> {
     let cursor = Cursor::new(content);
-    let mut archive = ZipArchive::new(cursor)
-        .map_err(|error| AppError::InvalidInput(format!("无法读取 ZIP 数据包: {}", error)))?;
-    let import_manifest = read_zip_text(&mut archive, "import_manifest.json")?;
+    let mut reader = ZipImportPackageReader::new(cursor, file_name.to_string())?;
+    read_import_package(&mut reader)
+}
+
+fn parse_folder_import_package(folder_path: &str) -> AppResult<ParsedImportPackage> {
+    let mut reader = FolderImportPackageReader::new(folder_path)?;
+    read_import_package(&mut reader)
+}
+
+fn read_import_package<R: ImportPackageReader>(reader: &mut R) -> AppResult<ParsedImportPackage> {
+    let mut warnings = Vec::new();
+    let package_root = reader.package_root();
+    let import_manifest = reader.read_text("import_manifest.json")?;
     let package_manifest = if import_manifest.is_none() {
-        read_zip_text(&mut archive, "manifest.json")?
+        reader.read_text("manifest.json")?
     } else {
         None
     };
-    let mut warnings = Vec::new();
-    let mut candidates = Vec::new();
 
     if let Some(manifest_text) = import_manifest {
-        let manifest_value: Value = serde_json::from_str(strip_json_bom(&manifest_text))?;
-        let files = manifest_value
-            .get("files")
-            .and_then(Value::as_array)
-            .ok_or_else(|| AppError::InvalidInput("manifest 缺少 files 数组".to_string()))?;
-        if let Some(package_name) = manifest_value.get("package_name").and_then(Value::as_str) {
-            warnings.push(format!("数据包: {}", package_name));
-        }
-        warnings.push(format!("manifest 文件数: {}", files.len()));
-        let mut package_search_terms = Vec::new();
-        for file in files {
-            let path = file
-                .get("path")
-                .and_then(Value::as_str)
-                .ok_or_else(|| AppError::InvalidInput("manifest 文件项缺少 path".to_string()))?;
-            let import_type = file
-                .get("type")
-                .and_then(Value::as_str)
-                .unwrap_or("generic_json");
-            let target = file
-                .get("target")
-                .and_then(Value::as_str)
-                .unwrap_or_default();
-            let primary = file
-                .get("primary")
-                .and_then(Value::as_bool)
-                .unwrap_or(false);
-            let can_direct_import =
-                import_type == "knowledge_items_v1" || import_type == "classic_passages_v1";
-            warnings.push(format!(
-                "文件: {} / 类型: {} / 目标: {} / 可直接导入: {}",
-                path,
-                import_type,
-                if target.is_empty() {
-                    "未声明"
-                } else {
-                    target
-                },
-                can_direct_import
-            ));
-            if import_type == "search_terms_v1" {
-                match read_zip_text(&mut archive, path)? {
-                    Some(text) => {
-                        let rows = if path.to_ascii_lowercase().ends_with(".csv") {
-                            parse_csv_rows(&text)?
-                        } else {
-                            parse_json_rows(&text)?
-                        };
-                        warnings.push(format!("已读取搜索词文件 {}：{} 条", path, rows.len()));
-                        package_search_terms.extend(rows);
-                    }
-                    None => {
-                        if file
-                            .get("required")
-                            .and_then(Value::as_bool)
-                            .unwrap_or(false)
-                        {
-                            return Err(AppError::InvalidInput(format!(
-                                "manifest 指向的必需搜索词文件不存在: {}",
-                                path
-                            )));
-                        }
-                        warnings.push(format!("可选搜索词文件不存在，已跳过: {}", path));
-                    }
-                }
-            } else if can_direct_import && primary {
-                if import_type != "knowledge_items_v1" && import_type != "classic_passages_v1" {
-                    warnings.push(format!(
-                        "已跳过 {}：当前 v0.1 只直接导入 knowledge_items_v1 与 classic_passages_v1",
-                        path
-                    ));
-                    continue;
-                }
-                let text = read_zip_text(&mut archive, path)?.ok_or_else(|| {
-                    AppError::InvalidInput(format!("manifest 指向的文件不存在: {}", path))
-                })?;
-                let rows = if path.to_ascii_lowercase().ends_with(".csv") {
-                    parse_csv_rows(&text)?
-                } else {
-                    parse_json_rows(&text)?
-                };
-                candidates.extend(rows);
-            } else if can_direct_import {
-                warnings.push(format!(
-                    "已识别 {}，但它不是 primary 主数据文件；v0.1 manifest 导入先只自动暂存主知识文件。",
-                    path
-                ));
-            } else {
-                warnings.push(format!(
-                    "已识别 manifest 文件 {}，v0.1 暂不直接导入目标 {}",
-                    path, target
-                ));
-            }
-        }
-        if package_search_terms.is_empty() {
-            package_search_terms = read_standard_package_search_terms(&mut archive, &mut warnings)?;
-        }
-        if candidates.is_empty() {
-            return Err(AppError::InvalidInput(
-                "manifest 中没有可导入到 knowledge_items 的文件".to_string(),
-            ));
-        }
-        attach_package_search_terms(&mut candidates, &package_search_terms);
-        return Ok((candidates, "zip_manifest".to_string(), warnings));
+        return read_manifest_import_package(reader, package_root, manifest_text);
     }
 
     if package_manifest.is_some() {
         warnings.push("检测到 package manifest，但不是 Import Engine V2 的 import_manifest.json，已按内置经典包规则自动查找可导入文件。".to_string());
     }
 
-    for path in [
-        "json/knowledge_items_import_curated.json",
-        "json/knowledge_items_import_full_clean.json",
-        "json/classic_passages_curated.json",
-        "json/classic_passages_full_clean.json",
-        "csv/knowledge_items_import_curated.csv",
-        "csv/knowledge_items_import_full_clean.csv",
-        "csv/classic_passages_curated.csv",
-        "csv/classic_passages_full_clean.csv",
-    ] {
-        if let Some(text) = read_zip_text(&mut archive, path)? {
-            let rows = if path.ends_with(".csv") {
-                parse_csv_rows(&text)?
-            } else {
-                parse_json_rows(&text)?
+    read_auto_import_package(reader, package_root, warnings)
+}
+
+fn read_manifest_import_package<R: ImportPackageReader>(
+    reader: &mut R,
+    package_root: String,
+    manifest_text: String,
+) -> AppResult<ParsedImportPackage> {
+    let manifest_value: Value = serde_json::from_str(strip_json_bom(&manifest_text))?;
+    let files = manifest_value
+        .get("files")
+        .and_then(Value::as_array)
+        .ok_or_else(|| AppError::InvalidInput("manifest 缺少 files 数组".to_string()))?;
+    let package_name = manifest_value
+        .get("package_name")
+        .and_then(Value::as_str)
+        .map(ToString::to_string);
+    let import_profile = manifest_value
+        .get("import_profile")
+        .and_then(Value::as_str)
+        .map(ToString::to_string);
+    let import_order = manifest_value
+        .get("import_order")
+        .and_then(Value::as_array)
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(Value::as_str)
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let mut file_entries = files
+        .iter()
+        .map(manifest_file_from_value)
+        .collect::<AppResult<Vec<_>>>()?;
+    file_entries.sort_by_key(|file| manifest_order_index(file, &import_order));
+
+    let mut package_files = Vec::new();
+    let mut primary_files = Vec::new();
+    let mut candidates = Vec::new();
+    let mut primary_path = None;
+    let mut primary_import_type = "zip_manifest".to_string();
+    let mut package_search_terms = Vec::new();
+    let mut warnings = Vec::new();
+
+    if let Some(name) = package_name.as_deref() {
+        warnings.push(format!("数据包: {}", name));
+    }
+    warnings.push(format!("manifest 文件数: {}", file_entries.len()));
+
+    for file in &file_entries {
+        let exists = reader.exists(&file.path);
+        if !exists {
+            return Err(AppError::InvalidInput(format!(
+                "manifest 指向的文件不存在: {}",
+                file.path
+            )));
+        }
+        warnings.push(format!(
+            "文件: {} / 类型: {} / 目标: {} / 可直接导入: {}",
+            file.path,
+            file.import_type,
+            file.target.as_deref().unwrap_or("未声明"),
+            is_direct_package_import_type(&file.import_type)
+        ));
+
+        let mut record_count = None;
+        if file.import_type == "search_terms_v1" {
+            let rows = read_package_rows(reader, &file.path)?;
+            record_count = Some(rows.len() as i64);
+            warnings.push(format!("已读取搜索词文件 {}：{} 条", file.path, rows.len()));
+            package_search_terms.extend(rows);
+        } else if is_direct_package_import_type(&file.import_type) && file.primary {
+            let rows = read_package_rows(reader, &file.path)?;
+            record_count = Some(rows.len() as i64);
+            primary_path = Some(file.path.clone());
+            primary_import_type = "zip_manifest".to_string();
+            candidates.extend(rows);
+            primary_files.push(file.path.clone());
+        } else if is_direct_package_import_type(&file.import_type) {
+            warnings.push(format!(
+                "已识别 {}，但它不是 primary 主数据文件；当前 manifest 导入只自动暂存主知识文件。",
+                file.path
+            ));
+        } else {
+            warnings.push(format!(
+                "已识别 manifest 文件 {}，当前版本暂不直接导入目标 {}",
+                file.path,
+                file.target.as_deref().unwrap_or("未声明")
+            ));
+        }
+
+        package_files.push(ImportPackageFile {
+            path: file.path.clone(),
+            import_type: file.import_type.clone(),
+            target: file.target.clone(),
+            primary: file.primary,
+            required: file.required,
+            exists,
+            record_count,
+        });
+    }
+
+    if package_search_terms.is_empty() {
+        package_search_terms = read_standard_package_search_terms(reader, &mut warnings)?;
+    }
+    if candidates.is_empty() {
+        return Err(AppError::InvalidInput(
+            "manifest 中没有可导入到 knowledge_items 的 primary 主数据文件".to_string(),
+        ));
+    }
+    attach_package_search_terms(&mut candidates, &package_search_terms);
+
+    let detected = detect_package_rows(
+        primary_path.as_deref().unwrap_or("import_manifest.json"),
+        &primary_import_type,
+        &candidates,
+    );
+    let direct_import_ready = import_engine_service::is_direct_import_type(&detected);
+    let descriptor = ImportPackageDescriptor {
+        package_root,
+        package_name,
+        import_profile,
+        manifest_found: true,
+        manifest_path: Some("import_manifest.json".to_string()),
+        files: package_files,
+        primary_files,
+        detected_type: detected,
+        record_count: candidates.len() as i64,
+        direct_import_ready,
+        warnings,
+        errors: Vec::new(),
+    };
+
+    Ok(ParsedImportPackage {
+        descriptor,
+        rows: candidates,
+        import_type: primary_import_type,
+    })
+}
+
+fn read_auto_import_package<R: ImportPackageReader>(
+    reader: &mut R,
+    package_root: String,
+    mut warnings: Vec<String>,
+) -> AppResult<ParsedImportPackage> {
+    for path in STANDARD_PACKAGE_MAIN_PATHS {
+        if reader.exists(path) {
+            let mut rows = read_package_rows(reader, path)?;
+            let mut search_warnings = Vec::new();
+            let package_search_terms =
+                read_standard_package_search_terms(reader, &mut search_warnings)?;
+            warnings.extend(search_warnings);
+            attach_package_search_terms(&mut rows, &package_search_terms);
+            let detected_type = detect_package_rows(path, "zip_auto", &rows);
+            let direct_import_ready = import_engine_service::is_direct_import_type(&detected_type);
+            let descriptor = ImportPackageDescriptor {
+                package_root,
+                package_name: None,
+                import_profile: None,
+                manifest_found: false,
+                manifest_path: None,
+                files: vec![ImportPackageFile {
+                    path: (*path).to_string(),
+                    import_type: detected_type.clone(),
+                    target: Some("knowledge_items".to_string()),
+                    primary: true,
+                    required: true,
+                    exists: true,
+                    record_count: Some(rows.len() as i64),
+                }],
+                primary_files: vec![(*path).to_string()],
+                detected_type,
+                record_count: rows.len() as i64,
+                direct_import_ready,
+                warnings,
+                errors: Vec::new(),
             };
-            return Ok((rows, "zip_auto".to_string(), warnings));
+            return Ok(ParsedImportPackage {
+                descriptor,
+                rows,
+                import_type: "zip_auto".to_string(),
+            });
         }
     }
 
+    if reader.contains_raw_source_files() {
+        return Err(AppError::InvalidInput(
+            "PDF 原始资料不能直接导入，请先使用外部数据处理工具转换为标准 import_manifest 数据包。"
+                .to_string(),
+        ));
+    }
+
     Err(AppError::InvalidInput(
-        "ZIP 中未找到 import_manifest.json 或支持的经典数据文件".to_string(),
+        "当前文件夹不是标准导入数据包，请先通过外部工具处理为 import_manifest 数据包。".to_string(),
     ))
 }
 
-fn read_standard_package_search_terms<R: Read + std::io::Seek>(
-    archive: &mut ZipArchive<R>,
+#[derive(Debug, Clone)]
+struct ManifestFileEntry {
+    path: String,
+    import_type: String,
+    target: Option<String>,
+    primary: bool,
+    required: bool,
+}
+
+fn manifest_file_from_value(value: &Value) -> AppResult<ManifestFileEntry> {
+    let path = value
+        .get("path")
+        .and_then(Value::as_str)
+        .ok_or_else(|| AppError::InvalidInput("manifest 文件项缺少 path".to_string()))?;
+    Ok(ManifestFileEntry {
+        path: normalize_package_path(path),
+        import_type: value
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or("generic_json")
+            .to_string(),
+        target: value
+            .get("target")
+            .and_then(Value::as_str)
+            .map(ToString::to_string),
+        primary: value
+            .get("primary")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        required: value
+            .get("required")
+            .and_then(Value::as_bool)
+            .unwrap_or(true),
+    })
+}
+
+fn manifest_order_index(file: &ManifestFileEntry, import_order: &[String]) -> usize {
+    file.target
+        .as_ref()
+        .and_then(|target| import_order.iter().position(|item| item == target))
+        .unwrap_or(import_order.len())
+}
+
+fn read_standard_package_search_terms<R: ImportPackageReader>(
+    reader: &mut R,
     warnings: &mut Vec<String>,
 ) -> AppResult<Vec<Map<String, Value>>> {
-    for path in [
-        "json/search_terms_curated.json",
-        "json/search_terms.json",
-        "csv/search_terms_curated.csv",
-        "csv/search_terms.csv",
-    ] {
-        if let Some(text) = read_zip_text(archive, path)? {
-            let rows = if path.ends_with(".csv") {
-                parse_csv_rows(&text)?
-            } else {
-                parse_json_rows(&text)?
-            };
+    for path in STANDARD_PACKAGE_SEARCH_TERM_PATHS {
+        if reader.exists(path) {
+            let rows = read_package_rows(reader, path)?;
             warnings.push(format!("已自动读取搜索词文件 {}：{} 条", path, rows.len()));
             return Ok(rows);
         }
@@ -940,26 +1198,104 @@ fn read_standard_package_search_terms<R: Read + std::io::Seek>(
     Ok(Vec::new())
 }
 
-fn strip_json_bom(content: &str) -> &str {
-    content.trim_start_matches('\u{feff}')
+fn read_package_rows<R: ImportPackageReader>(
+    reader: &mut R,
+    path: &str,
+) -> AppResult<Vec<Map<String, Value>>> {
+    let text = reader
+        .read_text(path)?
+        .ok_or_else(|| AppError::InvalidInput(format!("manifest 指向的文件不存在: {}", path)))?;
+    if path.to_ascii_lowercase().ends_with(".csv") {
+        parse_csv_rows(&text)
+    } else {
+        parse_json_rows(&text)
+    }
 }
 
-fn read_zip_text<R: Read + std::io::Seek>(
-    archive: &mut ZipArchive<R>,
-    path: &str,
-) -> AppResult<Option<String>> {
-    let normalized = path.replace('\\', "/");
-    for index in 0..archive.len() {
-        let mut file = archive
-            .by_index(index)
-            .map_err(|error| AppError::InvalidInput(format!("无法读取 ZIP 文件项: {}", error)))?;
-        if file.name().replace('\\', "/").ends_with(&normalized) {
-            let mut text = String::new();
-            file.read_to_string(&mut text)?;
-            return Ok(Some(text));
+fn detect_package_rows(path: &str, import_type: &str, rows: &[Map<String, Value>]) -> String {
+    import_engine_service::detect_import_type(path, import_type, rows).detected_type
+}
+
+fn is_direct_package_import_type(import_type: &str) -> bool {
+    matches!(import_type, "knowledge_items_v1" | "classic_passages_v1")
+}
+
+fn primary_file_name(descriptor: &ImportPackageDescriptor, fallback: &str) -> String {
+    descriptor
+        .primary_files
+        .first()
+        .cloned()
+        .unwrap_or_else(|| fallback.to_string())
+}
+
+fn apply_package_descriptor_to_preview(
+    preview: &mut ImportParsedPreview,
+    descriptor: &ImportPackageDescriptor,
+) {
+    preview.direct_import_ready = descriptor.direct_import_ready;
+    if descriptor.manifest_found {
+        if let Some(import_profile) = descriptor.import_profile.as_deref() {
+            preview.detection.detected_type = import_profile.to_string();
+        }
+        preview.detection.confidence = 0.99;
+        preview.detection.reason =
+            "检测到 import_manifest.json，按 manifest 驱动的标准数据包导入".to_string();
+    }
+    preview.warnings.extend(descriptor.warnings.clone());
+}
+
+const STANDARD_PACKAGE_MAIN_PATHS: &[&str] = &[
+    "json/knowledge_items_import.json",
+    "json/knowledge_items_import_curated.json",
+    "json/knowledge_items_import_full_clean.json",
+    "json/classic_passages_curated.json",
+    "json/classic_passages_full_clean.json",
+    "csv/knowledge_items_import.csv",
+    "csv/knowledge_items_import_curated.csv",
+    "csv/knowledge_items_import_full_clean.csv",
+    "csv/classic_passages_curated.csv",
+    "csv/classic_passages_full_clean.csv",
+];
+
+const STANDARD_PACKAGE_SEARCH_TERM_PATHS: &[&str] = &[
+    "json/search_terms_curated.json",
+    "json/search_terms.json",
+    "csv/search_terms_curated.csv",
+    "csv/search_terms.csv",
+];
+
+fn normalize_package_path(path: &str) -> String {
+    path.replace('\\', "/").trim_start_matches('/').to_string()
+}
+
+fn is_raw_source_path(path: &str) -> bool {
+    matches!(
+        Path::new(path)
+            .extension()
+            .and_then(|value| value.to_str())
+            .map(|value| value.to_ascii_lowercase())
+            .as_deref(),
+        Some("pdf" | "doc" | "docx" | "png" | "jpg" | "jpeg" | "webp" | "tif" | "tiff")
+    )
+}
+
+fn collect_folder_files(root: &Path, current: &Path, files: &mut Vec<String>) -> AppResult<()> {
+    for entry in std::fs::read_dir(current)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            collect_folder_files(root, &path, files)?;
+        } else if path.is_file() {
+            if let Ok(relative) = path.strip_prefix(root) {
+                files.push(normalize_package_path(&relative.to_string_lossy()));
+            }
         }
     }
-    Ok(None)
+    Ok(())
+}
+
+fn strip_json_bom(content: &str) -> &str {
+    content.trim_start_matches('\u{feff}')
 }
 
 fn attach_package_search_terms(
@@ -1620,8 +1956,8 @@ fn effective_target_type(target_type: &str, object: &Map<String, Value>) -> Stri
 #[cfg(test)]
 mod tests {
     use super::{
-        confirm_import, import_csv, import_json, import_quality_report, import_zip,
-        rollback_import_batch,
+        confirm_import, import_csv, import_json, import_package_folder, import_quality_report,
+        import_zip, preview_package_folder, rollback_import_batch,
     };
     use crate::db::connection::Database;
     use crate::models::data_pipeline::CreateImportRequest;
@@ -1639,6 +1975,46 @@ mod tests {
         let data_dir = std::env::temp_dir().join(format!("zhongyi-import-{test_name}-{unique}"));
         let database = Database::initialize(&data_dir).expect("initialize database");
         (data_dir, database)
+    }
+
+    fn write_folder_package(root: &std::path::Path, manifest: Option<&str>, knowledge_path: &str) {
+        fs::create_dir_all(root.join("json")).expect("create json dir");
+        if let Some(manifest) = manifest {
+            fs::write(root.join("import_manifest.json"), manifest).expect("write manifest");
+        }
+        fs::write(
+            root.join(knowledge_path),
+            r#"[
+              {
+                "type": "formula",
+                "code": "FOLDER-GZT-001",
+                "name": "文件夹桂枝汤",
+                "content": "桂枝汤原文用于文件夹数据包导入测试。",
+                "source_note": "伤寒论",
+                "tags": ["方剂", "文件夹导入"]
+              }
+            ]"#,
+        )
+        .expect("write knowledge file");
+    }
+
+    fn folder_manifest(path: &str) -> String {
+        format!(
+            r#"{{
+              "package_name": "folder_classics_package",
+              "schema_version": "1.0",
+              "import_profile": "classics_curated_v1",
+              "files": [
+                {{
+                  "path": "{path}",
+                  "type": "knowledge_items_v1",
+                  "target": "knowledge_items",
+                  "primary": true
+                }}
+              ],
+              "import_order": ["knowledge_items"]
+            }}"#
+        )
     }
 
     #[test]
@@ -2064,6 +2440,147 @@ mod tests {
                 Ok(())
             })
             .expect("inspect duplicate warning");
+
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn package_folder_preview_reads_root_import_manifest() {
+        let (data_dir, _database) = temp_database("folder-manifest-preview");
+        let package_dir = data_dir.join("folder_package");
+        write_folder_package(
+            &package_dir,
+            Some(&folder_manifest("json/knowledge_items_import.json")),
+            "json/knowledge_items_import.json",
+        );
+
+        let descriptor =
+            preview_package_folder(package_dir.to_str().unwrap()).expect("preview package folder");
+        assert!(descriptor.manifest_found);
+        assert_eq!(
+            descriptor.package_name.as_deref(),
+            Some("folder_classics_package")
+        );
+        assert_eq!(
+            descriptor.import_profile.as_deref(),
+            Some("classics_curated_v1")
+        );
+        assert_eq!(
+            descriptor.primary_files,
+            vec!["json/knowledge_items_import.json".to_string()]
+        );
+        assert_eq!(descriptor.record_count, 1);
+        assert!(descriptor.direct_import_ready);
+
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn package_folder_manifest_allows_utf8_bom() {
+        let (data_dir, _database) = temp_database("folder-manifest-bom");
+        let package_dir = data_dir.join("folder_package");
+        let manifest = format!(
+            "\u{feff}{}",
+            folder_manifest("json/knowledge_items_import.json")
+        );
+        write_folder_package(
+            &package_dir,
+            Some(&manifest),
+            "json/knowledge_items_import.json",
+        );
+
+        let descriptor = preview_package_folder(package_dir.to_str().unwrap())
+            .expect("preview package folder with bom");
+        assert!(descriptor.manifest_found);
+        assert_eq!(descriptor.record_count, 1);
+
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn package_folder_manifest_missing_file_returns_clear_error() {
+        let (data_dir, _database) = temp_database("folder-manifest-missing");
+        let package_dir = data_dir.join("folder_package");
+        fs::create_dir_all(&package_dir).expect("create package dir");
+        fs::write(
+            package_dir.join("import_manifest.json"),
+            folder_manifest("json/missing_knowledge_items_import.json"),
+        )
+        .expect("write manifest");
+
+        let error = preview_package_folder(package_dir.to_str().unwrap())
+            .expect_err("missing manifest file should fail")
+            .to_string();
+        assert!(error.contains("manifest 指向的文件不存在"));
+        assert!(error.contains("json/missing_knowledge_items_import.json"));
+
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn package_folder_without_manifest_detects_standard_knowledge_file() {
+        let (data_dir, _database) = temp_database("folder-auto-knowledge");
+        let package_dir = data_dir.join("folder_package");
+        write_folder_package(&package_dir, None, "json/knowledge_items_import.json");
+
+        let descriptor = preview_package_folder(package_dir.to_str().unwrap())
+            .expect("preview package folder without manifest");
+        assert!(!descriptor.manifest_found);
+        assert_eq!(descriptor.detected_type, "knowledge_items_v1");
+        assert_eq!(
+            descriptor.primary_files,
+            vec!["json/knowledge_items_import.json".to_string()]
+        );
+        assert_eq!(descriptor.record_count, 1);
+        assert!(descriptor.direct_import_ready);
+
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn package_folder_with_only_pdf_refuses_direct_import() {
+        let (data_dir, _database) = temp_database("folder-pdf-only");
+        let package_dir = data_dir.join("folder_package");
+        fs::create_dir_all(&package_dir).expect("create package dir");
+        fs::write(package_dir.join("3人纪-神农本草经.pdf"), b"%PDF-1.7")
+            .expect("write pdf placeholder");
+
+        let error = preview_package_folder(package_dir.to_str().unwrap())
+            .expect_err("pdf folder should fail")
+            .to_string();
+        assert!(error.contains("PDF 原始资料不能直接导入"));
+        assert!(error.contains("标准 import_manifest 数据包"));
+
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn package_folder_import_rebuilds_search_index() {
+        let (data_dir, database) = temp_database("folder-import-search");
+        let package_dir = data_dir.join("folder_package");
+        write_folder_package(
+            &package_dir,
+            Some(&folder_manifest("json/knowledge_items_import.json")),
+            "json/knowledge_items_import.json",
+        );
+
+        let summary = import_package_folder(&database, package_dir.to_str().unwrap())
+            .expect("import folder package");
+        assert_eq!(summary.total_rows, 1);
+        let batch_id = summary.batch.id.unwrap();
+        confirm_import(&database, batch_id).expect("confirm folder import");
+
+        let response = search_index_service::search(
+            &database,
+            SearchRequest {
+                query: "文件夹桂枝汤".to_string(),
+                item_type: None,
+                page: Some(1),
+                page_size: Some(10),
+            },
+        )
+        .expect("search folder import");
+        assert!(!response.results.is_empty());
 
         let _ = fs::remove_dir_all(data_dir);
     }

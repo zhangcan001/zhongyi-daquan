@@ -25,6 +25,31 @@ export type ImportParsedPreview = {
   warnings: string[];
 };
 
+export type ImportPackageFile = {
+  path: string;
+  importType: string;
+  target?: string | null;
+  primary: boolean;
+  required: boolean;
+  exists: boolean;
+  recordCount?: number | null;
+};
+
+export type ImportPackageDescriptor = {
+  packageRoot: string;
+  packageName?: string | null;
+  importProfile?: string | null;
+  manifestFound: boolean;
+  manifestPath?: string | null;
+  files: ImportPackageFile[];
+  primaryFiles: string[];
+  detectedType: string;
+  recordCount: number;
+  directImportReady: boolean;
+  warnings: string[];
+  errors: string[];
+};
+
 export type ImportBatchSummary = {
   batch: {
     id: number;

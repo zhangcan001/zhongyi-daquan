@@ -1,8 +1,8 @@
 use crate::errors::AppResult;
 use crate::models::data_pipeline::{
     ConfirmImportResult, CreateImportRequest, FieldMappingTemplate, ImportBatchSummary,
-    ImportParsedPreview, ImportQualityReport, RollbackImportResult, SaveMappingTemplateRequest,
-    StagingPage,
+    ImportPackageDescriptor, ImportParsedPreview, ImportQualityReport, RollbackImportResult,
+    SaveMappingTemplateRequest, StagingPage,
 };
 use crate::services::{field_mapping_service, import_project_service};
 use crate::AppState;
@@ -59,6 +59,19 @@ pub fn import_zip_to_staging(
     content: Vec<u8>,
 ) -> AppResult<ImportBatchSummary> {
     import_project_service::import_zip(&state.database, request, &content)
+}
+
+#[tauri::command]
+pub fn preview_package_folder_import(folder_path: String) -> AppResult<ImportPackageDescriptor> {
+    import_project_service::preview_package_folder(&folder_path)
+}
+
+#[tauri::command]
+pub fn import_package_folder(
+    state: State<'_, AppState>,
+    folder_path: String,
+) -> AppResult<ImportBatchSummary> {
+    import_project_service::import_package_folder(&state.database, &folder_path)
 }
 
 #[tauri::command]

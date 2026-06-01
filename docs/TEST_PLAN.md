@@ -33,6 +33,14 @@ cargo test --manifest-path src-tauri/Cargo.toml
   - 生成导入质量报告，覆盖字段覆盖率、重复指纹、包内搜索词数量。
   - 标准知识 JSON / manifest 主知识文件确认后追加 `imported_package` 搜索词。
   - 批次回滚后删除本批次知识条目，并重建搜索索引，原关键词不再命中。
+- 已解压数据包文件夹导入：
+  - 根目录存在 `import_manifest.json` 时按 manifest 识别。
+  - `import_manifest.json` 带 UTF-8 BOM 时仍可解析。
+  - manifest 可指向 `json/knowledge_items_import.json`。
+  - manifest 指向文件不存在时返回明确错误。
+  - 没有 manifest 但存在 `json/knowledge_items_import.json` 时可按 `knowledge_items_v1` 识别。
+  - 文件夹里只有 PDF 时拒绝直接导入，并提示先转换为标准 `import_manifest` 数据包。
+  - 文件夹导入确认后会重建搜索索引，可搜索新导入条目。
 
 前端检查：
 
@@ -66,6 +74,7 @@ npm --prefix frontend run build
 - `胃经`
 - 经典数据包导入后补充验证：`桂枝汤`、`太阳病`、`上古天真论`、`神农本草经`
 - v0.3 manifest 数据包导入后补充验证：`黄帝内经`、`金匮要略`
+- 已解压文件夹数据包导入后补充验证：`文件夹桂枝汤`
 
 ## 性能阈值
 
@@ -109,6 +118,8 @@ npm --prefix frontend run build
 
 - 可新增黄芪、足阳明胃经、足三里。
 - 可导入 CSV/JSON 并进入暂存区。
+- 可点击“导入数据包文件夹”选择已解压标准数据包，并看到 package_name、import_profile、manifest、主数据文件、记录数和导入方式。
+- PDF 原始资料文件夹不能直接导入，错误文案应明确说明先用外部工具转换为标准数据包。
 - 可显示错误行和校验问题。
 - 可检测重复候选。
 - 可接受关系建议并写入正式关系。

@@ -28,18 +28,19 @@
 
 ## Import Engine V2 导入流程
 
-推荐优先导入标准 JSON 或 ZIP 数据包：
+推荐优先导入标准 JSON、ZIP 数据包或已解压的数据包文件夹：
 
 1. `knowledge_items_import_curated.json`
 2. `knowledge_items_import_full_clean.json`
 3. `classic_passages_curated.json`
 4. `classic_passages_full_clean.json`
 5. `zhongyi_classics_curated_v0_3_manifest.zip`
-6. 如果暂时没有 v0.3 manifest 包，可导入 v0.2 包内的 `json/knowledge_items_import_curated.json`
+6. 已解压的 `zhongyi_classics_curated_v0_3_manifest/` 文件夹
+7. 如果暂时没有 v0.3 manifest 包，可导入 v0.2 包内的 `json/knowledge_items_import_curated.json`
 
 导入步骤：
 
-1. 在批量导入页面选择 JSON、CSV 或 ZIP。
+1. 在批量导入页面选择 JSON、CSV、ZIP，或点击“导入数据包文件夹”选择已解压文件夹。
 2. 点击“识别文件”，查看 `detected_type`、置信度、记录数和原因。
 3. 如果识别为 `knowledge_items_v1` 或 `classic_passages_v1`，页面会显示“可直接导入”，不需要人工映射。
 4. 如果识别为 `generic_csv`，系统显示字段映射候选，高置信字段自动映射，中置信字段建议确认，低置信字段不自动映射。
@@ -59,7 +60,24 @@
 
 ## v0.3 manifest 数据包
 
-`zhongyi_classics_curated_v0_3_manifest.zip` 基于 v0.2 数据包增加根目录 `import_manifest.json`。manifest 声明包名、schema、文件列表、主数据文件和导入顺序。当前 v0.1 会自动暂存 `primary: true` 的 `knowledge_items_import_curated.json`，其他文件显示在数据包概览中但不自动混入同一批次。确认入库后可查看质量报告，重点检查 `content`、`source_note`、`tags` 覆盖率，以及关键词搜索抽检。
+`zhongyi_classics_curated_v0_3_manifest.zip` 基于 v0.2 数据包增加根目录 `import_manifest.json`。也可以把 ZIP 解压为文件夹后直接选择文件夹导入。manifest 声明包名、schema、文件列表、主数据文件和导入顺序。当前 v0.1 会自动暂存 `primary: true` 的 `knowledge_items_import_curated.json` 或 `knowledge_items_import.json`，其他文件显示在数据包概览中但不自动混入同一批次。确认入库后可查看质量报告，重点检查 `content`、`source_note`、`tags` 覆盖率，以及关键词搜索抽检。
+
+标准文件夹结构示例：
+
+```text
+shennong_bencao_ni_notes_private_import/
+import_manifest.json
+json/
+knowledge_items_import.json
+csv/
+knowledge_items_import.csv
+docs/
+README_导入说明.md
+```
+
+如果文件夹没有 `import_manifest.json`，系统会尝试扫描常见标准路径，例如 `json/knowledge_items_import.json`、`json/knowledge_items_import_curated.json`、`json/knowledge_items_import_full_clean.json`、`csv/knowledge_items_import.csv`。推荐优先补齐 `import_manifest.json`，这样可以明确 package_name、import_profile、导入顺序和主数据文件。
+
+主软件不解析 PDF、Word 或图片原始资料。包含《神农本草经》PDF 的资料文件夹需要先通过外部数据处理工具转换为标准 JSON/CSV 和 `import_manifest.json`，再导入本软件。
 
 仓库内提供示例：
 

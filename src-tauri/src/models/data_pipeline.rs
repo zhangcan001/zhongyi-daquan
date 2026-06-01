@@ -100,6 +100,37 @@ pub struct ImportParsedPreview {
 #[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ImportPackageDescriptor {
+    pub package_root: String,
+    pub package_name: Option<String>,
+    pub import_profile: Option<String>,
+    pub manifest_found: bool,
+    pub manifest_path: Option<String>,
+    pub files: Vec<ImportPackageFile>,
+    pub primary_files: Vec<String>,
+    pub detected_type: String,
+    pub record_count: i64,
+    pub direct_import_ready: bool,
+    pub warnings: Vec<String>,
+    pub errors: Vec<String>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportPackageFile {
+    pub path: String,
+    pub import_type: String,
+    pub target: Option<String>,
+    pub primary: bool,
+    pub required: bool,
+    pub exists: bool,
+    pub record_count: Option<i64>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ImportDetectionResult {
     pub detected_type: String,
     pub confidence: f64,

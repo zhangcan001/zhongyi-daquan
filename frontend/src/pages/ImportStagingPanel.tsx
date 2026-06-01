@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import type {
   FieldMappingSuggestion,
   FieldMappingTemplate,
   ImportBatchSummary,
+  ImportPackageDescriptor,
   ImportParsedPreview,
   ImportQualityReport,
   Mapping,
@@ -30,10 +32,13 @@ const knowledgeTypes = [
   { value: "病症", label: "病症" },
 ];
 
+type ImportSourceType = "json" | "csv" | "zip" | "folder";
+
 export function ImportStagingPanel() {
-  const [importType, setImportType] = useState<"json" | "csv" | "zip">("json");
+  const [importType, setImportType] = useState<ImportSourceType>("json");
   const [targetType, setTargetType] = useState("穴位");
   const [fileName, setFileName] = useState("manual-import.json");
+  const [packageFolderPath, setPackageFolderPath] = useState("");
   const [content, setContent] = useState(sampleJson);
   const [binaryContent, setBinaryContent] = useState<number[] | null>(null);
   const [mappingText, setMappingText] = useState("");
@@ -43,6 +48,7 @@ export function ImportStagingPanel() {
   const [summary, setSummary] = useState<ImportBatchSummary | null>(null);
   const [staging, setStaging] = useState<StagingPage | null>(null);
   const [preview, setPreview] = useState<ImportParsedPreview | null>(null);
+  const [packageDescriptor, setPackageDescriptor] = useState<ImportPackageDescriptor | null>(null);
   const [qualityReport, setQualityReport] = useState<ImportQualityReport | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -66,9 +72,11 @@ export function ImportStagingPanel() {
       const bytes = Array.from(new Uint8Array(await file.arrayBuffer()));
       setBinaryContent(bytes);
       setContent("ZIP 数据包已读取，内容不在文本框中展开。");
+      setPackageDescriptor(null);
       await previewZip(file.name, bytes);
     } else {
       setBinaryContent(null);
+      setPackageDescriptor(null);
       const text = await file.text();
       setContent(text);
       await previewTextImport(nextType, text);
@@ -78,8 +86,30 @@ export function ImportStagingPanel() {
     }
   }
 
-  async function previewTextImport(nextType = importType, nextContent = content) {
-    if (nextType === "zip") return;
+  async function choosePackageFolder() {
+    setError("");
+    setMessage("");
+    try {
+      const selected = await open({ directory: true, multiple: false, title: "选择已解压数据包文件夹" });
+      if (!selected || Array.isArray(selected)) return;
+      setImportType("folder");
+      setPackageFolderPath(selected);
+      setFileName(selected.split(/[\\/]/).filter(Boolean).pop() ?? "package-folder");
+      setBinaryContent(null);
+      setContent("已选择数据包文件夹，内容不在文本框中展开。");
+      setPreview(null);
+      const descriptor = await invoke<ImportPackageDescriptor>("preview_package_folder_import", { folderPath: selected });
+      setPackageDescriptor(descriptor);
+      setTargetType("mixed");
+      setMessage("已识别数据包文件夹，可导入暂存区。");
+    } catch (cause) {
+      setPackageDescriptor(null);
+      setError(String(cause));
+    }
+  }
+
+  async function previewTextImport(nextType: ImportSourceType = importType, nextContent = content) {
+    if (nextType === "zip" || nextType === "folder") return;
     try {
       const command = nextType === "json" ? "preview_json_import" : "preview_csv_import";
       setPreview(await invoke<ImportParsedPreview>(command, { content: nextContent }));
@@ -111,9 +141,11 @@ export function ImportStagingPanel() {
         mapping,
         templateId: selectedTemplateId ? Number(selectedTemplateId) : null,
       };
-      const result = importType === "zip"
-        ? await invoke<ImportBatchSummary>("import_zip_to_staging", { request, content: binaryContent ?? [] })
-        : await invoke<ImportBatchSummary>(importType === "json" ? "import_json_to_staging" : "import_csv_to_staging", { request });
+      const result = importType === "folder"
+        ? await invoke<ImportBatchSummary>("import_package_folder", { folderPath: packageFolderPath })
+        : importType === "zip"
+          ? await invoke<ImportBatchSummary>("import_zip_to_staging", { request, content: binaryContent ?? [] })
+          : await invoke<ImportBatchSummary>(importType === "json" ? "import_json_to_staging" : "import_csv_to_staging", { request });
       setSummary(result);
       await loadStaging(result.batch.id);
       setQualityReport(null);
@@ -221,17 +253,19 @@ export function ImportStagingPanel() {
           <select
             value={importType}
             onChange={(event) => {
-              const nextType = event.target.value as "json" | "csv" | "zip";
+              const nextType = event.target.value as ImportSourceType;
               setImportType(nextType);
               setBinaryContent(null);
               setPreview(null);
-              setFileName(nextType === "json" ? "manual-import.json" : nextType === "csv" ? "manual-import.csv" : "manual-import.zip");
-              setContent(nextType === "json" ? sampleJson : nextType === "csv" ? sampleCsv : "请选择 ZIP 数据包。");
+              setPackageDescriptor(null);
+              setFileName(nextType === "json" ? "manual-import.json" : nextType === "csv" ? "manual-import.csv" : nextType === "zip" ? "manual-import.zip" : "package-folder");
+              setContent(nextType === "json" ? sampleJson : nextType === "csv" ? sampleCsv : nextType === "zip" ? "请选择 ZIP 数据包。" : "请选择已解压数据包文件夹。");
             }}
           >
             <option value="json">JSON</option>
             <option value="csv">CSV</option>
             <option value="zip">ZIP 数据包</option>
+            <option value="folder">已解压数据包文件夹</option>
           </select>
         </label>
         <label>
@@ -266,13 +300,16 @@ export function ImportStagingPanel() {
             setPreview(null);
           }}
           rows={7}
-          disabled={importType === "zip"}
+          disabled={importType === "zip" || importType === "folder"}
         />
       </label>
 
       <div className="import-actions">
         <button type="button" onClick={() => importType === "zip" ? previewZip() : previewTextImport()}>识别文件</button>
+        <button type="button" onClick={choosePackageFolder}>导入数据包文件夹</button>
       </div>
+
+      {packageDescriptor ? <PackageDescriptorPanel descriptor={packageDescriptor} /> : null}
 
       {preview ? (
         <div className="preview-panel">
@@ -310,9 +347,11 @@ export function ImportStagingPanel() {
           onClick={() => {
             setImportType("json");
             setFileName("manual-import.json");
+            setPackageFolderPath("");
             setContent(sampleJson);
             setBinaryContent(null);
             setPreview(null);
+            setPackageDescriptor(null);
           }}
         >
           载入 JSON 示例
@@ -322,9 +361,11 @@ export function ImportStagingPanel() {
           onClick={() => {
             setImportType("csv");
             setFileName("manual-import.csv");
+            setPackageFolderPath("");
             setContent(sampleCsv);
             setBinaryContent(null);
             setPreview(null);
+            setPackageDescriptor(null);
           }}
         >
           载入 CSV 示例
@@ -434,6 +475,27 @@ function MappingSuggestionTable({ suggestions }: { suggestions: FieldMappingSugg
   );
 }
 
+function PackageDescriptorPanel({ descriptor }: { descriptor: ImportPackageDescriptor }) {
+  return (
+    <div className="preview-panel">
+      <div className="summary-grid">
+        <Metric label="package_name" value={descriptor.packageName ?? "未声明"} />
+        <Metric label="import_profile" value={descriptor.importProfile ?? "未声明"} />
+        <Metric label="manifest" value={descriptor.manifestFound ? "已找到" : "未找到"} />
+        <Metric label="主数据文件" value={descriptor.primaryFiles.join("，") || "未识别"} />
+      </div>
+      <div className="summary-grid">
+        <Metric label="记录数" value={descriptor.recordCount} />
+        <Metric label="识别类型" value={descriptor.detectedType} />
+        <Metric label="导入方式" value={descriptor.directImportReady ? "可直接导入" : "需映射确认"} />
+        <Metric label="文件数" value={descriptor.files.length} />
+      </div>
+      {descriptor.warnings.length ? <p className="ai-message">{descriptor.warnings.join("；")}</p> : null}
+      {descriptor.errors.length ? <p className="error-text">{descriptor.errors.join("；")}</p> : null}
+    </div>
+  );
+}
+
 function ImportQualityReportPanel({ report }: { report: ImportQualityReport }) {
   const keywordEntries = Object.entries(report.searchableKeywordsChecked);
   return (
@@ -464,9 +526,9 @@ function formatCoverage(value?: number) {
   return `${Math.round((value ?? 0) * 100)}%`;
 }
 
-function readSourceHeaders(content: string, importType: "json" | "csv" | "zip") {
+function readSourceHeaders(content: string, importType: ImportSourceType) {
   try {
-    if (importType === "zip") return [];
+    if (importType === "zip" || importType === "folder") return [];
     if (importType === "csv") {
       return content.split(/\r?\n/)[0]?.split(",").map((header) => header.trim()).filter(Boolean) ?? [];
     }

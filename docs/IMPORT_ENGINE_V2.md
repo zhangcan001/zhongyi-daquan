@@ -61,9 +61,9 @@ Import Engine V2 用于解决 v0.1-alpha-package 中“先手工映射所有字�
 - `0.55 - 0.85`：需要用户确认。
 - `< 0.55`：不自动映射。
 
-## ZIP 与 manifest
+## ZIP / 已解压文件夹与 manifest
 
-ZIP 数据包如果包含 `import_manifest.json`，优先按 manifest 导入。
+标准数据包可以是 ZIP，也可以是已解压后的文件夹。两种入口共用同一套 ImportPackageReader 识别流程，并优先查找根目录 `import_manifest.json`。
 
 ```json
 {
@@ -82,9 +82,33 @@ ZIP 数据包如果包含 `import_manifest.json`，优先按 manifest 导入。
 }
 ```
 
-如果 ZIP 只有普通 `manifest.json`，系统会把它当作包说明，再自动查找 `json/knowledge_items_import_curated.json`、`json/classic_passages_curated.json` 等已知文件。
+如果 ZIP 或文件夹只有普通 `manifest.json`，系统会把它当作包说明，再自动查找 `json/knowledge_items_import.json`、`json/knowledge_items_import_curated.json`、`json/classic_passages_curated.json` 等已知文件。
 
-v0.3 manifest 数据包建议命名为 `zhongyi_classics_curated_v0_3_manifest.zip`。当前 v0.1 导入策略为：自动暂存 `primary: true` 的主知识文件，其他文件会显示在概览中，但不会混入同一导入批次。确认入库后会从主知识文件的 `name/code/category/tags` 追加包内搜索词；独立 `search_terms_curated.json` 的完整字段级入库后续由专门工具接入。
+v0.3 manifest 数据包建议命名为 `zhongyi_classics_curated_v0_3_manifest.zip`，或解压为同名文件夹后通过“导入数据包文件夹”入口选择。当前 v0.1 导入策略为：自动暂存 `primary: true` 的主知识文件，其他文件会显示在概览中，但不会混入同一导入批次。确认入库后会从主知识文件的 `name/code/category/tags` 追加包内搜索词；独立 `search_terms_curated.json` 的完整字段级入库后续由专门工具接入。
+
+推荐的已解压文件夹结构：
+
+```text
+shennong_bencao_ni_notes_private_import/
+import_manifest.json
+json/
+knowledge_items_import.json
+csv/
+knowledge_items_import.csv
+docs/
+README_导入说明.md
+```
+
+文件夹导入会显示：
+
+- `package_name`
+- `import_profile`
+- 是否找到 `import_manifest.json`
+- 主数据文件
+- 记录数
+- 是否可直接导入
+
+主软件不解析 PDF、Word 或图片原始资料。如果文件夹只包含 `3人纪-神农本草经.pdf` 这类原始文件，会返回：`PDF 原始资料不能直接导入，请先使用外部数据处理工具转换为标准 import_manifest 数据包。`
 
 ## 导入质量与回滚
 
@@ -102,6 +126,7 @@ v0.3 manifest 数据包建议命名为 `zhongyi_classics_curated_v0_3_manifest.z
 
 - `manifest 指向的文件不存在`：检查 ZIP 内路径是否与 `import_manifest.json` 一致。
 - `找不到 manifest`：如果没有 `import_manifest.json`，系统会按内置经典包规则查找主 JSON；若 ZIP 结构被多包一层目录，也支持自动匹配结尾路径。
+- `PDF 原始资料不能直接导入`：当前文件夹不是标准数据包，请先用外部工具整理为 JSON/CSV 与 `import_manifest.json`。
 - `缺少主 JSON`：确认 ZIP 内存在 `json/knowledge_items_import_curated.json`。
 - `detail 字段异常`：标准 `detail` 应为对象；无法识别字段会尽量保留到 `notes`。
 - `tags 格式异常`：建议使用数组，或使用逗号、顿号、分号分隔字符串。

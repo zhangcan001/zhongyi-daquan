@@ -1,6 +1,6 @@
 [package]
 name = "zhongyi-daquan"
-version = "0.1.0"
+version = "0.1.2"
 description = "中医大全本地桌面应用"
 authors = ["Zhongyi Daquan"]
 edition = "2021"

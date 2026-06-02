@@ -44,7 +44,7 @@
 
 ## v0.1.2-ux-polish
 
-`v0.1.2` 的目标是把已导入数据变成更好查、更好看、更好用的学习资料库，重点优化搜索结果、知识详情、资料注解、来源页码、最近查看、收藏和个人备注。
+`v0.1.2-test` 是 `v0.1.2` 的测试发布名，应用版本为 `0.1.2`。目标是把已导入数据变成更好查、更好看、更好用的学习资料库，重点优化搜索结果、知识详情、资料注解、来源页码、最近查看、收藏和个人备注。
 
 使用方式：
 
@@ -79,14 +79,15 @@
 
 ```text
 src-tauri/target/release/zhongyi-daquan.exe
-src-tauri/target/release/bundle/nsis/中医大全_0.1.0_x64-setup.exe
+src-tauri/target/release/bundle/nsis/中医大全_0.1.2_x64-setup.exe
+release-assets/zhongyi-daquan_0.1.2-test_x64-setup.exe
 ```
 
 版本口径：
 
 - 发布标签：`v0.1-alpha-package`。
 - 基础验收标签：`v0.1-alpha`。
-- 源码包版本：`0.1.0`，对应 `package.json`、`frontend/package.json`、`src-tauri/Cargo.toml` 和 `src-tauri/tauri.conf.json`。
+- `v0.1.2-test` 测试发布使用应用版本 `0.1.2`，对应 `package.json`、`frontend/package.json`、`src-tauri/Cargo.toml` 和 `src-tauri/tauri.conf.json`。
 
 ## 启动
 

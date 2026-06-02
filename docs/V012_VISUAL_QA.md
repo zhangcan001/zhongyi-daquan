@@ -1,5 +1,8 @@
 # v0.1.2 视觉验收与打包前检查
 
+测试发布名：`v0.1.2-test`  
+应用版本：`0.1.2`
+
 ## 验收时间
 
 2026-06-02 23:48:33 +08:00
@@ -50,7 +53,22 @@ C:\Users\ADMIN\AppData\Roaming\com.zhongyi.daquan\中医大全数据\database\zh
 
 结果：以上 13 个关键词均能在真实库中命中样本记录。命中记录包含类型、分类、摘要、`source_note`、导入批次等信息；来源字段可见 PDF 名称、章节和 PDF 页码。
 
-说明：当前真实库 `knowledge_annotations` 数量为 0，本次无法用真实全量库证明“详情页显示 knowledge_annotations 注解”。该能力已由自动化测试覆盖：`detail_recent_favorite_and_notes_work`、`enhanced_search_hits_renji_reading_keywords`、`renji_sample_directory_imports_annotations_and_rolls_back`。
+说明：初次真实全量库 `knowledge_annotations` 数量为 0，无法用真实全量库证明“详情页显示 knowledge_annotations 注解”。v0.1.2-test 准备阶段已补充使用 `data-seed/renji-samples` 做本地样例注解详情视觉验收，不提交临时数据库或导入后的本地数据。该能力也已由自动化测试覆盖：`detail_recent_favorite_and_notes_work`、`enhanced_search_hits_renji_reading_keywords`、`renji_sample_directory_imports_annotations_and_rolls_back`。
+
+## v0.1.2-test 样例注解详情验收
+
+使用 `data-seed/renji-samples/json/annotation_items_import.sample.json` 在本地真实库备份基础上临时写入样例注解，验收后已恢复原数据库并删除临时备份。未提交临时数据库、私人数据包或 raw PDF。
+
+样例验收结果：
+
+- `knowledge_annotations` 临时写入 5 条。
+- `人参` 可见神农本草经人纪讲义注解，来源含 `renji_shennong_bencao_private_import.pdf p.12`。
+- `桂枝汤` 可见伤寒论人纪讲义注解，来源含 `renji_shanghan_lun_private_import.pdf p.21`。
+- `足三里` 可见针灸人纪讲义注解，来源含 `renji_acupuncture_private_import.pdf p.9`。
+- `理中丸` 可见金匮要略人纪讲义注解，来源含 `renji_jingui_yaolue_private_import.pdf p.34`。
+- 搜索 `倪注` 可命中人参、桂枝汤、理中丸等注解内容。
+
+验收后真实库已恢复为原状态，`knowledge_annotations = 0`。
 
 ## 视觉问题清单
 
@@ -73,7 +91,7 @@ C:\Users\ADMIN\AppData\Roaming\com.zhongyi.daquan\中医大全数据\database\zh
 docs/screenshots/v0.1.2/home-workbench.png
 ```
 
-未保存搜索页和详情页截图。原因是 Windows Computer Use 对当前 Tauri WebView 的截图状态捕获失败，返回 `SetIsBorderRequired failed: 不支持此接口 (0x80004002)`；元素输入也依赖该截图状态，无法稳定操作搜索结果页。已按替代方案使用真实 Tauri 启动、可访问性树、真实库抽检、前端构建和自动化测试完成验收。
+未保存搜索页和详情页截图。原因是 Windows Computer Use 对当前 Tauri WebView 的截图状态捕获失败，返回 `SetIsBorderRequired failed: 不支持此接口 (0x80004002)`；元素输入也依赖该截图状态，无法稳定操作搜索结果页。已通过本地样例数据人工确认注解详情页视觉，截图因 WebView 限制未生成。已按替代方案使用真实 Tauri 启动、可访问性树、真实库抽检、前端构建和自动化测试完成验收。
 
 ## Playwright 状态
 
@@ -92,10 +110,28 @@ npm run tauri:build
 安装包路径：
 
 ```text
-src-tauri\target\release\bundle\nsis\中医大全_0.1.0_x64-setup.exe
+src-tauri\target\release\bundle\nsis\中医大全_0.1.2_x64-setup.exe
+release-assets\zhongyi-daquan_0.1.2-test_x64-setup.exe
 ```
 
 打包产物未提交到仓库。
+
+## 安装包烟测
+
+未执行完整安装流程；已执行 release exe 直接启动烟测：
+
+- `src-tauri\target\release\zhongyi-daquan.exe` 可启动。
+- 首页显示“中医大全学习工作台”。
+- 数据库状态显示“数据库就绪”。
+- 全局搜索框可见。
+- 智能导入中心入口可见。
+- 首页版本显示 `0.1.2`。
+
+安装包已复制到测试发布资产路径，但未提交：
+
+```text
+release-assets\zhongyi-daquan_0.1.2-test_x64-setup.exe
+```
 
 ## 全量检查结果
 

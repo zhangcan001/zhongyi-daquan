@@ -5326,7 +5326,7 @@ dependencies = [
 
 [[package]]
 name = "zhongyi-daquan"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "calamine",
  "chrono",

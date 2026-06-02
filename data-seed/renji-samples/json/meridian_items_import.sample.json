@@ -1,0 +1,17 @@
+[
+  {
+    "type": "acupuncture",
+    "code": "RENJI-MERIDIAN-ST",
+    "name": "足阳明胃经",
+    "category": "针灸",
+    "summary": "足阳明胃经经络主条目样例。",
+    "content": "足阳明胃经，针灸经络主条目样例。",
+    "source_note": "renji_acupuncture_private_import.pdf canonical",
+    "tags": ["针灸", "足阳明胃经"],
+    "data_status": "imported",
+    "detail": {
+      "canonical_key": "meridian:足阳明胃经",
+      "item_subtype": "meridian"
+    }
+  }
+]

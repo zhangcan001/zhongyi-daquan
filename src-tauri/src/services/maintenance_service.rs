@@ -468,9 +468,7 @@ pub fn clear_database_content(database: &Database) -> AppResult<MaintenanceRepor
         Ok(MaintenanceReport {
             job: completed_job,
             action: "clear_database_content".to_string(),
-            message: format!(
-                "数据库内容已清空：删除 {deleted_rows} 条业务数据，搜索索引已重置。"
-            ),
+            message: format!("数据库内容已清空：删除 {deleted_rows} 条业务数据，搜索索引已重置。"),
             affected_rows: Some(deleted_rows),
             output_path: None,
         })

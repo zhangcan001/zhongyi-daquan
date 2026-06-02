@@ -599,7 +599,7 @@ fn plan_action_for_draft(
                     "同名条目内容高度相似，跳过重复资料。",
                     draft,
                 ))
-            } else if item_type == "herb" || item_type == "中药" {
+            } else {
                 Ok(action(
                     row_index,
                     "attach_annotation",
@@ -607,18 +607,7 @@ fn plan_action_for_draft(
                     name,
                     Some(existing.id),
                     0.9,
-                    "同名中药已存在，作为注解资料附加到主条目。",
-                    draft,
-                ))
-            } else {
-                Ok(action(
-                    row_index,
-                    "create_new",
-                    Some(item_type),
-                    name,
-                    None,
-                    0.7,
-                    "未匹配到中药注解规则，创建新条目。",
+                    "匹配到已有主条目，作为注解资料附加。",
                     draft,
                 ))
             }
@@ -854,7 +843,7 @@ fn insert_annotation_tx(
         params![
             item_id,
             "source_annotation",
-            text(draft, "name"),
+            text(draft, "source_title").or_else(|| text(draft, "name")),
             text(draft, "source_note"),
             text(draft, "content"),
             serde_json::to_string(draft)?,
@@ -1089,7 +1078,10 @@ fn rollback_merge_empty_fields_tx(
             before.get("content").and_then(value_to_text),
             before.get("source_note").and_then(value_to_text),
             before.get("tags").and_then(value_to_text),
-            before.get("detail").map(normalize_detail_json).unwrap_or_else(|| "{}".to_string()),
+            before
+                .get("detail")
+                .map(normalize_detail_json)
+                .unwrap_or_else(|| "{}".to_string()),
             Utc::now().to_rfc3339()
         ],
     )?;
@@ -1184,7 +1176,10 @@ fn import_run_summary_json(import_run: &ImportRunSummary) -> Value {
 fn has_empty_field_to_merge(existing: &ExistingItem, draft: &Map<String, Value>) -> bool {
     if !existing.content.as_deref().unwrap_or_default().is_empty()
         && text(draft, "content").is_some()
-        && !content_similar(existing.content.as_deref(), text(draft, "content").as_deref())
+        && !content_similar(
+            existing.content.as_deref(),
+            text(draft, "content").as_deref(),
+        )
     {
         return false;
     }
@@ -1458,6 +1453,25 @@ mod tests {
                  (type, code, name, content, source_note, data_status, completeness_status, created_at, updated_at)
                  VALUES ('herb', ?1, ?2, ?3, ?4, 'validated', 'partial', datetime('now'), datetime('now'))",
                 params![format!("SEED-{name}"), name, content, source_note],
+            )?;
+            Ok(connection.last_insert_rowid())
+        }).unwrap()
+    }
+
+    fn seed_item(
+        database: &Database,
+        item_type: &str,
+        code: &str,
+        name: &str,
+        content: &str,
+        source_note: &str,
+    ) -> i64 {
+        database.with_connection(|connection| {
+            connection.execute(
+                "INSERT INTO knowledge_items
+                 (type, code, name, content, source_note, data_status, completeness_status, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, 'validated', 'partial', datetime('now'), datetime('now'))",
+                params![item_type, code, name, content, source_note],
             )?;
             Ok(connection.last_insert_rowid())
         }).unwrap()
@@ -1859,7 +1873,10 @@ mod tests {
         assert_eq!(plan.total_records, 5);
         assert_eq!(plan.create_count, 5);
         assert_eq!(
-            plan.type_counts.get("acupuncture").copied().unwrap_or_default(),
+            plan.type_counts
+                .get("acupuncture")
+                .copied()
+                .unwrap_or_default(),
             1
         );
         assert!(plan.keyword_checks.values().all(|hit| *hit));
@@ -1923,5 +1940,110 @@ mod tests {
         assert_eq!(rollback.rolled_back_changes, 5);
         assert_eq!(knowledge_item_count(&database, "足三里与合谷针灸笔记"), 0);
         let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn renji_sample_directory_imports_annotations_and_rolls_back() {
+        let (_data_dir, database) = temp_database("renji-sample-dir");
+        seed_item(
+            &database,
+            "herb",
+            "RENJI-SEED-HERB-001",
+            "人参",
+            "人参主条目。",
+            "seed",
+        );
+        seed_item(
+            &database,
+            "formula",
+            "RENJI-SEED-FORMULA-GZT",
+            "桂枝汤",
+            "桂枝汤主条目，关联太阳病。",
+            "seed",
+        );
+        seed_item(
+            &database,
+            "theory",
+            "RENJI-SEED-NEIJING-CH-001",
+            "上古天真论篇第一",
+            "上古天真论篇第一主条目。",
+            "seed",
+        );
+        seed_item(
+            &database,
+            "acupuncture",
+            "RENJI-SEED-ACU-ST36",
+            "足三里",
+            "足三里主条目。",
+            "seed",
+        );
+        seed_item(
+            &database,
+            "acupuncture",
+            "RENJI-SEED-MERIDIAN-ST",
+            "足阳明胃经",
+            "足阳明胃经主条目。",
+            "seed",
+        );
+
+        let sample_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("data-seed/renji-samples");
+        let plan = preview_import_plan(&database, sample_dir.to_str().unwrap()).unwrap();
+        assert_eq!(
+            plan.package_name.as_deref(),
+            Some("renji_sample_private_import")
+        );
+        assert_eq!(plan.import_intent, "annotation_enrichment");
+        assert_eq!(plan.attach_annotation_count, 4);
+        assert_eq!(plan.create_count, 1);
+        assert_eq!(plan.reject_invalid_count, 0);
+
+        let result = execute_import_plan(&database, plan).unwrap();
+        let import_run_id = result.import_run_id.unwrap();
+        assert_eq!(result.attached_annotation_count, 4);
+        assert_eq!(result.created_count, 1);
+        assert_eq!(annotation_count(&database).unwrap(), 4);
+
+        for keyword in [
+            "人参",
+            "倪注",
+            "桂枝汤",
+            "太阳病",
+            "上古天真论",
+            "足三里",
+            "足阳明胃经",
+            "理中丸",
+        ] {
+            let response = search_index_service::search(
+                &database,
+                SearchRequest {
+                    query: keyword.to_string(),
+                    item_type: None,
+                    page: Some(1),
+                    page_size: Some(10),
+                },
+            )
+            .unwrap();
+            assert!(!response.results.is_empty(), "expected hit for {keyword}");
+        }
+
+        let rollback = rollback_import_run(&database, import_run_id).unwrap();
+        assert_eq!(rollback.rolled_back_changes, 5);
+        assert_eq!(annotation_count(&database).unwrap(), 0);
+        assert_eq!(knowledge_item_count(&database, "理中丸"), 0);
+
+        let response = search_index_service::search(
+            &database,
+            SearchRequest {
+                query: "理中丸".to_string(),
+                item_type: None,
+                page: Some(1),
+                page_size: Some(10),
+            },
+        )
+        .unwrap();
+        assert!(response.results.is_empty());
     }
 }

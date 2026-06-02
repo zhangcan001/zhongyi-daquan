@@ -1,0 +1,18 @@
+[
+  {
+    "type": "acupuncture",
+    "code": "RENJI-ACU-ST36",
+    "name": "足三里",
+    "category": "针灸",
+    "summary": "足三里穴位主条目样例。",
+    "content": "足三里，足阳明胃经穴位主条目样例。",
+    "source_note": "renji_acupuncture_private_import.pdf canonical",
+    "tags": ["针灸", "足三里", "足阳明胃经"],
+    "data_status": "imported",
+    "detail": {
+      "canonical_key": "acupoint:足三里",
+      "item_subtype": "acupoint",
+      "meridian": "足阳明胃经"
+    }
+  }
+]

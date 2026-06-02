@@ -11,7 +11,11 @@ pub struct ImportEngineOutput {
     pub warnings: Vec<String>,
 }
 
-const DIRECT_TYPES: &[&str] = &["knowledge_items_v1", "classic_passages_v1"];
+const DIRECT_TYPES: &[&str] = &[
+    "knowledge_items_v1",
+    "classic_passages_v1",
+    "annotation_items_v1",
+];
 
 pub fn detect_import_type(
     file_name: &str,
@@ -29,6 +33,7 @@ pub fn detect_import_type(
     let candidates = [
         detect_knowledge_items(&lower_name, &field_set),
         detect_classic_passages(&lower_name, &field_set),
+        detect_annotation_items(&lower_name, &field_set),
         detect_search_terms(&lower_name, &field_set),
         detect_standard_terms(&field_set),
         detect_relation_suggestions(&field_set),
@@ -87,6 +92,7 @@ pub fn prepare_import_rows(
         match detection.detected_type.as_str() {
             "knowledge_items_v1" => rows.iter().map(adapt_knowledge_item).collect(),
             "classic_passages_v1" => rows.iter().map(adapt_classic_passage).collect(),
+            "annotation_items_v1" => rows.iter().map(adapt_annotation_item).collect(),
             _ => Vec::new(),
         }
     } else {
@@ -236,6 +242,29 @@ fn detect_search_terms(
     None
 }
 
+fn detect_annotation_items(
+    lower_name: &str,
+    fields: &HashSet<String>,
+) -> Option<(&'static str, f64, &'static str)> {
+    if lower_name.contains("annotation_items_import") {
+        return Some((
+            "annotation_items_v1",
+            0.99,
+            "文件名匹配 annotation_items 注解导入包",
+        ));
+    }
+    if has_all(fields, &["canonicalkey", "content"])
+        && has_any(fields, &["annotationtype", "targettype", "sourcenote"])
+    {
+        return Some((
+            "annotation_items_v1",
+            0.95,
+            "样本包含 canonical_key/content 与注解字段",
+        ));
+    }
+    None
+}
+
 fn detect_standard_terms(fields: &HashSet<String>) -> Option<(&'static str, f64, &'static str)> {
     has_all(fields, &["termtype", "standardname", "aliases"]).then_some((
         "standard_terms_v1",
@@ -365,6 +394,75 @@ fn adapt_classic_passage(raw: &Map<String, Value>) -> Map<String, Value> {
     output
 }
 
+fn adapt_annotation_item(raw: &Map<String, Value>) -> Map<String, Value> {
+    let canonical_key = text_alias(raw, &["canonical_key", "canonicalKey"]).unwrap_or_default();
+    let (target_type, target_name) = parse_canonical_key(&canonical_key);
+    let mut output = Map::new();
+    output.insert("type".to_string(), Value::String(target_type));
+    output.insert("name".to_string(), Value::String(target_name));
+    copy_alias(
+        raw,
+        &mut output,
+        "content",
+        &["content", "annotation", "annotation_text"],
+    );
+    copy_alias(raw, &mut output, "source_title", &["source_title", "title"]);
+    copy_alias(
+        raw,
+        &mut output,
+        "source_note",
+        &["source_note", "source", "page_ref"],
+    );
+    copy_alias(raw, &mut output, "tags", &["tags", "keywords"]);
+    output.insert(
+        "category".to_string(),
+        Value::String(text_alias(raw, &["category"]).unwrap_or_else(|| "人纪注解".to_string())),
+    );
+    output.insert(
+        "summary".to_string(),
+        Value::String(
+            text(&output, "content")
+                .map(|content| truncate_summary(&content))
+                .unwrap_or_else(|| "人纪注解资料".to_string()),
+        ),
+    );
+    output.insert(
+        "data_status".to_string(),
+        Value::String("imported".to_string()),
+    );
+
+    let mut detail = Map::new();
+    for (key, value) in raw {
+        detail.insert(key.clone(), value.clone());
+    }
+    detail.insert("canonical_key".to_string(), Value::String(canonical_key));
+    output.insert("detail".to_string(), Value::Object(detail));
+    preserve_private_fields(raw, &mut output);
+    normalize_knowledge_item_defaults(&mut output);
+    output
+}
+
+fn parse_canonical_key(canonical_key: &str) -> (String, String) {
+    let mut parts = canonical_key.split(':').collect::<Vec<_>>();
+    if parts.len() < 2 {
+        return ("note".to_string(), canonical_key.trim().to_string());
+    }
+    let key_type = parts.remove(0);
+    let item_type = match key_type {
+        "herb" => "herb",
+        "formula" => "formula",
+        "acupoint" | "meridian" => "acupuncture",
+        "classic_chapter" => "theory",
+        "classic_passage" => "syndrome",
+        _ => "note",
+    };
+    let name = match key_type {
+        "classic_passage" if parts.len() >= 2 => parts[1].trim().to_string(),
+        _ => parts.last().copied().unwrap_or_default().trim().to_string(),
+    };
+    (item_type.to_string(), name)
+}
+
 fn apply_scored_mapping(
     raw: &Map<String, Value>,
     target_type: &str,
@@ -430,7 +528,10 @@ fn normalize_knowledge_item_defaults(output: &mut Map<String, Value>) {
         .or_insert_with(|| Value::Object(Map::new()));
     if text(output, "summary").is_none() {
         if let Some(content) = text(output, "content") {
-            output.insert("summary".to_string(), Value::String(truncate_summary(&content)));
+            output.insert(
+                "summary".to_string(),
+                Value::String(truncate_summary(&content)),
+            );
         }
     }
     if text(output, "tags").is_none() {

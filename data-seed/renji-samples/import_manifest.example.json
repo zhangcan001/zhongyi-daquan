@@ -1,0 +1,68 @@
+{
+  "package_name": "renji_sample_private_import",
+  "schema_version": "renji_import_package_v1",
+  "import_profile": "renji_private_v1",
+  "import_intent": "annotation_enrichment",
+  "duplicate_policy": "attach_annotation",
+  "ai_assist": false,
+  "files": [
+    {
+      "path": "json/annotation_items_import.sample.json",
+      "type": "annotation_items_v1",
+      "target": "knowledge_annotations",
+      "primary": true,
+      "auto_stage": true,
+      "role": "main_annotation_items",
+      "description": "人纪注解主文件，导入时按 canonical_key 附加到已有主条目。"
+    },
+    {
+      "path": "json/canonical_items_import.sample.json",
+      "type": "knowledge_items_v1",
+      "target": "knowledge_items",
+      "primary": false,
+      "auto_stage": false,
+      "role": "canonical_reference"
+    },
+    {
+      "path": "json/classic_chapters.sample.json",
+      "type": "knowledge_items_v1",
+      "target": "knowledge_items",
+      "primary": false,
+      "auto_stage": false,
+      "role": "classic_chapter_reference"
+    },
+    {
+      "path": "json/classic_passages.sample.json",
+      "type": "knowledge_items_v1",
+      "target": "knowledge_items",
+      "primary": false,
+      "auto_stage": false,
+      "role": "classic_passage_reference"
+    },
+    {
+      "path": "json/formula_items_import.sample.json",
+      "type": "knowledge_items_v1",
+      "target": "knowledge_items",
+      "primary": false,
+      "auto_stage": false,
+      "role": "formula_reference"
+    },
+    {
+      "path": "json/acupoint_items_import.sample.json",
+      "type": "knowledge_items_v1",
+      "target": "knowledge_items",
+      "primary": false,
+      "auto_stage": false,
+      "role": "acupoint_reference"
+    },
+    {
+      "path": "json/meridian_items_import.sample.json",
+      "type": "knowledge_items_v1",
+      "target": "knowledge_items",
+      "primary": false,
+      "auto_stage": false,
+      "role": "meridian_reference"
+    }
+  ],
+  "import_order": ["knowledge_annotations"]
+}

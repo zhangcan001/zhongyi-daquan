@@ -5,8 +5,21 @@ use serde_json::{Map, Value};
 use std::collections::HashSet;
 
 const KNOWLEDGE_TYPES: &[&str] = &[
-    "中药", "方剂", "经络", "穴位", "证型", "病症", "herb", "formula", "meridian", "acupoint",
-    "syndrome", "disease", "acupuncture", "theory", "note",
+    "中药",
+    "方剂",
+    "经络",
+    "穴位",
+    "证型",
+    "病症",
+    "herb",
+    "formula",
+    "meridian",
+    "acupoint",
+    "syndrome",
+    "disease",
+    "acupuncture",
+    "theory",
+    "note",
 ];
 
 pub struct ValidationContext {

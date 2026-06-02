@@ -1,0 +1,77 @@
+[
+  {
+    "canonical_key": "herb:人参",
+    "target_type": "herb",
+    "target_name": "人参",
+    "annotation_type": "ni_note",
+    "source_title": "神农本草经人纪讲义",
+    "source_note": "renji_shennong_bencao_private_import.pdf p.12",
+    "summary": "人参倪注样例",
+    "content": "倪注：人参为神农本草经学习样例中的补气重点，用于说明注解写入 knowledge_annotations。",
+    "tags": ["神农本草经", "人参", "倪注"],
+    "detail": {
+      "pdf_name": "renji_shennong_bencao_private_import.pdf",
+      "page": 12
+    }
+  },
+  {
+    "canonical_key": "formula:桂枝汤",
+    "target_type": "formula",
+    "target_name": "桂枝汤",
+    "annotation_type": "ni_note",
+    "source_title": "伤寒论人纪讲义",
+    "source_note": "renji_shanghan_lun_private_import.pdf p.21",
+    "summary": "桂枝汤注解样例",
+    "content": "倪注：桂枝汤对应太阳病学习样例，强调方剂与条文应分离保存。",
+    "tags": ["伤寒论", "太阳病", "桂枝汤", "倪注"],
+    "detail": {
+      "pdf_name": "renji_shanghan_lun_private_import.pdf",
+      "page": 21
+    }
+  },
+  {
+    "canonical_key": "classic_chapter:上古天真论篇第一",
+    "target_type": "classic_chapter",
+    "target_name": "上古天真论篇第一",
+    "annotation_type": "lecture_note",
+    "source_title": "黄帝内经人纪讲义",
+    "source_note": "renji_huangdi_neijing_private_import.pdf p.3",
+    "summary": "上古天真论讲解样例",
+    "content": "讲解：上古天真论用于黄帝内经样例，展示篇章主条目与讲解注解分离。",
+    "tags": ["黄帝内经", "上古天真论", "讲解"],
+    "detail": {
+      "pdf_name": "renji_huangdi_neijing_private_import.pdf",
+      "page": 3
+    }
+  },
+  {
+    "canonical_key": "acupoint:足三里",
+    "target_type": "acupoint",
+    "target_name": "足三里",
+    "annotation_type": "technique_note",
+    "source_title": "针灸人纪讲义",
+    "source_note": "renji_acupuncture_private_import.pdf p.9",
+    "summary": "足三里补泻手法样例",
+    "content": "针灸注解：足三里补泻手法样例，关联足阳明胃经，用于验证足三里和足阳明胃经搜索。",
+    "tags": ["针灸", "足三里", "足阳明胃经"],
+    "detail": {
+      "pdf_name": "renji_acupuncture_private_import.pdf",
+      "page": 9
+    }
+  },
+  {
+    "canonical_key": "formula:理中丸",
+    "target_type": "formula",
+    "target_name": "理中丸",
+    "annotation_type": "ni_note",
+    "source_title": "金匮要略人纪讲义",
+    "source_note": "renji_jingui_yaolue_private_import.pdf p.34",
+    "summary": "理中丸注解样例",
+    "content": "倪注：理中丸用于金匮要略样例，目标不存在时不应导致整批导入失败。",
+    "tags": ["金匮要略", "理中丸", "倪注"],
+    "detail": {
+      "pdf_name": "renji_jingui_yaolue_private_import.pdf",
+      "page": 34
+    }
+  }
+]

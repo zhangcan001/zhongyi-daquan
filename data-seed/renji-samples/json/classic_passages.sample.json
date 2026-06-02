@@ -1,0 +1,32 @@
+[
+  {
+    "type": "syndrome",
+    "code": "RENJI-SHANGHAN-PASSAGE-001",
+    "name": "太阳病",
+    "category": "伤寒论",
+    "summary": "太阳病条文样例。",
+    "content": "太阳病经典条文样例，用于验证 classic_passage 主条目。",
+    "source_note": "renji_shanghan_lun_private_import.pdf canonical",
+    "tags": ["伤寒论", "太阳病"],
+    "data_status": "imported",
+    "detail": {
+      "canonical_key": "classic_passage:伤寒论:太阳病:001",
+      "item_subtype": "classic_passage"
+    }
+  },
+  {
+    "type": "theory",
+    "code": "RENJI-NEIJING-PASSAGE-001",
+    "name": "上古天真论原文",
+    "category": "黄帝内经",
+    "summary": "上古天真论原文 passage 样例。",
+    "content": "昔在黄帝，生而神灵。此为黄帝内经原文 passage 样例。",
+    "source_note": "renji_huangdi_neijing_private_import.pdf p.4",
+    "tags": ["黄帝内经", "上古天真论", "原文"],
+    "data_status": "imported",
+    "detail": {
+      "canonical_key": "classic_passage:黄帝内经:上古天真论:001",
+      "item_subtype": "classic_passage"
+    }
+  }
+]

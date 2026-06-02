@@ -194,42 +194,16 @@ export function ImportStagingPanel() {
             <Metric label="数据包名称" value={plan.packageName ?? (fileName || "未命名数据包")} />
             <Metric label="数据包类型" value={packageTitle} />
             <Metric label="导入意图" value={readableIntent(plan.importIntent)} />
-            <Metric label="主数据数量" value={plan.totalRecords} />
-          </div>
-          <div className="summary-grid">
-            <Metric label="是否可直接导入" value={plan.needsReviewCount > 0 ? "含待确认项" : "可直接导入"} />
-            <Metric label="AI 辅助状态" value="未启用，本地规则处理" />
             <Metric label="新增条目" value={plan.createCount} />
             <Metric label="附加注解" value={plan.attachAnnotationCount} />
-          </div>
-          {packageTitle === "本草注解增强包" ? (
-            <p className="ai-message">系统会把已存在药物的内容作为注解资料附加，避免创建重复药物条目。</p>
-          ) : null}
-          <details className="advanced-details" open>
-            <summary>校验摘要</summary>
-            <div className="summary-grid">
-              <Metric label="类型分布" value={formatCounts(plan.typeCounts)} />
-              <Metric label="分类分布" value={formatCounts(plan.categoryCounts)} />
-              <Metric label="缺失字段" value={formatCounts(plan.missingFieldCounts) || "无"} />
-              <Metric label="重复 code" value={plan.duplicateCodes.length ? plan.duplicateCodes.join("，") : "无"} />
-            </div>
-            <KeywordChecks checks={plan.keywordChecks} />
-          </details>
-        </div>
-      ) : null}
-
-      {plan ? (
-        <div className="preview-panel">
-          <h3>导入计划摘要</h3>
-          <div className="summary-grid">
-            <Metric label="新增条目数" value={plan.createCount} />
-            <Metric label="附加注解数" value={plan.attachAnnotationCount} />
             <Metric label="跳过重复数" value={plan.skipDuplicateCount} />
-            <Metric label="合并补全数" value={plan.updateCount} />
             <Metric label="待确认数" value={plan.needsReviewCount} />
             <Metric label="错误数" value={plan.rejectInvalidCount} />
+            <Metric label="是否可回滚" value="导入后可回滚" />
           </div>
-          <p className="ai-message">AI 辅助：未启用。当前使用本地规则自动处理。</p>
+          {packageTitle === "本草注解增强包" ? (
+            <p className="ai-message">系统会把已存在条目的内容作为注解资料附加，避免创建重复主条目。</p>
+          ) : null}
           {plan.needsReviewCount > 0 ? <p className="error-text">存在待确认项，本次不会自动执行这些记录。</p> : null}
         </div>
       ) : null}
@@ -272,7 +246,22 @@ export function ImportStagingPanel() {
           <dd>{plan?.planId ?? "未生成"}</dd>
           <dt>重复策略</dt>
           <dd>{plan?.duplicatePolicy ?? "未生成"}</dd>
+          <dt>记录总数</dt>
+          <dd>{plan?.totalRecords ?? "未生成"}</dd>
+          <dt>合并补全数</dt>
+          <dd>{plan?.updateCount ?? "未生成"}</dd>
         </dl>
+        {plan ? (
+          <>
+            <div className="summary-grid">
+              <Metric label="类型分布" value={formatCounts(plan.typeCounts)} />
+              <Metric label="分类分布" value={formatCounts(plan.categoryCounts)} />
+              <Metric label="缺失字段" value={formatCounts(plan.missingFieldCounts) || "无"} />
+              <Metric label="重复 code" value={plan.duplicateCodes.length ? plan.duplicateCodes.join("，") : "无"} />
+            </div>
+            <KeywordChecks checks={plan.keywordChecks} />
+          </>
+        ) : null}
         {plan?.warnings.length ? <p className="error-text">{plan.warnings.join("；")}</p> : null}
         {plan?.actions.length ? (
           <div className="staging-table-wrap compact">

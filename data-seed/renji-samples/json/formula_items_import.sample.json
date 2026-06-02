@@ -1,0 +1,32 @@
+[
+  {
+    "type": "formula",
+    "code": "RENJI-FORMULA-GZT",
+    "name": "桂枝汤",
+    "category": "伤寒论",
+    "summary": "桂枝汤方剂主条目样例。",
+    "content": "桂枝汤，伤寒论方剂主条目样例。",
+    "source_note": "renji_shanghan_lun_private_import.pdf canonical",
+    "tags": ["伤寒论", "桂枝汤"],
+    "data_status": "imported",
+    "detail": {
+      "canonical_key": "formula:桂枝汤",
+      "item_subtype": "shanghan_formula"
+    }
+  },
+  {
+    "type": "formula",
+    "code": "RENJI-FORMULA-LZW",
+    "name": "理中丸",
+    "category": "金匮要略",
+    "summary": "理中丸方剂主条目样例。",
+    "content": "理中丸，金匮要略方剂主条目样例。",
+    "source_note": "renji_jingui_yaolue_private_import.pdf canonical",
+    "tags": ["金匮要略", "理中丸"],
+    "data_status": "imported",
+    "detail": {
+      "canonical_key": "formula:理中丸",
+      "item_subtype": "jingui_formula"
+    }
+  }
+]

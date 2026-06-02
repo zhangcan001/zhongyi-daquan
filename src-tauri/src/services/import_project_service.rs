@@ -952,6 +952,11 @@ fn read_import_package<R: ImportPackageReader>(reader: &mut R) -> AppResult<Pars
     let mut warnings = Vec::new();
     let package_root = reader.package_root();
     let import_manifest = reader.read_text("import_manifest.json")?;
+    let example_import_manifest = if import_manifest.is_none() {
+        reader.read_text("import_manifest.example.json")?
+    } else {
+        None
+    };
     let package_manifest = if import_manifest.is_none() {
         reader.read_text("manifest.json")?
     } else {
@@ -960,6 +965,14 @@ fn read_import_package<R: ImportPackageReader>(reader: &mut R) -> AppResult<Pars
 
     if let Some(manifest_text) = import_manifest {
         return read_manifest_import_package(reader, package_root, manifest_text);
+    }
+    if let Some(manifest_text) = example_import_manifest {
+        return read_manifest_import_package_with_path(
+            reader,
+            package_root,
+            manifest_text,
+            "import_manifest.example.json",
+        );
     }
 
     if package_manifest.is_some() {
@@ -973,6 +986,20 @@ fn read_manifest_import_package<R: ImportPackageReader>(
     reader: &mut R,
     package_root: String,
     manifest_text: String,
+) -> AppResult<ParsedImportPackage> {
+    read_manifest_import_package_with_path(
+        reader,
+        package_root,
+        manifest_text,
+        "import_manifest.json",
+    )
+}
+
+fn read_manifest_import_package_with_path<R: ImportPackageReader>(
+    reader: &mut R,
+    package_root: String,
+    manifest_text: String,
+    manifest_path: &str,
 ) -> AppResult<ParsedImportPackage> {
     let manifest_value: Value = serde_json::from_str(strip_json_bom(&manifest_text))?;
     let files = manifest_value
@@ -1128,7 +1155,7 @@ fn read_manifest_import_package<R: ImportPackageReader>(
         duplicate_policy,
         ai_assist,
         manifest_found: true,
-        manifest_path: Some("import_manifest.json".to_string()),
+        manifest_path: Some(manifest_path.to_string()),
         primary_files,
         auxiliary_files: package_files
             .iter()
@@ -1356,7 +1383,10 @@ fn detect_package_rows(path: &str, import_type: &str, rows: &[Map<String, Value>
 }
 
 fn is_direct_package_import_type(import_type: &str) -> bool {
-    matches!(import_type, "knowledge_items_v1" | "classic_passages_v1")
+    matches!(
+        import_type,
+        "knowledge_items_v1" | "classic_passages_v1" | "annotation_items_v1"
+    )
 }
 
 fn primary_file_name(descriptor: &ImportPackageDescriptor, fallback: &str) -> String {
@@ -2119,7 +2149,9 @@ fn normalize_detail_json(value: &Value) -> String {
         Value::Object(_) => value.to_string(),
         Value::String(text) => serde_json::from_str::<Value>(text)
             .map(|value| value.to_string())
-            .unwrap_or_else(|_| serde_json::json!({ "raw_detail": text, "parse_error": true }).to_string()),
+            .unwrap_or_else(|_| {
+                serde_json::json!({ "raw_detail": text, "parse_error": true }).to_string()
+            }),
         Value::Null => "{}".to_string(),
         other => serde_json::json!({ "raw_detail": other }).to_string(),
     }

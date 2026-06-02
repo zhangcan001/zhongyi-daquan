@@ -1,0 +1,32 @@
+[
+  {
+    "type": "theory",
+    "code": "RENJI-NEIJING-CH-001",
+    "name": "上古天真论篇第一",
+    "category": "黄帝内经",
+    "summary": "黄帝内经上古天真论篇章样例。",
+    "content": "上古天真论篇第一，黄帝内经篇章主条目样例。",
+    "source_note": "renji_huangdi_neijing_private_import.pdf canonical",
+    "tags": ["黄帝内经", "上古天真论"],
+    "data_status": "imported",
+    "detail": {
+      "canonical_key": "classic_chapter:上古天真论篇第一",
+      "item_subtype": "classic_chapter"
+    }
+  },
+  {
+    "type": "theory",
+    "code": "RENJI-JINGUI-CH-001",
+    "name": "藏府经络先后病脉证第一",
+    "category": "金匮要略",
+    "summary": "金匮要略篇章样例。",
+    "content": "藏府经络先后病脉证第一，金匮要略篇章主条目样例。",
+    "source_note": "renji_jingui_yaolue_private_import.pdf canonical",
+    "tags": ["金匮要略", "藏府经络先后病脉证第一"],
+    "data_status": "imported",
+    "detail": {
+      "canonical_key": "classic_chapter:藏府经络先后病脉证第一",
+      "item_subtype": "classic_chapter"
+    }
+  }
+]

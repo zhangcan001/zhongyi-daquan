@@ -1,0 +1,17 @@
+[
+  {
+    "type": "herb",
+    "code": "RENJI-HERB-001",
+    "name": "人参",
+    "category": "神农本草经",
+    "summary": "人参主条目样例。",
+    "content": "人参，神农本草经主条目样例。注解应写入 knowledge_annotations。",
+    "source_note": "renji_shennong_bencao_private_import.pdf canonical",
+    "tags": ["神农本草经", "人参"],
+    "data_status": "imported",
+    "detail": {
+      "canonical_key": "herb:人参",
+      "item_subtype": "herb"
+    }
+  }
+]

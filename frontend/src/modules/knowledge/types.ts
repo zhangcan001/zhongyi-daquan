@@ -44,6 +44,8 @@ export type KnowledgeInput = Omit<
 export type KnowledgeDetailResponse = {
   item: KnowledgeItem;
   detail: Record<string, string | number | null>;
+  annotations: KnowledgeAnnotation[];
+  notes: UserNote[];
   versions: Array<{
     id: number;
     itemId: number;
@@ -51,6 +53,88 @@ export type KnowledgeDetailResponse = {
     snapshotJson: string;
     changeSummary?: string | null;
     changedAt: string;
+  }>;
+};
+
+export type KnowledgeAnnotation = {
+  id: number;
+  knowledgeItemId: number;
+  annotationType: string;
+  sourceTitle?: string | null;
+  sourceNote?: string | null;
+  content: string;
+  detail?: Record<string, unknown> | null;
+  tags?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RecentView = {
+  id: number;
+  itemId: number;
+  itemName: string;
+  itemType: KnowledgeType;
+  category?: string | null;
+  viewedAt: string;
+};
+
+export type FavoriteItem = {
+  id: number;
+  itemId: number;
+  itemName: string;
+  itemType: KnowledgeType;
+  category?: string | null;
+  createdAt: string;
+};
+
+export type UserNote = {
+  id: number;
+  itemId: number;
+  noteText: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type DashboardStats = {
+  knowledgeCount: number;
+  annotationCount: number;
+  importRunCount: number;
+  favoriteCount: number;
+  recentViewCount: number;
+};
+
+export type EnhancedSearchResult = {
+  itemId: number;
+  itemType: KnowledgeType;
+  typeLabel: string;
+  groupName: string;
+  code?: string | null;
+  name: string;
+  category?: string | null;
+  summary?: string | null;
+  contentSnippet?: string | null;
+  sourceTitle?: string | null;
+  sourceNote?: string | null;
+  tags?: string | null;
+  hasAnnotations: boolean;
+  annotationCount: number;
+  annotationSnippet?: string | null;
+  matchedBy: string;
+  score: number;
+  importBatchId?: string | null;
+  sourcePackage?: string | null;
+};
+
+export type EnhancedSearchResponse = {
+  query: string;
+  filter: string;
+  total: number;
+  page: number;
+  pageSize: number;
+  durationMs: number;
+  groups: Array<{
+    groupName: string;
+    results: EnhancedSearchResult[];
   }>;
 };
 

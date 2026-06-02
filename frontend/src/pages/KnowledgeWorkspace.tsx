@@ -7,6 +7,7 @@ import {
   setKnowledgeFavorite,
   updateKnowledgeItem,
 } from "../modules/knowledge/api";
+import { KnowledgeDetailReader } from "../modules/knowledge/KnowledgeDetailReader";
 import { detailFields, emptyKnowledgeInput } from "../modules/knowledge/schema";
 import {
   completenessOptions,
@@ -246,12 +247,16 @@ export function KnowledgeWorkspace() {
         <div className="section-heading">
           <div>
             <h2>{mode === "create" ? "新增知识" : "知识详情"}</h2>
-            <p>编辑保存前会自动写入版本历史；保存后刷新搜索索引。</p>
+            <p>先阅读资料、来源和注解；需要整理时再编辑字段。</p>
           </div>
           <button type="button" onClick={toggleFavorite}>
             {form.isFavorite ? "取消收藏" : "收藏"}
           </button>
         </div>
+
+        {mode === "edit" && selectedId ? (
+          <KnowledgeDetailReader itemId={selectedId} query={query} onChanged={loadList} />
+        ) : null}
 
         <div className="form-grid">
           <label>

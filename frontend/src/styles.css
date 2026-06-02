@@ -162,6 +162,131 @@ h2 {
   gap: 8px;
 }
 
+.search-bar-large input {
+  min-height: 52px;
+  font-size: 17px;
+}
+
+.filter-pills,
+.result-flags,
+.reader-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-pills button {
+  min-height: 34px;
+  border: 1px solid #b9c5b5;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #33413a;
+  padding: 0 12px;
+}
+
+.filter-pills button.active {
+  border-color: #2f6d4f;
+  background: #e5f2ea;
+  color: #1f4d37;
+  font-weight: 700;
+}
+
+.empty-suggestions {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #d8dfd4;
+  border-radius: 8px;
+  background: #f8faf7;
+  padding: 14px;
+  color: #54615a;
+}
+
+.search-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.15fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.grouped-results {
+  display: grid;
+  gap: 14px;
+  max-height: 720px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.result-group {
+  display: grid;
+  gap: 8px;
+}
+
+.result-group h3 {
+  margin: 6px 0 2px;
+}
+
+.result-card {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  border: 1px solid #d8dfd4;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+  text-align: left;
+  color: #25342c;
+}
+
+.result-card.active {
+  border-color: #2f6d4f;
+  background: #edf7f1;
+}
+
+.result-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.result-title-row em,
+.type-badge {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #e7efe5;
+  color: #2f5d43;
+  padding: 3px 8px;
+  font-style: normal;
+  font-size: 13px;
+}
+
+.result-card small,
+.source-line {
+  color: #5f6e66;
+  line-height: 1.55;
+}
+
+.annotation-hit {
+  border-left: 3px solid #8a6f2f;
+  padding-left: 8px;
+}
+
+.result-flags {
+  color: #66736c;
+  font-size: 13px;
+}
+
+mark {
+  border-radius: 3px;
+  background: #fff1a8;
+  color: inherit;
+  padding: 0 2px;
+}
+
+.search-detail {
+  min-width: 0;
+}
+
 .compact-result-list {
   display: grid;
   gap: 8px;
@@ -700,6 +825,122 @@ h3 {
   overflow-wrap: anywhere;
 }
 
+.reader-shell {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #d8dfd4;
+  border-radius: 8px;
+  background: #fffefa;
+  padding: 16px;
+}
+
+.reader-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #e3e8df;
+  padding-bottom: 12px;
+}
+
+.reader-title-row h2 {
+  margin: 8px 0 6px;
+  font-size: 24px;
+}
+
+.reader-title-row p {
+  margin-bottom: 0;
+  color: #66736c;
+}
+
+.reader-actions button {
+  min-height: 36px;
+  border: 1px solid #b9c5b5;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #33413a;
+  padding: 0 12px;
+}
+
+.reader-section {
+  display: grid;
+  gap: 10px;
+}
+
+.reader-section h3 {
+  margin: 0;
+  color: #274634;
+}
+
+.meta-list {
+  grid-template-columns: 76px minmax(0, 1fr);
+}
+
+.reader-summary {
+  border-left: 3px solid #7a9f70;
+  padding-left: 10px;
+  color: #425149;
+}
+
+.reader-content,
+.field-list p,
+.annotation-block p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.78;
+}
+
+.field-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.field-list div {
+  border: 1px solid #e1e8dd;
+  border-radius: 8px;
+  background: #f8faf7;
+  padding: 12px;
+}
+
+.field-list small {
+  color: #8f5c35;
+}
+
+.annotation-list {
+  display: grid;
+  gap: 8px;
+}
+
+.annotation-block {
+  border: 1px solid #e1e0d6;
+  border-radius: 8px;
+  background: #fffdf5;
+  padding: 10px 12px;
+}
+
+.annotation-block summary {
+  display: grid;
+  gap: 4px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.annotation-block summary small {
+  color: #7a6b52;
+  font-weight: 400;
+}
+
+.note-editor {
+  width: 100%;
+  min-height: 96px;
+  border: 1px solid #aebbac;
+  border-radius: 6px;
+  padding: 10px;
+  resize: vertical;
+}
+
 .import-actions button:disabled {
   color: #7c8780;
   background: #eef1ec;
@@ -897,7 +1138,10 @@ h3 {
   }
 
   .inline-action-row,
-  .review-grid {
+  .review-grid,
+  .search-layout,
+  .reader-title-row {
     grid-template-columns: 1fr;
+    display: grid;
   }
 }

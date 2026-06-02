@@ -149,6 +149,9 @@ mod tests {
                     "ai_tasks",
                     "ai_drafts",
                     "ai_call_logs",
+                    "recent_views",
+                    "user_favorites",
+                    "user_notes",
                 ] {
                     let exists: i64 = connection.query_row(
                         "SELECT COUNT(1) FROM sqlite_master WHERE type = 'table' AND name = ?1",

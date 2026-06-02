@@ -68,6 +68,58 @@ pub struct SearchResponse {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct EnhancedSearchRequest {
+    pub query: String,
+    pub filter: Option<String>,
+    pub page: Option<u32>,
+    pub page_size: Option<u32>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnhancedSearchResult {
+    pub item_id: i64,
+    pub item_type: String,
+    pub type_label: String,
+    pub group_name: String,
+    pub code: Option<String>,
+    pub name: String,
+    pub category: Option<String>,
+    pub summary: Option<String>,
+    pub content_snippet: Option<String>,
+    pub source_title: Option<String>,
+    pub source_note: Option<String>,
+    pub tags: Option<String>,
+    pub has_annotations: bool,
+    pub annotation_count: i64,
+    pub annotation_snippet: Option<String>,
+    pub matched_by: String,
+    pub score: i64,
+    pub import_batch_id: Option<String>,
+    pub source_package: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnhancedSearchGroup {
+    pub group_name: String,
+    pub results: Vec<EnhancedSearchResult>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnhancedSearchResponse {
+    pub query: String,
+    pub filter: String,
+    pub total: usize,
+    pub page: u32,
+    pub page_size: u32,
+    pub duration_ms: i64,
+    pub groups: Vec<EnhancedSearchGroup>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ListCacheRequest {
     pub item_type: Option<String>,
     pub page: Option<u32>,

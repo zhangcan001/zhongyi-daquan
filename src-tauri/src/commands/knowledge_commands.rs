@@ -1,7 +1,7 @@
 use crate::errors::AppResult;
 use crate::models::knowledge::{
-    FavoriteRequest, KnowledgeDetailResponse, KnowledgeInput, KnowledgeListRequest,
-    KnowledgeListResponse,
+    DashboardStats, FavoriteItem, KnowledgeDetailResponse, KnowledgeInput, KnowledgeListRequest,
+    KnowledgeListResponse, RecentView, UserNote,
 };
 use crate::services::knowledge_service;
 use crate::AppState;
@@ -48,9 +48,54 @@ pub fn delete_knowledge_item(state: State<'_, AppState>, item_id: i64) -> AppRes
 #[tauri::command]
 pub fn set_knowledge_favorite(
     state: State<'_, AppState>,
-    request: FavoriteRequest,
+    request: crate::models::knowledge::FavoriteRequest,
 ) -> AppResult<KnowledgeDetailResponse> {
     knowledge_service::set_favorite(&state.database, request.item_id, request.is_favorite)
+}
+
+#[tauri::command]
+pub fn toggle_favorite(
+    state: State<'_, AppState>,
+    item_id: i64,
+) -> AppResult<KnowledgeDetailResponse> {
+    knowledge_service::toggle_favorite(&state.database, item_id)
+}
+
+#[tauri::command]
+pub fn list_favorites(state: State<'_, AppState>) -> AppResult<Vec<FavoriteItem>> {
+    knowledge_service::list_favorites(&state.database)
+}
+
+#[tauri::command]
+pub fn record_recent_view(state: State<'_, AppState>, item_id: i64) -> AppResult<RecentView> {
+    knowledge_service::record_recent_view(&state.database, item_id)
+}
+
+#[tauri::command]
+pub fn list_recent_views(
+    state: State<'_, AppState>,
+    limit: Option<i64>,
+) -> AppResult<Vec<RecentView>> {
+    knowledge_service::list_recent_views(&state.database, limit)
+}
+
+#[tauri::command]
+pub fn save_user_note(
+    state: State<'_, AppState>,
+    item_id: i64,
+    note_text: String,
+) -> AppResult<UserNote> {
+    knowledge_service::save_user_note(&state.database, item_id, note_text)
+}
+
+#[tauri::command]
+pub fn delete_user_note(state: State<'_, AppState>, note_id: i64) -> AppResult<()> {
+    knowledge_service::delete_user_note(&state.database, note_id)
+}
+
+#[tauri::command]
+pub fn get_dashboard_stats(state: State<'_, AppState>) -> AppResult<DashboardStats> {
+    knowledge_service::dashboard_stats(&state.database)
 }
 
 #[tauri::command]

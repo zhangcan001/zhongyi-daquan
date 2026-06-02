@@ -167,7 +167,66 @@ pub struct KnowledgeInput {
 pub struct KnowledgeDetailResponse {
     pub item: KnowledgeItem,
     pub detail: Value,
+    pub annotations: Vec<KnowledgeAnnotation>,
+    pub notes: Vec<UserNote>,
     pub versions: Vec<KnowledgeVersion>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeAnnotation {
+    pub id: i64,
+    pub knowledge_item_id: i64,
+    pub annotation_type: String,
+    pub source_title: Option<String>,
+    pub source_note: Option<String>,
+    pub content: String,
+    pub detail: Option<Value>,
+    pub tags: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecentView {
+    pub id: i64,
+    pub item_id: i64,
+    pub item_name: String,
+    pub item_type: String,
+    pub category: Option<String>,
+    pub viewed_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FavoriteItem {
+    pub id: i64,
+    pub item_id: i64,
+    pub item_name: String,
+    pub item_type: String,
+    pub category: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserNote {
+    pub id: i64,
+    pub item_id: i64,
+    pub note_text: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DashboardStats {
+    pub knowledge_count: i64,
+    pub annotation_count: i64,
+    pub import_run_count: i64,
+    pub favorite_count: i64,
+    pub recent_view_count: i64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

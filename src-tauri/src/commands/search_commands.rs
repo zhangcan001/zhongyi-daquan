@@ -1,7 +1,8 @@
 use crate::errors::AppResult;
 use crate::models::search::{
-    KnowledgeSearchResult, ListCacheRequest, ListCacheResponse, RebuildSearchIndexResponse,
-    SearchRequest, SearchResponse, SearchSeedOptions, SearchSeedResponse,
+    EnhancedSearchRequest, EnhancedSearchResponse, KnowledgeSearchResult, ListCacheRequest,
+    ListCacheResponse, RebuildSearchIndexResponse, SearchRequest, SearchResponse,
+    SearchSeedOptions, SearchSeedResponse,
 };
 use crate::services::search_index_service;
 use crate::AppState;
@@ -13,6 +14,14 @@ pub fn search_knowledge(
     request: SearchRequest,
 ) -> AppResult<SearchResponse> {
     search_index_service::search(&state.database, request)
+}
+
+#[tauri::command]
+pub fn search_knowledge_enhanced(
+    state: State<'_, AppState>,
+    request: EnhancedSearchRequest,
+) -> AppResult<EnhancedSearchResponse> {
+    search_index_service::search_enhanced(&state.database, request)
 }
 
 #[tauri::command]

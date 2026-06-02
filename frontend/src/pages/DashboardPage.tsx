@@ -1,4 +1,8 @@
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import type { AppStatus } from "../modules/app/types";
+import { getDashboardStats, listFavorites, listRecentViews } from "../modules/knowledge/api";
+import type { DashboardStats, FavoriteItem, RecentView } from "../modules/knowledge/types";
 import { AiSettingsPanel } from "./AiSettingsPanel";
 import { RelationReviewPanel } from "./RelationReviewPanel";
 import { SearchPanel } from "./SearchPanel";
@@ -13,94 +17,151 @@ type DashboardPageProps = {
   onNavigate: (view: AppView) => void;
 };
 
-const knowledgeTypes = ["中药", "方剂", "针灸", "辨证", "理论", "笔记"];
-const entryActions = ["快速新增", "表格录入", "批量导入", "字段映射", "暂存区", "数据清洗"];
+type ImportRunSummary = {
+  id: number;
+  packageName?: string | null;
+  importIntent: string;
+  status: string;
+  totalRecords: number;
+  createCount: number;
+  attachAnnotationCount: number;
+  createdAt: string;
+  rolledBackAt?: string | null;
+};
+
+const quickEntries: Array<{ label: string; hint: string; view: AppView }> = [
+  { label: "中药", hint: "按药名、别名、本经原文检索", view: "knowledge" },
+  { label: "方剂", hint: "查组成、主治、出处与注解", view: "knowledge" },
+  { label: "穴位", hint: "查定位、所属经络和学习资料", view: "knowledge" },
+  { label: "经络", hint: "查循行、脏腑关联和相关穴位", view: "knowledge" },
+  { label: "原典", hint: "查章节、条文和讲解", view: "knowledge" },
+  { label: "人纪讲义", hint: "查看已导入注解资料", view: "knowledge" },
+  { label: "智能导入中心", hint: "导入标准数据包", view: "import" },
+  { label: "导入历史", hint: "查看报告与回滚入口", view: "import" },
+];
 
 export function DashboardPage({ status, error, activeView, onNavigate }: DashboardPageProps) {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [recentViews, setRecentViews] = useState<RecentView[]>([]);
+  const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
+  const [importRuns, setImportRuns] = useState<ImportRunSummary[]>([]);
+
+  useEffect(() => {
+    if (activeView !== "dashboard") return;
+    getDashboardStats().then(setStats).catch(() => undefined);
+    listRecentViews(8).then(setRecentViews).catch(() => undefined);
+    listFavorites().then(setFavorites).catch(() => undefined);
+    invoke<ImportRunSummary[]>("list_import_runs").then((runs) => setImportRuns(runs.slice(0, 5))).catch(() => undefined);
+  }, [activeView]);
+
   return (
     <>
       <section className="topbar">
         <div>
-          <h1>中医大全</h1>
-          <p>本软件仅用于中医知识学习、资料整理与本地记录，不构成医疗诊断、治疗建议或处方依据。</p>
+          <h1>中医大全学习工作台</h1>
+          <p>用于中医知识学习、资料整理与本地记录；不提供诊断、开方、在线问诊或针灸操作指导。</p>
         </div>
         <div className="status-pill">{status?.databaseReady ? "数据库就绪" : "初始化中"}</div>
       </section>
 
       <nav className="main-tabs">
-        <button
-          className={activeView === "knowledge" ? "active" : ""}
-          type="button"
-          onClick={() => onNavigate("knowledge")}
-        >
+        <button className={activeView === "dashboard" ? "active" : ""} type="button" onClick={() => onNavigate("dashboard")}>
+          学习工作台
+        </button>
+        <button className={activeView === "knowledge" ? "active" : ""} type="button" onClick={() => onNavigate("knowledge")}>
           知识库
         </button>
-        <button
-          className={activeView === "grid" ? "active" : ""}
-          type="button"
-          onClick={() => onNavigate("grid")}
-        >
+        <button className={activeView === "grid" ? "active" : ""} type="button" onClick={() => onNavigate("grid")}>
           表格录入
         </button>
-        <button
-          className={activeView === "import" ? "active" : ""}
-          type="button"
-          onClick={() => onNavigate("import")}
-        >
+        <button className={activeView === "import" ? "active" : ""} type="button" onClick={() => onNavigate("import")}>
           智能导入中心
-        </button>
-        <button
-          className={activeView === "dashboard" ? "active" : ""}
-          type="button"
-          onClick={() => onNavigate("dashboard")}
-        >
-          状态
         </button>
       </nav>
 
       {activeView === "dashboard" ? (
         <>
-          <section className="workspace-grid">
-            <SearchPanel />
-
-            <div className="panel">
-              <h2>应用状态</h2>
-              {error ? <p className="error-text">{error}</p> : null}
-              <dl>
-                <dt>版本</dt>
-                <dd>{status?.version ?? "读取中"}</dd>
-                <dt>AI</dt>
-                <dd>{status?.aiEnabled ? "已启用" : "默认关闭"}</dd>
-                <dt>本地数据目录</dt>
-                <dd>{status?.dataDir ?? "准备中"}</dd>
-              </dl>
-            </div>
-          </section>
+          <SearchPanel />
 
           <section className="section-band">
-            <h2>知识库</h2>
-            <div className="type-grid">
-              {knowledgeTypes.map((type) => (
-                <button key={type} type="button" disabled>
-                  {type}
-                </button>
-              ))}
+            <div className="section-heading">
+              <div>
+                <h2>快捷入口</h2>
+                <p>按学习场景进入资料库，搜索仍是主要入口。</p>
+              </div>
             </div>
-          </section>
-
-          <section className="section-band">
-            <h2>数据录入中心</h2>
             <div className="action-grid">
-              <button type="button" onClick={() => onNavigate("import")}>
-                智能导入中心
-                <small>导入标准数据包，系统自动识别、去重、合并并生成导入报告。</small>
-              </button>
-              {entryActions.map((action) => (
-                <button key={action} type="button" disabled>
-                  {action}
+              {quickEntries.map((entry) => (
+                <button key={entry.label} type="button" onClick={() => onNavigate(entry.view)}>
+                  {entry.label}
+                  <small>{entry.hint}</small>
                 </button>
               ))}
             </div>
+          </section>
+
+          <section className="section-band">
+            <h2>数据概览</h2>
+            {error ? <p className="error-text">{error}</p> : null}
+            <div className="summary-grid">
+              <Metric label="知识条目" value={stats?.knowledgeCount} />
+              <Metric label="注解资料" value={stats?.annotationCount} />
+              <Metric label="最近导入批次" value={importRuns[0]?.packageName || importRuns[0]?.id || "无"} />
+              <Metric label="收藏数量" value={stats?.favoriteCount} />
+              <Metric label="最近查看" value={stats?.recentViewCount} />
+              <Metric label="版本" value={status?.version ?? "读取中"} />
+            </div>
+          </section>
+
+          <section className="workspace-grid">
+            <div className="panel">
+              <h2>最近查看</h2>
+              <SimpleList
+                empty="暂无最近查看"
+                rows={recentViews.map((item) => ({
+                  key: item.id,
+                  title: item.itemName,
+                  meta: [typeLabel(item.itemType), item.category, item.viewedAt].filter(Boolean).join(" / "),
+                }))}
+              />
+            </div>
+            <div className="panel">
+              <h2>我的收藏</h2>
+              <SimpleList
+                empty="暂无收藏"
+                rows={favorites.slice(0, 8).map((item) => ({
+                  key: item.id,
+                  title: item.itemName,
+                  meta: [typeLabel(item.itemType), item.category, item.createdAt].filter(Boolean).join(" / "),
+                }))}
+              />
+            </div>
+          </section>
+
+          <section className="section-band">
+            <div className="section-heading">
+              <div>
+                <h2>导入历史</h2>
+                <p>查看最近导入批次；报告与回滚在智能导入中心处理，回滚前会二次确认。</p>
+              </div>
+              <button type="button" onClick={() => onNavigate("import")}>
+                进入导入中心
+              </button>
+            </div>
+            <SimpleList
+              empty="暂无导入批次"
+              rows={importRuns.map((run) => ({
+                key: run.id,
+                title: run.packageName || `导入批次 #${run.id}`,
+                meta: [
+                  run.importIntent,
+                  run.status,
+                  `主条目 ${run.createCount}`,
+                  `注解 ${run.attachAnnotationCount}`,
+                  run.rolledBackAt ? "已回滚" : "可查看报告",
+                ].join(" / "),
+              }))}
+            />
           </section>
 
           <RelationReviewPanel />
@@ -108,13 +169,44 @@ export function DashboardPage({ status, error, activeView, onNavigate }: Dashboa
           <AiSettingsPanel />
         </>
       ) : null}
-
-      {activeView !== "dashboard" ? (
-        <section className="summary-strip">
-          <span>知识类型：{knowledgeTypes.join(" / ")}</span>
-          <span>入口：{entryActions.join(" / ")}</span>
-        </section>
-      ) : null}
     </>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string | number | null | undefined }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value ?? "读取中"}</strong>
+    </div>
+  );
+}
+
+function SimpleList({ rows, empty }: { rows: Array<{ key: string | number; title: string; meta: string }>; empty: string }) {
+  if (!rows.length) return <p className="empty-text">{empty}</p>;
+  return (
+    <div className="compact-result-list">
+      {rows.map((row) => (
+        <div key={row.key}>
+          <strong>{row.title}</strong>
+          <span>{row.meta}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function typeLabel(type: string) {
+  return (
+    {
+      herb: "中药",
+      formula: "方剂",
+      acupuncture: "针灸",
+      acupoint: "穴位",
+      meridian: "经络",
+      syndrome: "原典条文",
+      theory: "原典章节",
+      note: "注解",
+    }[type] ?? type
   );
 }

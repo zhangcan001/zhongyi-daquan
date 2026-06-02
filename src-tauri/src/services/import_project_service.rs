@@ -1713,8 +1713,8 @@ fn insert_knowledge_item(
     transaction.execute(
         "INSERT INTO knowledge_items
          (type, code, name, alias, pinyin, category, summary, content, source_note, tags,
-          data_status, completeness_status, content_version, is_favorite, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'partial', 1, 0, ?12, ?13)",
+          data_status, completeness_status, content_version, is_favorite, detail, source_package, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'partial', 1, 0, ?12, ?13, ?14, ?15)",
         params![
             text(object, "type").unwrap_or_else(|| target_type.to_string()),
             text(object, "code"),
@@ -1726,7 +1726,9 @@ fn insert_knowledge_item(
             text(object, "content"),
             text(object, "source_note"),
             text(object, "tags"),
-            text(object, "data_status").unwrap_or_else(|| "validated".to_string()),
+            text(object, "data_status").unwrap_or_else(|| "imported".to_string()),
+            detail_json(object),
+            text(object, "_source_package"),
             now,
             now
         ],
@@ -2080,6 +2082,46 @@ fn value_to_text(value: &Value) -> Option<String> {
             (!joined.is_empty()).then_some(joined)
         }
         _ => None,
+    }
+}
+
+fn detail_json(object: &Map<String, Value>) -> String {
+    object
+        .get("detail")
+        .map(normalize_detail_json)
+        .unwrap_or_else(|| {
+            let mut detail = Map::new();
+            for (key, value) in object {
+                if !matches!(
+                    key.as_str(),
+                    "type"
+                        | "code"
+                        | "name"
+                        | "alias"
+                        | "pinyin"
+                        | "category"
+                        | "summary"
+                        | "content"
+                        | "source_note"
+                        | "tags"
+                        | "data_status"
+                ) && !key.starts_with('_')
+                {
+                    detail.insert(key.clone(), value.clone());
+                }
+            }
+            Value::Object(detail).to_string()
+        })
+}
+
+fn normalize_detail_json(value: &Value) -> String {
+    match value {
+        Value::Object(_) => value.to_string(),
+        Value::String(text) => serde_json::from_str::<Value>(text)
+            .map(|value| value.to_string())
+            .unwrap_or_else(|_| serde_json::json!({ "raw_detail": text, "parse_error": true }).to_string()),
+        Value::Null => "{}".to_string(),
+        other => serde_json::json!({ "raw_detail": other }).to_string(),
     }
 }
 

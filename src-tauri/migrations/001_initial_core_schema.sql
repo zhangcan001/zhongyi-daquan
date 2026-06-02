@@ -275,8 +275,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_fts USING fts5(
   category,
   summary,
   content,
-  tags,
-  content=''
+  tags
 );
 
 CREATE TABLE IF NOT EXISTS search_terms (

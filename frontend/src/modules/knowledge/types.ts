@@ -1,5 +1,14 @@
-export type KnowledgeType = "herb" | "formula" | "meridian" | "acupoint" | "syndrome" | "disease";
-export type DataStatus = "draft" | "imported" | "needs_fix" | "validated" | "ready" | "archived";
+export type KnowledgeType =
+  | "herb"
+  | "formula"
+  | "acupuncture"
+  | "syndrome"
+  | "theory"
+  | "note"
+  | "meridian"
+  | "acupoint"
+  | "disease";
+export type DataStatus = "draft" | "pending_review" | "reviewed" | "needs_check" | "imported" | "needs_fix" | "validated" | "ready" | "archived";
 export type CompletenessStatus = "empty" | "partial" | "complete";
 
 export type KnowledgeItem = {
@@ -18,6 +27,9 @@ export type KnowledgeItem = {
   completenessStatus: CompletenessStatus;
   contentVersion: number;
   isFavorite: boolean;
+  detail?: Record<string, unknown> | null;
+  importBatchId?: string | null;
+  sourcePackage?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 };
@@ -62,14 +74,17 @@ export type GridSaveResponse = {
 export const knowledgeTypeOptions: Array<{ value: KnowledgeType; label: string }> = [
   { value: "herb", label: "中药" },
   { value: "formula", label: "方剂" },
-  { value: "meridian", label: "经络" },
-  { value: "acupoint", label: "穴位" },
-  { value: "syndrome", label: "证型" },
-  { value: "disease", label: "病症" },
+  { value: "acupuncture", label: "针灸" },
+  { value: "syndrome", label: "辨证" },
+  { value: "theory", label: "理论" },
+  { value: "note", label: "笔记" },
 ];
 
 export const dataStatusOptions: Array<{ value: DataStatus; label: string }> = [
   { value: "draft", label: "草稿" },
+  { value: "pending_review", label: "待复核" },
+  { value: "reviewed", label: "已复核" },
+  { value: "needs_check", label: "需检查" },
   { value: "imported", label: "已导入" },
   { value: "needs_fix", label: "需修正" },
   { value: "validated", label: "已校验" },

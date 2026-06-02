@@ -153,6 +153,11 @@ export type ImportPlan = {
   skipDuplicateCount: number;
   needsReviewCount: number;
   rejectInvalidCount: number;
+  typeCounts: Record<string, number>;
+  categoryCounts: Record<string, number>;
+  missingFieldCounts: Record<string, number>;
+  duplicateCodes: string[];
+  keywordChecks: Record<string, boolean>;
   warnings: string[];
   actions: ImportPlanAction[];
   aiMessage?: string | null;

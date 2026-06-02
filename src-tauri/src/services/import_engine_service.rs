@@ -292,14 +292,15 @@ fn adapt_knowledge_item(raw: &Map<String, Value>) -> Map<String, Value> {
     );
     copy_alias(raw, &mut output, "data_status", &["data_status"]);
 
+    if let Some(detail_value) = get_alias(raw, &["detail", "详情", "扩展字段"]) {
+        output.insert("detail".to_string(), normalize_detail_value(detail_value));
+    }
     if let Some(Value::Object(detail)) = get_alias(raw, &["detail", "详情", "扩展字段"]) {
         merge_detail_into_output(&mut output, detail);
     }
     preserve_private_fields(raw, &mut output);
     preserve_context_fields(raw, &mut output);
-    output
-        .entry("type".to_string())
-        .or_insert_with(|| Value::String("mixed".to_string()));
+    normalize_knowledge_item_defaults(&mut output);
     output
 }
 
@@ -357,8 +358,10 @@ fn adapt_classic_passage(raw: &Map<String, Value>) -> Map<String, Value> {
     );
     output.insert("symptoms".to_string(), Value::String(original_text));
     output.insert("notes".to_string(), Value::String(detail_notes(raw)));
+    output.insert("detail".to_string(), Value::Object(raw.clone()));
     preserve_private_fields(raw, &mut output);
     preserve_context_fields(raw, &mut output);
+    normalize_knowledge_item_defaults(&mut output);
     output
 }
 
@@ -389,7 +392,92 @@ fn apply_scored_mapping(
     output
         .entry("type".to_string())
         .or_insert_with(|| Value::String(target_type.to_string()));
+    normalize_knowledge_item_defaults(&mut output);
     output
+}
+
+fn normalize_knowledge_item_defaults(output: &mut Map<String, Value>) {
+    let original_type = text(output, "type").unwrap_or_else(|| "note".to_string());
+    let normalized_type = normalize_item_type(&original_type);
+    if normalized_type != original_type {
+        let mut detail = output
+            .get("detail")
+            .cloned()
+            .unwrap_or_else(|| Value::Object(Map::new()));
+        if !detail.is_object() {
+            detail = normalize_detail_value(&detail);
+        }
+        if let Some(map) = detail.as_object_mut() {
+            map.insert(
+                "import_warning".to_string(),
+                Value::String(format!(
+                    "原 type '{original_type}' 不在允许集合中，已按 {normalized_type} 导入。"
+                )),
+            );
+            map.insert("original_type".to_string(), Value::String(original_type));
+        }
+        output.insert("detail".to_string(), detail);
+    }
+    output.insert("type".to_string(), Value::String(normalized_type));
+    output
+        .entry("alias".to_string())
+        .or_insert_with(|| Value::Array(Vec::new()));
+    output
+        .entry("pinyin".to_string())
+        .or_insert_with(|| Value::String(String::new()));
+    output
+        .entry("detail".to_string())
+        .or_insert_with(|| Value::Object(Map::new()));
+    if text(output, "summary").is_none() {
+        if let Some(content) = text(output, "content") {
+            output.insert("summary".to_string(), Value::String(truncate_summary(&content)));
+        }
+    }
+    if text(output, "tags").is_none() {
+        let tags = [
+            text(output, "name"),
+            text(output, "category"),
+            text(output, "type"),
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+        output.insert("tags".to_string(), Value::String(tags.join(",")));
+    }
+    let status = text(output, "data_status").unwrap_or_else(|| "pending_review".to_string());
+    let status = match status.as_str() {
+        "pending_review" | "reviewed" | "needs_check" | "imported" | "validated" | "ready" => {
+            status
+        }
+        _ => "pending_review".to_string(),
+    };
+    output.insert("data_status".to_string(), Value::String(status));
+}
+
+fn normalize_item_type(value: &str) -> String {
+    match value {
+        "herb" | "formula" | "acupuncture" | "syndrome" | "theory" | "note" => value.to_string(),
+        "classic" => "theory".to_string(),
+        "acupoint" | "meridian" => "acupuncture".to_string(),
+        "unknown" | "mixed" | "auto" | "disease" => "note".to_string(),
+        "中药" => "herb".to_string(),
+        "方剂" => "formula".to_string(),
+        "经络" | "穴位" => "acupuncture".to_string(),
+        "证型" => "syndrome".to_string(),
+        "理论" => "theory".to_string(),
+        "笔记" | "病症" => "note".to_string(),
+        _ => "note".to_string(),
+    }
+}
+
+fn normalize_detail_value(value: &Value) -> Value {
+    match value {
+        Value::Object(_) => value.clone(),
+        Value::String(text) => serde_json::from_str::<Value>(text)
+            .unwrap_or_else(|_| serde_json::json!({ "raw_detail": text, "parse_error": true })),
+        Value::Null => Value::Object(Map::new()),
+        other => serde_json::json!({ "raw_detail": other }),
+    }
 }
 
 fn score_field(

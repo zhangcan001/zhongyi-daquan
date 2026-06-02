@@ -305,6 +305,19 @@ dd {
   padding: 0 14px;
 }
 
+.task-center button.danger-button {
+  border-color: #b94335;
+  background: #fff1ed;
+  color: #8f2418;
+  font-weight: 700;
+}
+
+.task-center button.danger-button:disabled {
+  border-color: #d8b7b1;
+  background: #f5eeee;
+  color: #9a7771;
+}
+
 .maintenance-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
@@ -633,6 +646,13 @@ h3 {
   color: #33413a;
 }
 
+.keyword-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .file-button {
   display: inline-flex;
   min-height: 40px;
@@ -735,15 +755,80 @@ h3 {
 }
 
 @media (max-width: 760px) {
+  :root {
+    font-size: 15px;
+  }
+
+  body {
+    background: #ffffff;
+  }
+
+  .app-shell {
+    width: 100%;
+    padding: 14px 12px 28px;
+  }
+
   .topbar,
   .workspace-grid,
   .workspace-split {
     display: block;
   }
 
+  .topbar {
+    padding-bottom: 14px;
+  }
+
+  h1 {
+    font-size: 26px;
+  }
+
+  .topbar p {
+    line-height: 1.55;
+  }
+
   .status-pill {
     display: inline-block;
     margin-top: 16px;
+  }
+
+  .main-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 10px 0;
+    margin: 10px 0 14px;
+    background: #ffffff;
+    scrollbar-width: none;
+  }
+
+  .main-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .main-tabs button {
+    flex: 0 0 auto;
+    min-height: 42px;
+  }
+
+  .panel,
+  .section-band,
+  .list-pane,
+  .detail-pane {
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    padding: 16px 0;
+  }
+
+  .section-heading {
+    display: grid;
+    gap: 12px;
+  }
+
+  .section-heading button {
+    width: 100%;
   }
 
   .panel + .panel {
@@ -756,6 +841,55 @@ h3 {
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-grid strong {
+    font-size: 18px;
+  }
+
+  .knowledge-list {
+    min-height: 0;
+  }
+
+  .knowledge-row {
+    min-height: 64px;
+  }
+
+  .row-meta {
+    justify-items: start;
+    white-space: normal;
+  }
+
+  .filter-row,
+  .grid-actions,
+  .detail-actions,
+  .pager,
+  .import-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .filter-row input,
+  .filter-row select {
+    flex: none;
+  }
+
+  .grid-entry-shell {
+    height: 62vh;
+    border-radius: 0;
+  }
+
+  .staging-table,
+  .job-table {
+    min-width: 640px;
+  }
+
+  .advanced-details {
+    border-radius: 6px;
   }
 
   .restore-row {

@@ -12,6 +12,7 @@ const ALLOWED_JOB_TYPES: &[&str] = &[
     "backup",
     "restore",
     "ai_task",
+    "clear_database_content",
 ];
 
 pub fn is_allowed_job_type(job_type: &str) -> bool {

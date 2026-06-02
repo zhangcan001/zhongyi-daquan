@@ -7,6 +7,9 @@
     "tauri:dev": ".\\frontend\\node_modules\\.bin\\tauri.cmd dev --config src-tauri/tauri.conf.json",
     "build": "npm --prefix frontend run build",
     "tauri:build": ".\\frontend\\node_modules\\.bin\\tauri.cmd build --config src-tauri/tauri.conf.json --bundles nsis --ci",
+    "android:init": ".\\frontend\\node_modules\\.bin\\tauri.cmd android init --config src-tauri/tauri.conf.json",
+    "android:dev": ".\\frontend\\node_modules\\.bin\\tauri.cmd android dev --config src-tauri/tauri.conf.json",
+    "android:build": ".\\frontend\\node_modules\\.bin\\tauri.cmd android build --config src-tauri/tauri.conf.json",
     "check": "npm --prefix frontend run check && cargo check --manifest-path src-tauri/Cargo.toml"
   }
 }

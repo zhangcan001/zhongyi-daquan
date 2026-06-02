@@ -205,6 +205,16 @@ export function ImportStagingPanel() {
           {packageTitle === "本草注解增强包" ? (
             <p className="ai-message">系统会把已存在药物的内容作为注解资料附加，避免创建重复药物条目。</p>
           ) : null}
+          <details className="advanced-details" open>
+            <summary>校验摘要</summary>
+            <div className="summary-grid">
+              <Metric label="类型分布" value={formatCounts(plan.typeCounts)} />
+              <Metric label="分类分布" value={formatCounts(plan.categoryCounts)} />
+              <Metric label="缺失字段" value={formatCounts(plan.missingFieldCounts) || "无"} />
+              <Metric label="重复 code" value={plan.duplicateCodes.length ? plan.duplicateCodes.join("，") : "无"} />
+            </div>
+            <KeywordChecks checks={plan.keywordChecks} />
+          </details>
         </div>
       ) : null}
 
@@ -418,4 +428,26 @@ function stepLabel(step: ImportStep) {
 
 function readNumber(value: unknown) {
   return typeof value === "number" ? value : 0;
+}
+
+function formatCounts(counts?: Record<string, number>) {
+  if (!counts) return "";
+  return Object.entries(counts)
+    .slice(0, 8)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join("，");
+}
+
+function KeywordChecks({ checks }: { checks?: Record<string, boolean> }) {
+  const entries = Object.entries(checks ?? {});
+  if (!entries.length) return null;
+  return (
+    <div className="keyword-checks">
+      {entries.map(([keyword, hit]) => (
+        <span key={keyword} className={hit ? "status-pill" : "status-pill muted"}>
+          {keyword} {hit ? "命中" : "未见"}
+        </span>
+      ))}
+    </div>
+  );
 }

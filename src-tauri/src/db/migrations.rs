@@ -48,6 +48,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "import_runs_v1",
         sql: include_str!("../../migrations/008_import_runs_v1.sql"),
     },
+    Migration {
+        version: 9,
+        name: "renji_manifest_package_compat",
+        sql: include_str!("../../migrations/009_renji_manifest_package_compat.sql"),
+    },
 ];
 
 pub fn run(connection: &Connection) -> AppResult<()> {

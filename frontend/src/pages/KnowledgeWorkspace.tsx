@@ -85,6 +85,8 @@ export function KnowledgeWorkspace() {
           dataStatus: response.item.dataStatus,
           completenessStatus: response.item.completenessStatus,
           isFavorite: response.item.isFavorite,
+          importBatchId: response.item.importBatchId ?? "",
+          sourcePackage: response.item.sourcePackage ?? "",
           detail: response.detail ?? {},
         });
       })
@@ -212,7 +214,7 @@ export function KnowledgeWorkspace() {
             >
               <span>
                 <strong>{item.name}</strong>
-                <small>{item.code || item.category || "未填写编号"}</small>
+                <small>{[item.code, item.category, item.sourceNote].filter(Boolean).join(" / ") || "未填写编号"}</small>
               </span>
               <span className="row-meta">
                 {item.isFavorite ? "收藏" : ""}
@@ -323,6 +325,28 @@ export function KnowledgeWorkspace() {
           内容
           <textarea value={form.content ?? ""} onChange={(event) => updateForm("content", event.target.value)} />
         </label>
+        <div className="form-grid">
+          <label>
+            出处
+            <input value={form.sourceNote ?? ""} onChange={(event) => updateForm("sourceNote", event.target.value)} />
+          </label>
+          <label>
+            标签
+            <input value={form.tags ?? ""} onChange={(event) => updateForm("tags", event.target.value)} />
+          </label>
+        </div>
+        {mode === "edit" ? (
+          <div className="summary-grid compact">
+            <div>
+              <span>导入批次</span>
+              <strong>{form.importBatchId ? `#${form.importBatchId}` : "手工/旧数据"}</strong>
+            </div>
+            <div>
+              <span>来源包</span>
+              <strong>{form.sourcePackage || "未记录"}</strong>
+            </div>
+          </div>
+        ) : null}
 
         <h3>类型详情</h3>
         <div className="form-grid">
@@ -345,6 +369,11 @@ export function KnowledgeWorkspace() {
             </label>
           ))}
         </div>
+
+        <details className="advanced-details">
+          <summary>detail JSON</summary>
+          <pre>{JSON.stringify(form.detail ?? {}, null, 2)}</pre>
+        </details>
 
         <div className="detail-actions">
           <button type="button" onClick={saveForm}>

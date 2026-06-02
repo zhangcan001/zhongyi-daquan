@@ -16,6 +16,7 @@ const jobTypeLabels: Record<string, string> = {
   backup: "备份",
   restore: "恢复",
   ai_task: "AI 占位任务",
+  clear_database_content: "清空数据库内容",
 };
 
 const statusLabels: Record<string, string> = {
@@ -61,6 +62,19 @@ export function TaskCenterPanel() {
     } finally {
       setBusyAction(null);
     }
+  };
+
+  const clearDatabaseContent = async () => {
+    const firstConfirm = window.confirm(
+      "此操作会清空知识库、导入记录、搜索索引、关系、日志等业务数据，且不能直接撤销。建议先执行备份。确定继续？",
+    );
+    if (!firstConfirm) return;
+    const typed = window.prompt("请再输入“清空数据库”确认执行。");
+    if (typed !== "清空数据库") {
+      setMessage("已取消清空数据库。");
+      return;
+    }
+    await runAction<MaintenanceReport>("clear-db", "clear_database_content");
   };
 
   return (
@@ -121,6 +135,14 @@ export function TaskCenterPanel() {
           disabled={busyAction !== null}
         >
           导出性能报告
+        </button>
+        <button
+          className="danger-button"
+          type="button"
+          onClick={clearDatabaseContent}
+          disabled={busyAction !== null}
+        >
+          一键清空数据库内容
         </button>
       </div>
 

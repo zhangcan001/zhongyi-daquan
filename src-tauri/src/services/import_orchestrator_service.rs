@@ -12,6 +12,7 @@ use crate::services::{
 use chrono::Utc;
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Map, Value};
+use std::collections::{BTreeMap, BTreeSet};
 
 pub fn preview_import_plan(database: &Database, package_path: &str) -> AppResult<ImportPlan> {
     let parsed = import_project_service::parse_path_import_package(package_path)?;
@@ -100,6 +101,10 @@ pub fn execute_import_plan(
             match action.action_type.as_str() {
                 "create_new" => match insert_knowledge_item_tx(&transaction, &draft) {
                     Ok(item_id) => {
+                        transaction.execute(
+                            "UPDATE knowledge_items SET import_batch_id = ?2 WHERE id = ?1",
+                            params![item_id, import_run_id.to_string()],
+                        )?;
                         let after_json = load_item_snapshot_tx(&transaction, item_id)?;
                         record_change_tx(
                             &transaction,
@@ -235,6 +240,11 @@ pub fn execute_import_plan(
         "needs_review_count": needs_review_count,
         "rejected_count": rejected_count,
         "failed_count": failed_count,
+        "type_counts": plan.type_counts,
+        "category_counts": plan.category_counts,
+        "missing_field_counts": plan.missing_field_counts,
+        "duplicate_codes": plan.duplicate_codes,
+        "keyword_checks": plan.keyword_checks,
         "search_index_rebuilt": true,
         "can_rollback": true,
         "rollback_note": "回滚会撤销本次新增条目、附加注解和补空字段；已跳过、待确认和失败项不会修改。"
@@ -492,6 +502,11 @@ fn build_plan(
             .filter(|action| action.action_type == kind)
             .count() as i64
     };
+    let type_counts = count_field(&actions, "type");
+    let category_counts = count_field(&actions, "category");
+    let missing_field_counts = missing_field_counts(&actions);
+    let duplicate_codes = duplicate_codes(&actions);
+    let keyword_checks = keyword_checks_from_actions(&actions);
     ImportPlan {
         plan_id: format!("smart-import-{}", Utc::now().timestamp_millis()),
         package_path: package_path.to_string(),
@@ -505,6 +520,11 @@ fn build_plan(
         skip_duplicate_count: count("skip_duplicate"),
         needs_review_count: count("needs_review"),
         reject_invalid_count: count("reject_invalid"),
+        type_counts,
+        category_counts,
+        missing_field_counts,
+        duplicate_codes,
+        keyword_checks,
         warnings,
         actions,
         ai_message,
@@ -529,6 +549,18 @@ fn plan_action_for_draft(
             None,
             0.0,
             "缺少 name，不能自动导入。",
+            draft,
+        ));
+    }
+    if text(draft, "content").is_none() {
+        return Ok(action(
+            row_index,
+            "reject_invalid",
+            Some(item_type),
+            name,
+            None,
+            0.0,
+            "缺少 content，不能自动导入。",
             draft,
         ));
     }
@@ -759,8 +791,8 @@ fn insert_knowledge_item_tx(
     transaction.execute(
         "INSERT INTO knowledge_items
          (type, code, name, alias, pinyin, category, summary, content, source_note, tags,
-          data_status, completeness_status, content_version, is_favorite, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'validated', 'partial', 1, 0, ?11, ?12)",
+          data_status, completeness_status, content_version, is_favorite, detail, source_package, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'partial', 1, 0, ?12, ?13, ?14, ?15)",
         params![
             text(draft, "type").unwrap_or_else(|| "unknown".to_string()),
             text(draft, "code"),
@@ -772,6 +804,9 @@ fn insert_knowledge_item_tx(
             text(draft, "content"),
             text(draft, "source_note"),
             text(draft, "tags"),
+            text(draft, "data_status").unwrap_or_else(|| "imported".to_string()),
+            detail_json(draft),
+            text(draft, "_source_package"),
             now,
             now
         ],
@@ -790,7 +825,8 @@ fn merge_empty_fields_tx(
              content = CASE WHEN COALESCE(content, '') = '' THEN ?3 ELSE content END,
              source_note = CASE WHEN COALESCE(source_note, '') = '' THEN ?4 ELSE source_note END,
              tags = CASE WHEN COALESCE(tags, '') = '' THEN ?5 ELSE tags END,
-             updated_at = ?6
+             detail = CASE WHEN COALESCE(detail, '{}') IN ('', '{}') THEN ?6 ELSE detail END,
+             updated_at = ?7
          WHERE id = ?1",
         params![
             item_id,
@@ -798,6 +834,7 @@ fn merge_empty_fields_tx(
             text(draft, "content"),
             text(draft, "source_note"),
             text(draft, "tags"),
+            detail_json(draft),
             Utc::now().to_rfc3339()
         ],
     )?;
@@ -986,7 +1023,7 @@ fn load_item_snapshot_tx(
     transaction
         .query_row(
             "SELECT id, type, code, name, alias, pinyin, category, summary, content, source_note,
-                    tags, updated_at
+                    tags, detail, import_batch_id, source_package, updated_at
              FROM knowledge_items
              WHERE id = ?1",
             [item_id],
@@ -1003,7 +1040,12 @@ fn load_item_snapshot_tx(
                     "content": row.get::<_, Option<String>>(8)?,
                     "source_note": row.get::<_, Option<String>>(9)?,
                     "tags": row.get::<_, Option<String>>(10)?,
-                    "updated_at": row.get::<_, String>(11)?,
+                    "detail": row.get::<_, Option<String>>(11)?
+                        .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+                        .unwrap_or_else(|| json!({})),
+                    "import_batch_id": row.get::<_, Option<String>>(12)?,
+                    "source_package": row.get::<_, Option<String>>(13)?,
+                    "updated_at": row.get::<_, String>(14)?,
                 }))
             },
         )
@@ -1039,7 +1081,7 @@ fn rollback_merge_empty_fields_tx(
         .unwrap_or(Value::Null);
     transaction.execute(
         "UPDATE knowledge_items
-         SET summary = ?2, content = ?3, source_note = ?4, tags = ?5, updated_at = ?6
+         SET summary = ?2, content = ?3, source_note = ?4, tags = ?5, detail = ?6, updated_at = ?7
          WHERE id = ?1",
         params![
             item_id,
@@ -1047,6 +1089,7 @@ fn rollback_merge_empty_fields_tx(
             before.get("content").and_then(value_to_text),
             before.get("source_note").and_then(value_to_text),
             before.get("tags").and_then(value_to_text),
+            before.get("detail").map(normalize_detail_json).unwrap_or_else(|| "{}".to_string()),
             Utc::now().to_rfc3339()
         ],
     )?;
@@ -1065,7 +1108,7 @@ fn item_changed_after_import_tx(
         return Ok(false);
     }
     let current = load_item_snapshot_tx(transaction, item_id)?;
-    for field in ["summary", "content", "source_note", "tags"] {
+    for field in ["summary", "content", "source_note", "tags", "detail"] {
         if current.get(field) != expected.get(field) {
             return Ok(true);
         }
@@ -1139,6 +1182,12 @@ fn import_run_summary_json(import_run: &ImportRunSummary) -> Value {
 }
 
 fn has_empty_field_to_merge(existing: &ExistingItem, draft: &Map<String, Value>) -> bool {
+    if !existing.content.as_deref().unwrap_or_default().is_empty()
+        && text(draft, "content").is_some()
+        && !content_similar(existing.content.as_deref(), text(draft, "content").as_deref())
+    {
+        return false;
+    }
     (existing.summary.as_deref().unwrap_or_default().is_empty() && text(draft, "summary").is_some())
         || (existing.content.as_deref().unwrap_or_default().is_empty()
             && text(draft, "content").is_some())
@@ -1215,6 +1264,135 @@ fn value_to_text(value: &Value) -> Option<String> {
         }
         _ => None,
     }
+}
+
+fn detail_json(draft: &Map<String, Value>) -> String {
+    draft
+        .get("detail")
+        .map(normalize_detail_json)
+        .unwrap_or_else(|| {
+            let mut detail = Map::new();
+            for (key, value) in draft {
+                if !matches!(
+                    key.as_str(),
+                    "type"
+                        | "code"
+                        | "name"
+                        | "alias"
+                        | "pinyin"
+                        | "category"
+                        | "summary"
+                        | "content"
+                        | "source_note"
+                        | "tags"
+                        | "data_status"
+                ) && !key.starts_with('_')
+                {
+                    detail.insert(key.clone(), value.clone());
+                }
+            }
+            Value::Object(detail).to_string()
+        })
+}
+
+fn normalize_detail_json(value: &Value) -> String {
+    match value {
+        Value::Object(_) => value.to_string(),
+        Value::String(text) => serde_json::from_str::<Value>(text)
+            .map(|value| value.to_string())
+            .unwrap_or_else(|_| json!({ "raw_detail": text, "parse_error": true }).to_string()),
+        Value::Null => "{}".to_string(),
+        other => json!({ "raw_detail": other }).to_string(),
+    }
+}
+
+fn count_field(actions: &[ImportPlanAction], field: &str) -> BTreeMap<String, i64> {
+    let mut counts = BTreeMap::new();
+    for action in actions {
+        if let Some(object) = action.draft_json.as_object() {
+            let value = text(object, field).unwrap_or_else(|| "未填写".to_string());
+            *counts.entry(value).or_default() += 1;
+        }
+    }
+    counts
+}
+
+fn missing_field_counts(actions: &[ImportPlanAction]) -> BTreeMap<String, i64> {
+    let mut counts = BTreeMap::new();
+    for action in actions {
+        if let Some(object) = action.draft_json.as_object() {
+            for field in [
+                "type",
+                "code",
+                "name",
+                "category",
+                "content",
+                "source_note",
+                "tags",
+                "data_status",
+                "detail",
+            ] {
+                if text(object, field).is_none()
+                    && !(field == "detail" && object.get("detail").is_some())
+                {
+                    *counts.entry(field.to_string()).or_default() += 1;
+                }
+            }
+        }
+    }
+    counts
+}
+
+fn duplicate_codes(actions: &[ImportPlanAction]) -> Vec<String> {
+    let mut seen = BTreeSet::new();
+    let mut duplicates = BTreeSet::new();
+    for action in actions {
+        if let Some(object) = action.draft_json.as_object() {
+            if let Some(code) = text(object, "code") {
+                if !seen.insert(code.clone()) {
+                    duplicates.insert(code);
+                }
+            }
+        }
+    }
+    duplicates.into_iter().collect()
+}
+
+fn keyword_checks_from_actions(actions: &[ImportPlanAction]) -> BTreeMap<String, bool> {
+    let keywords = [
+        "针灸",
+        "任脉",
+        "督脉",
+        "足三里",
+        "合谷",
+        "黄帝内经",
+        "上古天真论",
+        "四气调神大论",
+        "神农本草经",
+        "人参",
+        "甘草",
+        "黄耆",
+        "附子",
+        "伤寒论",
+        "太阳病",
+        "桂枝汤",
+        "麻黄汤",
+        "小柴胡汤",
+        "金匮要略",
+        "血痹虚劳",
+        "半夏厚朴汤",
+        "温经汤",
+    ];
+    let haystack = actions
+        .iter()
+        .filter_map(|action| action.draft_json.as_object())
+        .map(|object| Value::Object(object.clone()).to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    keywords
+        .into_iter()
+        .map(|keyword| (keyword.to_string(), haystack.contains(keyword)))
+        .collect()
 }
 
 #[cfg(test)]
@@ -1592,6 +1770,158 @@ mod tests {
                 .unwrap_or(false),
             true
         );
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn renji_manifest_package_preserves_detail_searches_and_rolls_back() {
+        let (data_dir, database) = temp_database("renji-compat");
+        let package = data_dir.join("package");
+        write_package(
+            &package,
+            "primary_seed",
+            r#"[
+              {
+                "type": "acupoint",
+                "code": "RENJI-ACU-001",
+                "name": "足三里与合谷针灸笔记",
+                "category": "针灸",
+                "content": "针灸资料：任脉、督脉、足三里、合谷。",
+                "source_note": "renji_acupuncture_private_import.pdf p.12",
+                "tags": ["针灸", "任脉", "督脉"],
+                "detail": {
+                  "item_subtype": "acupoint",
+                  "meridian": "足阳明胃经",
+                  "location_text": "足三里定位",
+                  "ni_note": "针灸学习笔记"
+                }
+              },
+              {
+                "type": "theory",
+                "code": "RENJI-NEIJING-001",
+                "name": "黄帝内经 上古天真论 四气调神大论",
+                "category": "黄帝内经",
+                "content": "黄帝内经：上古天真论，四气调神大论。",
+                "source_note": "renji_huangdi_neijing_private_import.pdf p.3",
+                "tags": ["黄帝内经", "上古天真论", "四气调神大论"],
+                "detail": {
+                  "item_subtype": "classic_section",
+                  "classic_name": "黄帝内经",
+                  "chapter_title": "上古天真论"
+                }
+              },
+              {
+                "type": "herb",
+                "code": "RENJI-BENCAO-001",
+                "name": "神农本草经 人参 甘草 黄耆 附子",
+                "category": "神农本草经",
+                "content": "神农本草经条目：人参、甘草、黄耆、附子。",
+                "source_note": "renji_shennong_bencao_private_import.pdf p.8",
+                "tags": ["神农本草经", "人参", "甘草", "黄耆", "附子"],
+                "detail": {
+                  "item_subtype": "herb",
+                  "bencao_original": "本经原文",
+                  "nature_flavor": "甘温"
+                }
+              },
+              {
+                "type": "formula",
+                "code": "RENJI-SHANGHAN-001",
+                "name": "伤寒论 太阳病 桂枝汤 麻黄汤 小柴胡汤",
+                "category": "伤寒论",
+                "content": "伤寒论太阳病相关：桂枝汤、麻黄汤、小柴胡汤。",
+                "source_note": "renji_shanghan_lun_private_import.pdf p.21",
+                "tags": ["伤寒论", "太阳病", "桂枝汤", "麻黄汤", "小柴胡汤"],
+                "detail": {
+                  "item_subtype": "shanghan_formula",
+                  "classic_name": "伤寒论",
+                  "formula_name": "桂枝汤"
+                }
+              },
+              {
+                "type": "formula",
+                "code": "RENJI-JINGUI-001",
+                "name": "金匮要略 血痹虚劳 半夏厚朴汤 温经汤",
+                "category": "金匮要略",
+                "content": "金匮要略血痹虚劳，半夏厚朴汤，温经汤。",
+                "source_note": "renji_jingui_yaolue_private_import.pdf p.34",
+                "tags": ["金匮要略", "血痹虚劳", "半夏厚朴汤", "温经汤"],
+                "detail": {
+                  "item_subtype": "jingui_formula",
+                  "classic_name": "金匮要略",
+                  "formula_name": "温经汤"
+                }
+              }
+            ]"#,
+        );
+
+        let plan = preview_import_plan(&database, package.to_str().unwrap()).unwrap();
+        assert_eq!(plan.total_records, 5);
+        assert_eq!(plan.create_count, 5);
+        assert_eq!(
+            plan.type_counts.get("acupuncture").copied().unwrap_or_default(),
+            1
+        );
+        assert!(plan.keyword_checks.values().all(|hit| *hit));
+
+        let result = execute_import_plan(&database, plan).unwrap();
+        let import_run_id = result.import_run_id.unwrap();
+        assert_eq!(result.created_count, 5);
+
+        let (detail_text, batch_id): (String, Option<String>) = database
+            .with_connection(|connection| {
+                connection
+                    .query_row(
+                        "SELECT detail, import_batch_id FROM knowledge_items WHERE code = 'RENJI-ACU-001'",
+                        [],
+                        |row| Ok((row.get(0)?, row.get(1)?)),
+                    )
+                    .map_err(Into::into)
+            })
+            .unwrap();
+        assert!(detail_text.contains("location_text"));
+        assert_eq!(batch_id, Some(import_run_id.to_string()));
+
+        for keyword in [
+            "针灸",
+            "任脉",
+            "督脉",
+            "足三里",
+            "合谷",
+            "黄帝内经",
+            "上古天真论",
+            "四气调神大论",
+            "神农本草经",
+            "人参",
+            "甘草",
+            "黄耆",
+            "附子",
+            "伤寒论",
+            "太阳病",
+            "桂枝汤",
+            "麻黄汤",
+            "小柴胡汤",
+            "金匮要略",
+            "血痹虚劳",
+            "半夏厚朴汤",
+            "温经汤",
+        ] {
+            let response = search_index_service::search(
+                &database,
+                SearchRequest {
+                    query: keyword.to_string(),
+                    item_type: None,
+                    page: Some(1),
+                    page_size: Some(10),
+                },
+            )
+            .unwrap();
+            assert!(!response.results.is_empty(), "expected hit for {keyword}");
+        }
+
+        let rollback = rollback_import_run(&database, import_run_id).unwrap();
+        assert_eq!(rollback.rolled_back_changes, 5);
+        assert_eq!(knowledge_item_count(&database, "足三里与合谷针灸笔记"), 0);
         let _ = fs::remove_dir_all(data_dir);
     }
 }

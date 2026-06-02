@@ -36,3 +36,8 @@ pub fn export_performance_report(state: State<'_, AppState>) -> AppResult<Mainte
 pub fn check_data_integrity(state: State<'_, AppState>) -> AppResult<MaintenanceReport> {
     maintenance_service::check_data_integrity(&state.database)
 }
+
+#[tauri::command]
+pub fn clear_database_content(state: State<'_, AppState>) -> AppResult<MaintenanceReport> {
+    maintenance_service::clear_database_content(&state.database)
+}

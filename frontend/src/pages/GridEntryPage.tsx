@@ -18,7 +18,7 @@ type GridColumn = {
   options?: Array<{ value: string; label: string }>;
 };
 
-const columnsByType: Record<KnowledgeType, GridColumn[]> = {
+const columnsByType: Partial<Record<KnowledgeType, GridColumn[]>> = {
   herb: [
     { key: "name", label: "名称", width: "150px" },
     { key: "code", label: "编号", width: "110px" },
@@ -67,7 +67,7 @@ export function GridEntryPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
 
-  const columns = useMemo(() => columnsByType[itemType], [itemType]);
+  const columns = useMemo(() => columnsByType[itemType] ?? columnsByType.herb ?? [], [itemType]);
   const visibleRows = rows;
 
   function resetType(nextType: KnowledgeType) {

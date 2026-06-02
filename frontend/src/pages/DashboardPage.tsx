@@ -13,7 +13,7 @@ type DashboardPageProps = {
   onNavigate: (view: AppView) => void;
 };
 
-const knowledgeTypes = ["中药", "方剂", "经络", "穴位", "证型", "病症"];
+const knowledgeTypes = ["中药", "方剂", "针灸", "辨证", "理论", "笔记"];
 const entryActions = ["快速新增", "表格录入", "批量导入", "字段映射", "暂存区", "数据清洗"];
 
 export function DashboardPage({ status, error, activeView, onNavigate }: DashboardPageProps) {

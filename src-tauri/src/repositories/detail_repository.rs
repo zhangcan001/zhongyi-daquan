@@ -3,8 +3,18 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Map, Value};
 
 pub fn get_detail(connection: &Connection, item_type: &str, item_id: i64) -> AppResult<Value> {
+    let mut main_detail = connection
+        .query_row(
+            "SELECT detail FROM knowledge_items WHERE id = ?1",
+            params![item_id],
+            |row| row.get::<_, Option<String>>(0),
+        )
+        .optional()?
+        .flatten()
+        .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+        .unwrap_or_else(|| json!({}));
     let Some(schema) = schema_for(item_type) else {
-        return Ok(json!({}));
+        return Ok(main_detail);
     };
     let sql = format!(
         "SELECT {} FROM {} WHERE item_id = ?1",
@@ -32,7 +42,14 @@ pub fn get_detail(connection: &Connection, item_type: &str, item_id: i64) -> App
             Ok(Value::Object(map))
         })
         .optional()?;
-    Ok(detail.unwrap_or_else(|| json!({})))
+    if let Some(table_detail) = detail {
+        if let (Some(base), Some(extra)) = (main_detail.as_object_mut(), table_detail.as_object()) {
+            for (key, value) in extra {
+                base.entry(key.clone()).or_insert_with(|| value.clone());
+            }
+        }
+    }
+    Ok(main_detail)
 }
 
 pub fn upsert_detail_tx(
@@ -41,6 +58,10 @@ pub fn upsert_detail_tx(
     item_id: i64,
     detail: &Value,
 ) -> AppResult<()> {
+    connection.execute(
+        "UPDATE knowledge_items SET detail = ?2 WHERE id = ?1",
+        params![item_id, normalize_detail_json(detail)],
+    )?;
     let Some(schema) = schema_for(item_type) else {
         return Ok(());
     };
@@ -66,6 +87,17 @@ pub fn upsert_detail_tx(
     }
     connection.execute(&sql, rusqlite::params_from_iter(values.iter()))?;
     Ok(())
+}
+
+fn normalize_detail_json(detail: &Value) -> String {
+    match detail {
+        Value::Object(_) => detail.to_string(),
+        Value::String(text) => serde_json::from_str::<Value>(text)
+            .map(|value| value.to_string())
+            .unwrap_or_else(|_| json!({ "raw_detail": text, "parse_error": true }).to_string()),
+        Value::Null => "{}".to_string(),
+        other => other.to_string(),
+    }
 }
 
 pub fn delete_detail_tx(connection: &Connection, item_type: &str, item_id: i64) -> AppResult<()> {

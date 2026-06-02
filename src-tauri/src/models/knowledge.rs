@@ -20,6 +20,9 @@ pub struct KnowledgeItem {
     pub completeness_status: String,
     pub content_version: i64,
     pub is_favorite: bool,
+    pub detail: Option<Value>,
+    pub import_batch_id: Option<String>,
+    pub source_package: Option<String>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
 }

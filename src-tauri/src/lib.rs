@@ -114,6 +114,7 @@ pub fn run() {
             commands::maintenance_commands::clean_old_performance_logs,
             commands::maintenance_commands::export_performance_report,
             commands::maintenance_commands::check_data_integrity,
+            commands::maintenance_commands::clear_database_content,
             commands::performance_commands::list_performance_logs,
             commands::performance_commands::record_performance_log,
             commands::audit_commands::record_audit_log,

@@ -6,7 +6,7 @@ use std::collections::HashSet;
 
 const KNOWLEDGE_TYPES: &[&str] = &[
     "中药", "方剂", "经络", "穴位", "证型", "病症", "herb", "formula", "meridian", "acupoint",
-    "syndrome", "disease",
+    "syndrome", "disease", "acupuncture", "theory", "note",
 ];
 
 pub struct ValidationContext {
@@ -77,7 +77,7 @@ fn validate_row_with_context(
                 "invalid_enum",
                 Some("type"),
                 "type 不在允许的知识类型中",
-                Some("请使用中药、方剂、经络、穴位、证型、病症之一"),
+                Some("请使用 herb、formula、acupuncture、syndrome、theory、note 之一"),
             ));
         }
     }

@@ -378,3 +378,145 @@ pub fn check_data_integrity(database: &Database) -> AppResult<MaintenanceReport>
 
     finish_or_fail(database, job.id, result)
 }
+
+pub fn clear_database_content(database: &Database) -> AppResult<MaintenanceReport> {
+    let job = background_job_service::create_internal_job(
+        database,
+        "clear_database_content",
+        Some("{\"action\":\"clear_database_content\"}"),
+    )?;
+    let result = (|| {
+        background_job_service::set_progress(database, job.id, 10.0)?;
+        let deleted_rows = database.with_connection(|connection| {
+            let transaction = connection.unchecked_transaction()?;
+            transaction.execute_batch("PRAGMA foreign_keys = ON;")?;
+            let mut deleted = 0_i64;
+
+            for table in [
+                "knowledge_fts",
+                "knowledge_list_view_cache",
+                "relation_count_cache",
+                "search_terms",
+                "knowledge_fingerprints",
+                "duplicate_candidates",
+                "merge_records",
+                "relation_suggestions",
+                "knowledge_relations",
+                "knowledge_versions",
+                "knowledge_annotations",
+                "herb_details",
+                "formula_details",
+                "meridian_details",
+                "acupoint_details",
+                "syndrome_details",
+                "disease_details",
+                "knowledge_items",
+                "data_transform_row_changes",
+                "data_transform_steps",
+                "data_validation_issues",
+                "data_import_rows",
+                "data_import_batches",
+                "import_run_changes",
+                "import_reports",
+                "import_runs",
+                "ai_drafts",
+                "ai_tasks",
+                "ai_call_logs",
+                "performance_logs",
+                "error_logs",
+            ] {
+                deleted += transaction.execute(&format!("DELETE FROM {table}"), [])? as i64;
+            }
+
+            transaction.execute(
+                "DELETE FROM background_jobs WHERE id != ?1",
+                [job.id],
+            )?;
+            transaction.execute(
+                "DELETE FROM audit_logs WHERE action != 'clear_database_content'",
+                [],
+            )?;
+            transaction.execute(
+                "DELETE FROM sqlite_sequence
+                 WHERE name NOT IN ('schema_migrations', 'validation_rules', 'field_mapping_templates',
+                                    'standard_terms', 'ai_provider_settings', 'ai_prompt_templates',
+                                    'background_jobs', 'audit_logs')",
+                [],
+            )?;
+            transaction.commit()?;
+            Ok::<i64, crate::errors::AppError>(deleted)
+        })?;
+
+        background_job_service::set_progress(database, job.id, 80.0)?;
+        let index = search_index_service::rebuild_search_index(database)?;
+        let report_json = serde_json::json!({
+            "action": "clear_database_content",
+            "deletedRows": deleted_rows,
+            "indexedItemsAfterClear": index.indexed_items,
+            "searchTermsAfterClear": index.search_terms
+        });
+        audit_repository::record(
+            database,
+            "clear_database_content",
+            Some("database"),
+            None,
+            None,
+            Some(&report_json.to_string()),
+        )?;
+        let completed_job =
+            background_job_service::success_with_json(database, job.id, &report_json.to_string())?;
+        Ok(MaintenanceReport {
+            job: completed_job,
+            action: "clear_database_content".to_string(),
+            message: format!(
+                "数据库内容已清空：删除 {deleted_rows} 条业务数据，搜索索引已重置。"
+            ),
+            affected_rows: Some(deleted_rows),
+            output_path: None,
+        })
+    })();
+    finish_or_fail(database, job.id, result)
+}
+
+#[cfg(test)]
+mod clear_database_tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn clear_database_content_removes_knowledge_rows() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        let data_dir = std::env::temp_dir().join(format!("zhongyi-clear-db-{unique}"));
+        let database = Database::initialize(&data_dir).expect("database initializes");
+
+        database
+            .with_connection(|connection| {
+                connection.execute(
+                    "INSERT INTO knowledge_items
+                     (type, code, name, content, data_status, completeness_status, created_at, updated_at)
+                     VALUES ('herb', 'CLEAR-001', '清空测试', '测试内容', 'imported', 'partial', datetime('now'), datetime('now'))",
+                    [],
+                )?;
+                Ok::<(), crate::errors::AppError>(())
+            })
+            .expect("seed item");
+
+        let report = clear_database_content(&database).expect("clear succeeds");
+        assert_eq!(report.action, "clear_database_content");
+
+        let count: i64 = database
+            .with_connection(|connection| {
+                connection
+                    .query_row("SELECT COUNT(1) FROM knowledge_items", [], |row| row.get(0))
+                    .map_err(Into::into)
+            })
+            .expect("count rows");
+        assert_eq!(count, 0);
+
+        let _ = fs::remove_dir_all(data_dir);
+    }
+}

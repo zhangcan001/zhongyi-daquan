@@ -16,7 +16,9 @@ pub struct IndexableKnowledgeItem {
     pub category: Option<String>,
     pub summary: Option<String>,
     pub content: Option<String>,
+    pub source_note: Option<String>,
     pub tags: Option<String>,
+    pub detail: Option<String>,
     pub data_status: String,
     pub is_favorite: i64,
     pub updated_at: String,
@@ -201,14 +203,14 @@ pub fn list_cache(
             (
                 connection.query_row(
                     "SELECT COUNT(1) FROM knowledge_list_view_cache
-                     WHERE type = ?1 AND data_status IN ('validated', 'ready')",
+                     WHERE type = ?1 AND data_status IN ('validated', 'ready', 'imported', 'reviewed', 'pending_review', 'needs_check')",
                     params![item_type],
                     |row| row.get(0),
                 )?,
                 "SELECT item_id, type, code, name, pinyin, category, summary, tags,
                         data_status, relation_count
                  FROM knowledge_list_view_cache
-                 WHERE type = ?1 AND data_status IN ('validated', 'ready')
+                 WHERE type = ?1 AND data_status IN ('validated', 'ready', 'imported', 'reviewed', 'pending_review', 'needs_check')
                  ORDER BY updated_at DESC, item_id DESC
                  LIMIT ?2 OFFSET ?3"
                     .to_string(),
@@ -217,14 +219,14 @@ pub fn list_cache(
             (
                 connection.query_row(
                     "SELECT COUNT(1) FROM knowledge_list_view_cache
-                     WHERE data_status IN ('validated', 'ready')",
+                     WHERE data_status IN ('validated', 'ready', 'imported', 'reviewed', 'pending_review', 'needs_check')",
                     [],
                     |row| row.get(0),
                 )?,
                 "SELECT item_id, type, code, name, pinyin, category, summary, tags,
                         data_status, relation_count
                  FROM knowledge_list_view_cache
-                 WHERE data_status IN ('validated', 'ready')
+                 WHERE data_status IN ('validated', 'ready', 'imported', 'reviewed', 'pending_review', 'needs_check')
                  ORDER BY updated_at DESC, item_id DESC
                  LIMIT ?1 OFFSET ?2"
                     .to_string(),
@@ -415,7 +417,7 @@ fn collect_term_candidates(
          FROM search_terms st
          JOIN knowledge_list_view_cache lc ON lc.item_id = st.item_id
          WHERE lc.type = ?4
-           AND lc.data_status IN ('validated', 'ready')
+           AND lc.data_status IN ('validated', 'ready', 'imported', 'reviewed', 'pending_review', 'needs_check')
            AND (st.term = ?1 OR st.term LIKE ?2 OR st.term LIKE ?3)
          GROUP BY st.item_id
          ORDER BY score DESC
@@ -432,7 +434,7 @@ fn collect_term_candidates(
                 GROUP_CONCAT(DISTINCT st.term_type) AS matched_by
          FROM search_terms st
          JOIN knowledge_list_view_cache lc ON lc.item_id = st.item_id
-         WHERE lc.data_status IN ('validated', 'ready')
+         WHERE lc.data_status IN ('validated', 'ready', 'imported', 'reviewed', 'pending_review', 'needs_check')
            AND (st.term = ?1 OR st.term LIKE ?2 OR st.term LIKE ?3)
          GROUP BY st.item_id
          ORDER BY score DESC
@@ -474,7 +476,7 @@ fn collect_fts_candidates(
          JOIN knowledge_list_view_cache lc ON lc.item_id = f.rowid
          WHERE knowledge_fts MATCH ?1
            AND lc.type = ?2
-           AND lc.data_status IN ('validated', 'ready')
+           AND lc.data_status IN ('validated', 'ready', 'imported', 'reviewed', 'pending_review', 'needs_check')
          ORDER BY bm25(knowledge_fts)
          LIMIT ?3"
     } else {
@@ -482,7 +484,7 @@ fn collect_fts_candidates(
          FROM knowledge_fts f
          JOIN knowledge_list_view_cache lc ON lc.item_id = f.rowid
          WHERE knowledge_fts MATCH ?1
-           AND lc.data_status IN ('validated', 'ready')
+           AND lc.data_status IN ('validated', 'ready', 'imported', 'reviewed', 'pending_review', 'needs_check')
          ORDER BY bm25(knowledge_fts)
          LIMIT ?2"
     };
@@ -518,7 +520,7 @@ fn collect_fts_candidates(
 fn load_indexable_items(connection: &Connection) -> AppResult<Vec<IndexableKnowledgeItem>> {
     let mut statement = connection.prepare(
         "SELECT id, type, code, name, alias, pinyin, category, summary, content,
-                tags, data_status, is_favorite, updated_at
+                source_note, tags, detail, data_status, is_favorite, updated_at
          FROM knowledge_items",
     )?;
     let rows = statement.query_map([], map_indexable_row)?;
@@ -531,7 +533,7 @@ fn load_indexable_items_since(
 ) -> AppResult<Vec<IndexableKnowledgeItem>> {
     let mut statement = connection.prepare(
         "SELECT id, type, code, name, alias, pinyin, category, summary, content,
-                tags, data_status, is_favorite, updated_at
+                source_note, tags, detail, data_status, is_favorite, updated_at
          FROM knowledge_items
          WHERE id >= ?1",
     )?;
@@ -546,7 +548,7 @@ fn load_indexable_item(
     connection
         .query_row(
             "SELECT id, type, code, name, alias, pinyin, category, summary, content,
-                    tags, data_status, is_favorite, updated_at
+                    source_note, tags, detail, data_status, is_favorite, updated_at
              FROM knowledge_items
              WHERE id = ?1",
             params![item_id],
@@ -572,8 +574,8 @@ fn upsert_fts_tx(connection: &Connection, item: &IndexableKnowledgeItem) -> AppR
     )?;
     connection.execute(
         "INSERT INTO knowledge_fts
-         (rowid, name, code, alias, pinyin, category, summary, content, tags)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        (rowid, name, code, alias, pinyin, category, summary, content, source_note, tags, detail_text)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
             item.id,
             item.name,
@@ -583,7 +585,9 @@ fn upsert_fts_tx(connection: &Connection, item: &IndexableKnowledgeItem) -> AppR
             item.category,
             item.summary,
             content,
-            item.tags
+            item.source_note,
+            item.tags,
+            detail_text(item.detail.as_deref())
         ],
     )?;
     Ok(())
@@ -682,10 +686,12 @@ fn map_indexable_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<IndexableKnowl
         category: row.get(6)?,
         summary: row.get(7)?,
         content: row.get(8)?,
-        tags: row.get(9)?,
-        data_status: row.get(10)?,
-        is_favorite: row.get(11)?,
-        updated_at: row.get(12)?,
+        source_note: row.get(9)?,
+        tags: row.get(10)?,
+        detail: row.get(11)?,
+        data_status: row.get(12)?,
+        is_favorite: row.get(13)?,
+        updated_at: row.get(14)?,
     })
 }
 
@@ -797,8 +803,17 @@ pub fn build_terms_from_item(item: &IndexableKnowledgeItem) -> Vec<SearchTerm> {
         "category",
         55,
     );
+    push_optional(
+        &mut terms,
+        &mut seen,
+        item.source_note.as_deref(),
+        "source_note",
+        60,
+    );
     push_split_terms(&mut terms, &mut seen, item.alias.as_deref(), "alias", 85);
     push_split_terms(&mut terms, &mut seen, item.tags.as_deref(), "tags", 45);
+    let detail_search = detail_text(item.detail.as_deref());
+    push_split_terms(&mut terms, &mut seen, Some(&detail_search), "detail", 35);
     push_known_normalized_terms(&mut terms, &mut seen, item);
     terms
 }
@@ -866,7 +881,9 @@ fn push_known_normalized_terms(
         item.alias.as_deref().unwrap_or_default(),
         item.pinyin.as_deref().unwrap_or_default(),
         item.category.as_deref().unwrap_or_default(),
+        item.source_note.as_deref().unwrap_or_default(),
         item.tags.as_deref().unwrap_or_default(),
+        item.detail.as_deref().unwrap_or_default(),
     ]
     .join(" ");
 
@@ -889,6 +906,28 @@ fn push_known_normalized_terms(
         if normalized.contains(&normalized_term) {
             push_term(terms, seen, term, term_type, weight);
         }
+    }
+}
+
+fn detail_text(value: Option<&str>) -> String {
+    let Some(value) = value else {
+        return String::new();
+    };
+    let parsed = serde_json::from_str::<serde_json::Value>(value);
+    match parsed {
+        Ok(value) => flatten_json_strings(&value).join(" "),
+        Err(_) => value.to_string(),
+    }
+}
+
+fn flatten_json_strings(value: &serde_json::Value) -> Vec<String> {
+    match value {
+        serde_json::Value::String(text) if !text.trim().is_empty() => vec![text.trim().to_string()],
+        serde_json::Value::Number(number) => vec![number.to_string()],
+        serde_json::Value::Bool(value) => vec![value.to_string()],
+        serde_json::Value::Array(values) => values.iter().flat_map(flatten_json_strings).collect(),
+        serde_json::Value::Object(map) => map.values().flat_map(flatten_json_strings).collect(),
+        _ => Vec::new(),
     }
 }
 

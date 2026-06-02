@@ -26,11 +26,22 @@ pub fn list(
         }
         if let Some(query) = clean_opt(request.query.as_deref()) {
             filters.push(
-                "(name LIKE ? OR code LIKE ? OR alias LIKE ? OR pinyin LIKE ? OR tags LIKE ?)"
+                "(name LIKE ? OR code LIKE ? OR alias LIKE ? OR pinyin LIKE ? OR category LIKE ? OR summary LIKE ? OR content LIKE ? OR source_note LIKE ? OR tags LIKE ? OR detail LIKE ?)"
                     .to_string(),
             );
             let like = format!("%{query}%");
-            values.extend([like.clone(), like.clone(), like.clone(), like.clone(), like]);
+            values.extend([
+                like.clone(),
+                like.clone(),
+                like.clone(),
+                like.clone(),
+                like.clone(),
+                like.clone(),
+                like.clone(),
+                like.clone(),
+                like.clone(),
+                like,
+            ]);
         }
 
         let where_sql = if filters.is_empty() {
@@ -48,7 +59,7 @@ pub fn list(
         let list_sql = format!(
             "SELECT id, type, code, name, alias, pinyin, category, summary, content,
                     source_note, tags, data_status, completeness_status, content_version,
-                    is_favorite, created_at, updated_at
+                    is_favorite, detail, import_batch_id, source_package, created_at, updated_at
              FROM knowledge_items{where_sql}
              ORDER BY updated_at DESC, id DESC
              LIMIT ? OFFSET ?"
@@ -68,7 +79,7 @@ pub fn get_by_id(connection: &Connection, item_id: i64) -> AppResult<Option<Know
         .query_row(
             "SELECT id, type, code, name, alias, pinyin, category, summary, content,
                     source_note, tags, data_status, completeness_status, content_version,
-                    is_favorite, created_at, updated_at
+                    is_favorite, detail, import_batch_id, source_package, created_at, updated_at
              FROM knowledge_items
              WHERE id = ?1",
             params![item_id],
@@ -82,8 +93,8 @@ pub fn insert_tx(connection: &Connection, input: &KnowledgeInput) -> AppResult<i
     connection.execute(
         "INSERT INTO knowledge_items
          (type, code, name, alias, pinyin, category, summary, content, source_note, tags,
-          data_status, completeness_status, content_version, is_favorite, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 1, ?13, datetime('now'), datetime('now'))",
+          data_status, completeness_status, content_version, is_favorite, detail, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 1, ?13, ?14, datetime('now'), datetime('now'))",
         params![
             input.item_type,
             empty_to_none(input.code.as_deref()),
@@ -97,7 +108,8 @@ pub fn insert_tx(connection: &Connection, input: &KnowledgeInput) -> AppResult<i
             empty_to_none(input.tags.as_deref()),
             input.data_status,
             input.completeness_status,
-            i64::from(input.is_favorite)
+            i64::from(input.is_favorite),
+            normalize_detail_json(&input.detail)
         ],
     )?;
     Ok(connection.last_insert_rowid())
@@ -119,9 +131,10 @@ pub fn update_tx(connection: &Connection, item_id: i64, input: &KnowledgeInput) 
              data_status = ?11,
              completeness_status = ?12,
              is_favorite = ?13,
+             detail = ?14,
              content_version = content_version + 1,
              updated_at = datetime('now')
-         WHERE id = ?14",
+         WHERE id = ?15",
         params![
             input.item_type,
             empty_to_none(input.code.as_deref()),
@@ -136,6 +149,7 @@ pub fn update_tx(connection: &Connection, item_id: i64, input: &KnowledgeInput) 
             input.data_status,
             input.completeness_status,
             i64::from(input.is_favorite),
+            normalize_detail_json(&input.detail),
             item_id
         ],
     )?;
@@ -177,8 +191,13 @@ fn map_item_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<KnowledgeItem> {
         completeness_status: row.get(12)?,
         content_version: row.get(13)?,
         is_favorite: row.get::<_, i64>(14)? == 1,
-        created_at: row.get(15)?,
-        updated_at: row.get(16)?,
+        detail: row
+            .get::<_, Option<String>>(15)?
+            .and_then(|text| serde_json::from_str(&text).ok()),
+        import_batch_id: row.get(16)?,
+        source_package: row.get(17)?,
+        created_at: row.get(18)?,
+        updated_at: row.get(19)?,
     })
 }
 
@@ -202,6 +221,19 @@ fn empty_to_none(value: Option<&str>) -> Option<&str> {
             Some(trimmed)
         }
     })
+}
+
+fn normalize_detail_json(detail: &serde_json::Value) -> String {
+    match detail {
+        serde_json::Value::Object(_) => detail.to_string(),
+        serde_json::Value::String(text) => serde_json::from_str::<serde_json::Value>(text)
+            .map(|value| value.to_string())
+            .unwrap_or_else(|_| {
+                serde_json::json!({ "raw_detail": text, "parse_error": true }).to_string()
+            }),
+        serde_json::Value::Null => "{}".to_string(),
+        other => other.to_string(),
+    }
 }
 
 /// 从版本快照恢复知识条目（用于版本回滚）

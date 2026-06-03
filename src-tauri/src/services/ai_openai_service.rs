@@ -70,10 +70,19 @@ pub fn run_task(database: &Database, request: AiTaskRequest) -> AppResult<AiComm
     let task_type = request.task_type.trim();
     let question = extract_question(&request);
     let context = build_context(database, &settings, &question, request.related_item_id)?;
+    let mut warnings = Vec::new();
     let web_sources = if settings.only_use_local_context {
         Vec::new()
     } else {
-        web_search(&question, settings.timeout_seconds)?
+        match web_search(&question, settings.timeout_seconds) {
+            Ok(sources) => sources,
+            Err(error) => {
+                warnings.push(format!(
+                    "联网检索失败，已自动降级为本地知识库回答：{error}"
+                ));
+                Vec::new()
+            }
+        }
     };
     let mut citations = context
         .iter()
@@ -104,7 +113,14 @@ pub fn run_task(database: &Database, request: AiTaskRequest) -> AppResult<AiComm
         Some(answer.clone()),
         citations,
         context,
-        task_warnings(task_type, settings.only_use_local_context, &web_sources),
+        {
+            warnings.extend(task_warnings(
+                task_type,
+                settings.only_use_local_context,
+                &web_sources,
+            ));
+            warnings
+        },
     ))
 }
 

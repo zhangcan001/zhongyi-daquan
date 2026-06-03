@@ -115,7 +115,7 @@ export function AiSettingsPanel() {
   }
 
   return (
-    <section className="section-band ai-settings">
+    <section className="section-band ai-settings dashboard-ai">
       <div className="section-heading">
         <div>
           <h2>AI 设置</h2>
@@ -125,6 +125,44 @@ export function AiSettingsPanel() {
           {form.enabled ? "已启用" : "默认关闭"}
         </span>
       </div>
+
+      <section className="ai-assistant-box">
+        <h3>AI 知识库助手</h3>
+        <div className="inline-action-row">
+          <input
+            value={assistantQuestion}
+            onChange={(event) => setAssistantQuestion(event.target.value)}
+            placeholder="输入资料问题，例如：桂枝汤组成是什么？"
+          />
+          <button type="button" onClick={askAssistant} disabled={isAsking || !assistantQuestion.trim()}>
+            {isAsking ? "生成中" : "提问"}
+          </button>
+        </div>
+        {assistantAnswer?.answer ? <div className="reader-content">{assistantAnswer.answer}</div> : null}
+        {assistantAnswer?.warnings?.length ? (
+          <div className="formula-field">
+            <strong>运行提示</strong>
+            <ul>
+              {assistantAnswer.warnings.map((warning, index) => (
+                <li key={`${warning}-${index}`}>{warning}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {assistantAnswer?.citations?.length ? (
+          <div className="formula-field">
+            <strong>引用来源</strong>
+            <ul>
+              {assistantAnswer.citations.map((citation, index) => (
+                <li key={`${citation.title ?? ""}-${citation.note ?? ""}-${index}`}>
+                  {[citation.title, citation.note].filter(Boolean).join("｜") || "未记录来源"}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </section>
+
       <div className="ai-form-grid">
         <label>
           启用 AI
@@ -268,33 +306,6 @@ export function AiSettingsPanel() {
 
       {error ? <p className="error-text">{error}</p> : null}
       <p className="ai-message">{message}</p>
-
-      <section className="ai-assistant-box">
-        <h3>AI 知识库助手</h3>
-        <div className="inline-action-row">
-          <input
-            value={assistantQuestion}
-            onChange={(event) => setAssistantQuestion(event.target.value)}
-            placeholder="输入资料问题，例如：桂枝汤组成是什么？"
-          />
-          <button type="button" onClick={askAssistant} disabled={isAsking || !assistantQuestion.trim()}>
-            {isAsking ? "生成中" : "提问"}
-          </button>
-        </div>
-        {assistantAnswer?.answer ? <div className="reader-content">{assistantAnswer.answer}</div> : null}
-        {assistantAnswer?.citations?.length ? (
-          <div className="formula-field">
-            <strong>引用来源</strong>
-            <ul>
-              {assistantAnswer.citations.map((citation, index) => (
-                <li key={`${citation.title ?? ""}-${citation.note ?? ""}-${index}`}>
-                  {[citation.title, citation.note].filter(Boolean).join("｜") || "未记录来源"}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-      </section>
     </section>
   );
 }

@@ -81,6 +81,7 @@ export function DashboardPage({ status, error, activeView, onNavigate }: Dashboa
 
       {activeView === "dashboard" ? (
         <>
+          <AiSettingsPanel />
           <SearchPanel />
 
           <section className="section-band">
@@ -166,7 +167,6 @@ export function DashboardPage({ status, error, activeView, onNavigate }: Dashboa
 
           <RelationReviewPanel />
           <TaskCenterPanel />
-          <AiSettingsPanel />
         </>
       ) : null}
     </>

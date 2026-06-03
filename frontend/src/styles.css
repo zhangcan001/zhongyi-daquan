@@ -401,6 +401,10 @@ dd {
   margin-top: 16px;
 }
 
+.dashboard-ai {
+  margin-top: 0;
+}
+
 .ai-form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -1434,6 +1438,46 @@ mark {
 .formula-card-title,
 .ai-assistant-box {
   border-color: var(--line);
+}
+
+.dashboard-ai {
+  border-color: rgba(215, 255, 53, 0.58);
+  background:
+    linear-gradient(135deg, rgba(0, 229, 255, 0.18), rgba(255, 61, 242, 0.08) 46%, rgba(7, 12, 25, 0.96)),
+    var(--surface);
+  box-shadow: var(--shadow-panel), 0 0 34px rgba(0, 229, 255, 0.18);
+}
+
+.dashboard-ai .section-heading {
+  align-items: center;
+}
+
+.dashboard-ai .ai-assistant-box {
+  margin-top: 16px;
+  border: 1px solid rgba(0, 229, 255, 0.36);
+  border-radius: 8px;
+  background: rgba(3, 8, 18, 0.74);
+  padding: 16px;
+  box-shadow: inset 0 0 24px rgba(0, 229, 255, 0.08);
+}
+
+.dashboard-ai .ai-assistant-box h3 {
+  color: var(--accent);
+  text-shadow: 0 0 14px rgba(215, 255, 53, 0.28);
+}
+
+.dashboard-ai .inline-action-row input {
+  min-height: 54px;
+  border-color: rgba(215, 255, 53, 0.42);
+  font-size: 17px;
+}
+
+.dashboard-ai .inline-action-row button {
+  min-width: 96px;
+  border-color: var(--accent);
+  background: linear-gradient(135deg, var(--accent), var(--primary));
+  color: #020611;
+  font-weight: 800;
 }
 
 .reader-summary {

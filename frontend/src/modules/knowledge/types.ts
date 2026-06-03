@@ -158,8 +158,11 @@ export type GridSaveResponse = {
 export const knowledgeTypeOptions: Array<{ value: KnowledgeType; label: string }> = [
   { value: "herb", label: "中药" },
   { value: "formula", label: "方剂" },
+  { value: "acupoint", label: "穴位" },
+  { value: "meridian", label: "经络" },
   { value: "acupuncture", label: "针灸" },
   { value: "syndrome", label: "辨证" },
+  { value: "disease", label: "病症" },
   { value: "theory", label: "理论" },
   { value: "note", label: "笔记" },
 ];

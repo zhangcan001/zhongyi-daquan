@@ -3,7 +3,7 @@ import { searchKnowledgeEnhanced } from "../modules/knowledge/api";
 import { KnowledgeDetailReader } from "../modules/knowledge/KnowledgeDetailReader";
 import type { EnhancedSearchResponse, EnhancedSearchResult } from "../modules/knowledge/types";
 
-const filters = ["全部", "中药", "方剂", "针灸", "原典", "注解"];
+const filters = ["全部", "中药", "方剂", "穴位", "经络", "针灸", "原典", "注解"];
 const quickSearches = ["人参", "甘草", "黄耆", "黄芪", "倪注", "桂枝汤", "太阳病", "上古天真论", "足三里", "理中丸"];
 
 export function SearchPanel() {

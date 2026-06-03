@@ -468,6 +468,8 @@ fn filter_allows(filter: &str, result: &EnhancedSearchResult) -> bool {
         "全部" | "" => true,
         "中药" => result.item_type == "herb" || result.group_name == "中药",
         "方剂" => result.item_type == "formula" || result.group_name == "方剂",
+        "穴位" => result.item_type == "acupoint" || result.group_name == "穴位",
+        "经络" => result.item_type == "meridian" || result.group_name == "经络",
         "针灸" => {
             matches!(
                 result.item_type.as_str(),

@@ -37,6 +37,29 @@ AI 知识库助手支持在本地资料范围内展示经方和方剂信息：
 - 不提供针灸操作指导。
 - 本地资料没有组成时，会明确显示“本地资料中未检索到完整组成”，不会编造。
 
+## AI API 配置
+
+`v0.2-ai-alpha` 支持 OpenAI-compatible API 调用，默认关闭。
+
+配置方式：
+
+- 在 AI 设置页开启 AI。
+- Provider Type 选择 `openai_compatible`。
+- 填写 Base URL、Model Name 和 API Key。
+- API Key 输入框为密码框，默认不显示明文，可手动显示/隐藏。
+- 读取设置时不会回显 API Key，只显示是否已配置。
+- 不填写新 API Key 保存配置时，不覆盖旧 Key。
+- 可点击“清除 API Key”删除本地保存的 Key。
+- 点击“测试连接”只发送最小测试消息，不发送知识库内容。
+
+隐私与存储：
+
+- 当前版本 API Key 采用过渡方案，仅保存在本机 SQLite 的 `api_key_encrypted` 字段。
+- 不提交 `.env`，不上传 API Key，不在日志或错误信息中打印 Key。
+- 后续计划升级为 Windows 系统凭据管理器或加密存储。
+- AI 只会在用户主动点击 AI 功能时发送当前问题和本地检索到的相关片段。
+- 不上传整个数据库、原始 PDF 或私人数据包。
+
 ## v0.1-alpha
 
 当前 `v0.1-alpha` 已完成源码构建、开发启动和 Windows 安装包验证。

@@ -10,6 +10,11 @@ impl PromptTemplateService {
             status: "disabled".to_string(),
             task_id: None,
             message: AI_DISABLED_MESSAGE.to_string(),
+            answer: None,
+            citations: Vec::new(),
+            used_context_items: Vec::new(),
+            warnings: Vec::new(),
+            safety_notice: None,
         })
     }
 }

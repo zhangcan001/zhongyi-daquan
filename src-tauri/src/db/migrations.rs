@@ -58,6 +58,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "ux_polish_v012",
         sql: include_str!("../../migrations/010_ux_polish_v012.sql"),
     },
+    Migration {
+        version: 11,
+        name: "ai_openai_compatible_v020",
+        sql: include_str!("../../migrations/011_ai_openai_compatible_v020.sql"),
+    },
 ];
 
 pub fn run(connection: &Connection) -> AppResult<()> {

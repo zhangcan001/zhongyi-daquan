@@ -4,11 +4,12 @@ import {
   deleteUserNote,
   getKnowledgeDetail,
   recordRecentView,
+  runAiTask,
   saveUserNote,
   toggleFavorite,
 } from "./api";
 import { detailFields } from "./schema";
-import type { FormulaAiAnswer, FormulaCard } from "../ai/types";
+import type { AiCommandResponse, FormulaAiAnswer, FormulaCard } from "../ai/types";
 import type { KnowledgeAnnotation, KnowledgeDetailResponse, KnowledgeType, UserNote } from "./types";
 
 type Props = {
@@ -35,6 +36,7 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
   const [message, setMessage] = useState("");
   const [noteText, setNoteText] = useState("");
   const [aiAnswer, setAiAnswer] = useState<FormulaAiAnswer | null>(null);
+  const [genericAiAnswer, setGenericAiAnswer] = useState<AiCommandResponse | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
 
   useEffect(() => {
@@ -47,6 +49,7 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
         setDetail(response);
         setNoteText(response.notes[0]?.noteText ?? "");
         setAiAnswer(null);
+        setGenericAiAnswer(null);
         return recordRecentView(itemId);
       })
       .catch((error) => setMessage(String(error)));
@@ -141,6 +144,24 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
       .finally(() => setIsAiLoading(false));
   }
 
+  function draftStudyNote() {
+    if (!item.id) return;
+    setIsAiLoading(true);
+    setMessage("");
+    setGenericAiAnswer(null);
+    runAiTask({
+      taskType: "draft_study_note",
+      inputJson: JSON.stringify({ question: `请基于本地资料为「${item.name}」生成学习笔记草稿。` }),
+      relatedItemId: item.id,
+    })
+      .then((response) => {
+        setGenericAiAnswer(response);
+        setMessage(response.message);
+      })
+      .catch((error) => setMessage(String(error)))
+      .finally(() => setIsAiLoading(false));
+  }
+
   const isFormula = item.itemType === "formula";
 
   return (
@@ -199,6 +220,9 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
               >
                 AI 对比相关注解
               </button>
+              <button type="button" disabled={isAiLoading} onClick={draftStudyNote}>
+                生成学习笔记草稿
+              </button>
             </>
           ) : (
             <>
@@ -216,11 +240,20 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
               >
                 方剂组成一并列出
               </button>
+              <button type="button" disabled={isAiLoading} onClick={draftStudyNote}>
+                生成学习笔记草稿
+              </button>
             </>
           )}
         </div>
         {isAiLoading ? <p className="empty-text">正在检索本地方剂资料...</p> : null}
         {aiAnswer ? <FormulaAiResult answer={aiAnswer} /> : null}
+        {genericAiAnswer?.answer ? (
+          <div className="ai-formula-result">
+            <div className="reader-content">{genericAiAnswer.answer}</div>
+            {genericAiAnswer.safetyNotice ? <p className="safety-note">{genericAiAnswer.safetyNotice}</p> : null}
+          </div>
+        ) : null}
       </section>
 
       <section className="reader-section">

@@ -25,6 +25,15 @@ cargo test --manifest-path src-tauri/Cargo.toml
   - 用户问“太阳病可以参考哪些方？”时，先检索条文/证候，再返回候选方并尽量列出组成。
   - 用户要求“直接告诉我每味多少克吃几天”时，只展示本地资料原文剂量和比例，不给个人服用剂量和疗程。
   - 本地资料没有组成时，显示“本地资料中未检索到完整组成”，不编造。
+- v0.2-ai-alpha API Key 与真实调用：
+  - `get_ai_settings` 不返回 API Key 明文。
+  - 保存 API Key 后 `has_api_key = true`。
+  - 清除 API Key 后 `has_api_key = false`。
+  - `test_ai_connection` 未启用或未配置 Key 时返回友好提示，不调用网络。
+  - `provider = disabled` 时 `run_ai_task` 不调用网络。
+  - RAG context 按 `max_context_chars` 截断。
+  - 本地检索片段和来源会进入 prompt context。
+  - API 错误不包含 API Key 明文。
 - Import Engine V2：
   - `knowledge_items_v1` 检测。
   - `classic_passages_v1` 检测。
@@ -169,6 +178,8 @@ npm --prefix frontend run build
 - 可接受关系建议并写入正式关系。
 - 备份恢复后搜索仍可用。
 - AI 设置页面存在，默认关闭。
+- AI 设置页支持 OpenAI-compatible API 配置、API Key 密码输入、显示/隐藏、测试连接和清除 Key。
+- AI 设置页说明：只在主动点击 AI 功能时发送当前问题和本地检索片段，不上传整库、原始 PDF 或私人数据包。
 - 方剂详情页提供“AI 解释此方”“AI 提取原方组成”“AI 总结方义”“AI 对比相关注解”。
 - 非方剂详情页提供“相关方剂候选”和“方剂组成一并列出”。
 - AI 方剂卡片展示方剂名、原方组成、药材比例、原文煎服法、适用条文/证候、注解摘要和来源。

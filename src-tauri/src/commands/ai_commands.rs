@@ -4,6 +4,7 @@ use crate::models::ai::{
     SaveAiProviderSettingsRequest,
 };
 use crate::services::ai_formula_service::{self, FormulaAiAnswer, FormulaAiRequest};
+use crate::services::ai_openai_service;
 use crate::services::ai_placeholder_service::{self, AiPlaceholderService};
 use crate::services::ai_provider_service::AiProviderService;
 use crate::AppState;
@@ -30,13 +31,34 @@ pub fn save_ai_provider_settings(
 }
 
 #[tauri::command]
-pub fn test_ai_connection() -> AppResult<AiCommandResponse> {
-    AiPlaceholderService::test_connection()
+pub fn clear_ai_api_key(state: State<'_, AppState>) -> AppResult<AiProviderSettingsResponse> {
+    AiProviderService::clear_api_key(&state.database)
 }
 
 #[tauri::command]
-pub fn run_ai_task(request: AiTaskRequest) -> AppResult<AiCommandResponse> {
-    AiPlaceholderService::run_task(request)
+pub fn get_ai_settings(state: State<'_, AppState>) -> AppResult<AiProviderSettingsResponse> {
+    AiProviderService::get_settings(&state.database)
+}
+
+#[tauri::command]
+pub fn save_ai_settings(
+    state: State<'_, AppState>,
+    settings: SaveAiProviderSettingsRequest,
+) -> AppResult<AiProviderSettingsResponse> {
+    AiProviderService::save_settings(&state.database, settings)
+}
+
+#[tauri::command]
+pub fn test_ai_connection(state: State<'_, AppState>) -> AppResult<AiCommandResponse> {
+    ai_openai_service::test_connection(&state.database)
+}
+
+#[tauri::command]
+pub fn run_ai_task(
+    state: State<'_, AppState>,
+    request: AiTaskRequest,
+) -> AppResult<AiCommandResponse> {
+    ai_openai_service::run_task(&state.database, request)
 }
 
 #[tauri::command]
@@ -68,11 +90,12 @@ mod tests {
         assert!(!placeholder.enabled);
         assert_eq!(placeholder.message, AI_DISABLED_MESSAGE);
 
-        let connection = test_ai_connection().expect("test connection placeholder");
+        let connection =
+            AiPlaceholderService::test_connection().expect("test connection placeholder");
         assert!(!connection.enabled);
         assert!(connection.message.contains("未启用"));
 
-        let task = run_ai_task(AiTaskRequest {
+        let task = AiPlaceholderService::run_task(AiTaskRequest {
             task_type: "normalize".to_string(),
             input_json: Some("{\"name\":\"黄芪\"}".to_string()),
             related_batch_id: None,

@@ -4,9 +4,14 @@ export type AiProviderSettings = {
   providerName?: string | null;
   baseUrl?: string | null;
   modelName?: string | null;
+  hasApiKey: boolean;
   timeoutSeconds?: number | null;
   maxTokens?: number | null;
   temperature?: number | null;
+  maxContextItems?: number | null;
+  maxContextChars?: number | null;
+  onlyUseLocalContext: boolean;
+  safetyMode: string;
   enabled: boolean;
   createdAt?: string | null;
   updatedAt?: string | null;
@@ -21,10 +26,16 @@ export type SaveAiProviderSettingsRequest = {
   providerType: string;
   providerName?: string | null;
   baseUrl?: string | null;
+  apiKey?: string | null;
   modelName?: string | null;
   timeoutSeconds?: number | null;
   maxTokens?: number | null;
   temperature?: number | null;
+  maxContextItems?: number | null;
+  maxContextChars?: number | null;
+  onlyUseLocalContext?: boolean | null;
+  safetyMode?: string | null;
+  enabled?: boolean | null;
 };
 
 export type AiCommandResponse = {
@@ -32,6 +43,21 @@ export type AiCommandResponse = {
   status: string;
   taskId?: number | null;
   message: string;
+  answer?: string | null;
+  citations?: Array<{
+    title?: string | null;
+    note?: string | null;
+  }>;
+  usedContextItems?: Array<{
+    itemId: number;
+    itemType: string;
+    name: string;
+    sourceTitle?: string | null;
+    sourceNote?: string | null;
+    snippet: string;
+  }>;
+  warnings?: string[];
+  safetyNotice?: string | null;
 };
 
 export type FormulaSource = {

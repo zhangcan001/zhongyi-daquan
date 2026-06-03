@@ -10,9 +10,14 @@ pub struct AiProviderSettings {
     pub provider_name: Option<String>,
     pub base_url: Option<String>,
     pub model_name: Option<String>,
+    pub has_api_key: bool,
     pub timeout_seconds: Option<i64>,
     pub max_tokens: Option<i64>,
     pub temperature: Option<f64>,
+    pub max_context_items: Option<i64>,
+    pub max_context_chars: Option<i64>,
+    pub only_use_local_context: bool,
+    pub safety_mode: String,
     pub enabled: bool,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
@@ -26,9 +31,14 @@ impl Default for AiProviderSettings {
             provider_name: None,
             base_url: None,
             model_name: None,
+            has_api_key: false,
             timeout_seconds: Some(30),
             max_tokens: Some(1024),
             temperature: Some(0.2),
+            max_context_items: Some(6),
+            max_context_chars: Some(6000),
+            only_use_local_context: true,
+            safety_mode: "strict".to_string(),
             enabled: false,
             created_at: None,
             updated_at: None,
@@ -42,10 +52,16 @@ pub struct SaveAiProviderSettingsRequest {
     pub provider_type: String,
     pub provider_name: Option<String>,
     pub base_url: Option<String>,
+    pub api_key: Option<String>,
     pub model_name: Option<String>,
     pub timeout_seconds: Option<i64>,
     pub max_tokens: Option<i64>,
     pub temperature: Option<f64>,
+    pub max_context_items: Option<i64>,
+    pub max_context_chars: Option<i64>,
+    pub only_use_local_context: Option<bool>,
+    pub safety_mode: Option<String>,
+    pub enabled: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -72,6 +88,34 @@ pub struct AiCommandResponse {
     pub status: String,
     pub task_id: Option<i64>,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub answer: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub citations: Vec<AiCitation>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub used_context_items: Vec<AiContextItem>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub safety_notice: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiCitation {
+    pub title: Option<String>,
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiContextItem {
+    pub item_id: i64,
+    pub item_type: String,
+    pub name: String,
+    pub source_title: Option<String>,
+    pub source_note: Option<String>,
+    pub snippet: String,
 }
 
 #[derive(Debug, Serialize)]

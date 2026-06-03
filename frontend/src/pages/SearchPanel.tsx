@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { searchKnowledgeEnhanced } from "../modules/knowledge/api";
 import { KnowledgeDetailReader } from "../modules/knowledge/KnowledgeDetailReader";
-import { herbNatureClass, parseNatureText } from "../modules/knowledge/natureColor";
+import { herbNatureClass, meridianElementClass, meridianElementFromSearch, parseNatureText } from "../modules/knowledge/natureColor";
 import type { EnhancedSearchResponse, EnhancedSearchResult } from "../modules/knowledge/types";
 
 const filters = ["全部", "中药", "方剂", "穴位", "经络", "针灸", "原典", "注解"];
@@ -153,13 +153,15 @@ function SearchCard({
 }) {
   const source = [item.sourceTitle, item.sourceNote].filter(Boolean).join(" | ");
   const nature = item.itemType === "herb" ? parseNatureText(item.fourQi ?? "") : null;
+  const element = meridianElementFromSearch(item);
   return (
     <button className={active ? "result-card active" : "result-card"} type="button" onClick={onOpen}>
       <span className="result-title-row">
-        <strong className={herbNatureClass(nature)}>{highlight(item.name, query)}</strong>
+        <strong className={herbNatureClass(nature) ?? meridianElementClass(element)}>{highlight(item.name, query)}</strong>
         <span className="result-badges">
           <em>{item.typeLabel}</em>
           {nature ? <em className={`nature-chip herb-nature-${nature.tone}`}>{nature.label}</em> : null}
+          {element ? <em className={`element-chip meridian-element-${element.tone}`}>{element.organ} / {element.label}</em> : null}
         </span>
       </span>
       <span>{[item.category, item.code].filter(Boolean).join(" / ") || "未记录分类"}</span>

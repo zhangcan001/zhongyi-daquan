@@ -2360,6 +2360,11 @@ h3 {
   transition: color 140ms ease, text-shadow 140ms ease;
 }
 
+.meridian-element-name {
+  font-weight: 800;
+  transition: color 140ms ease, text-shadow 140ms ease;
+}
+
 .herb-nature-deep-cold {
   color: #355cff;
 }
@@ -2392,6 +2397,26 @@ h3 {
   color: #d30f2d;
 }
 
+.meridian-element-wood {
+  color: #58d878;
+}
+
+.meridian-element-fire {
+  color: #ff4d57;
+}
+
+.meridian-element-earth {
+  color: #d9b451;
+}
+
+.meridian-element-metal {
+  color: #f3f5f8;
+}
+
+.meridian-element-water {
+  color: #58a6ff;
+}
+
 .result-badges {
   display: inline-flex;
   flex: 0 0 auto;
@@ -2401,6 +2426,18 @@ h3 {
 }
 
 .nature-chip {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: rgba(247, 251, 255, 0.08);
+  padding: 3px 8px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.element-chip {
   border: 1px solid currentColor;
   border-radius: 999px;
   background: rgba(247, 251, 255, 0.08);
@@ -2442,6 +2479,26 @@ h3 {
 
 .nature-chip.herb-nature-deep-hot {
   background: rgba(211, 15, 45, 0.16);
+}
+
+.element-chip.meridian-element-wood {
+  background: rgba(88, 216, 120, 0.13);
+}
+
+.element-chip.meridian-element-fire {
+  background: rgba(255, 77, 87, 0.14);
+}
+
+.element-chip.meridian-element-earth {
+  background: rgba(217, 180, 81, 0.14);
+}
+
+.element-chip.meridian-element-metal {
+  background: rgba(243, 245, 248, 0.1);
+}
+
+.element-chip.meridian-element-water {
+  background: rgba(88, 166, 255, 0.14);
 }
 
 @media (max-width: 760px) {

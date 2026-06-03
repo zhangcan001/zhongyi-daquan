@@ -9,7 +9,7 @@ import {
   toggleFavorite,
 } from "./api";
 import { detailFields } from "./schema";
-import { herbNatureClass, herbNatureFromDetail } from "./natureColor";
+import { herbNatureClass, herbNatureFromDetail, meridianElementClass, meridianElementFromDetail } from "./natureColor";
 import type { AiCommandResponse, FormulaAiAnswer, FormulaCard } from "../ai/types";
 import type { KnowledgeAnnotation, KnowledgeDetailResponse, KnowledgeType, UserNote } from "./types";
 
@@ -79,6 +79,7 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
   const notes = detail.notes ?? [];
   const sourceLine = [item.sourcePackage, item.sourceNote].filter(Boolean).join(" | ");
   const nature = herbNatureFromDetail(detail.detail);
+  const element = meridianElementFromDetail(item.itemType, item.name, item.category, detail.detail);
 
   async function copyCurrent() {
     const text = [
@@ -170,11 +171,12 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
       <div className="reader-title-row">
         <div>
           <span className="type-badge">{typeTitles[item.itemType] ?? item.itemType}</span>
-          <h2 className={herbNatureClass(nature)}>{highlight(item.name, query)}</h2>
+          <h2 className={herbNatureClass(nature) ?? meridianElementClass(element)}>{highlight(item.name, query)}</h2>
           <p>{[item.category, item.alias ? `别名：${item.alias}` : "", item.pinyin].filter(Boolean).join(" / ")}</p>
         </div>
         <div className="reader-actions">
           {nature ? <span className={`nature-chip herb-nature-${nature.tone}`}>{nature.label}</span> : null}
+          {element ? <span className={`element-chip meridian-element-${element.tone}`}>{element.organ} / {element.label}</span> : null}
           {onBack ? (
             <button type="button" onClick={onBack}>
               返回

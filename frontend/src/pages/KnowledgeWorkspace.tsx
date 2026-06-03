@@ -8,7 +8,7 @@ import {
   updateKnowledgeItem,
 } from "../modules/knowledge/api";
 import { KnowledgeDetailReader } from "../modules/knowledge/KnowledgeDetailReader";
-import { herbNatureClass, herbNatureFromItem } from "../modules/knowledge/natureColor";
+import { herbNatureClass, herbNatureFromItem, meridianElementClass, meridianElementFromItem } from "../modules/knowledge/natureColor";
 import { detailFields, emptyKnowledgeInput } from "../modules/knowledge/schema";
 import {
   completenessOptions,
@@ -400,14 +400,16 @@ function KnowledgeListRow({
   onOpen: () => void;
 }) {
   const nature = herbNatureFromItem(item);
+  const element = meridianElementFromItem(item);
   return (
     <button className={active ? "knowledge-row active" : "knowledge-row"} type="button" onClick={onOpen}>
       <span>
-        <strong className={herbNatureClass(nature)}>{item.name}</strong>
+        <strong className={herbNatureClass(nature) ?? meridianElementClass(element)}>{item.name}</strong>
         <small>{[item.code, item.category, item.sourceNote].filter(Boolean).join(" / ") || "未填写编号"}</small>
       </span>
       <span className="row-meta">
         {nature ? <em className={`nature-chip herb-nature-${nature.tone}`}>{nature.label}</em> : null}
+        {element ? <em className={`element-chip meridian-element-${element.tone}`}>{element.organ} / {element.label}</em> : null}
         {item.isFavorite ? "收藏" : ""}
         {item.dataStatus}
       </span>

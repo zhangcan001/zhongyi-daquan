@@ -18,6 +18,17 @@ CLASSIC_BOOK_IDS = {"renji_shanghanlun", "renji_jingui_yaolue"}
 VERTICAL_HEADER_CHARS = list("觀其脈證知犯何逆隨證治之")
 VERTICAL_HEADER_SET = set(VERTICAL_HEADER_CHARS)
 REPORT_PATH = pathlib.Path("reports/classic_fragmented_text_report.json")
+PDF_BACKUP_MARKER = "【原PDF对应页完整文本校对备份】"
+PDF_LAYOUT_NOISE_PATTERNS = [
+    re.compile(r"^倪海厦注(?:《?(?:金匮|伤寒论|神农本草经)》?)?$"),
+    re.compile(r"^倪注(?:金匮|伤寒论|神农本草经)?$"),
+    re.compile(r"^(?:勤求古訓|勤求古训)\s*(?:博采眾方|博采众方)?$"),
+    re.compile(r"^(?:博采眾方|博采众方)$"),
+    re.compile(r"^小桂枝[·.．、-]?群龙无首.*(?:校排)?$"),
+    re.compile(r"^[\d.。．]+校排$"),
+    re.compile(r"^校排$"),
+    re.compile(r"^【PDF页码\d+】$"),
+]
 
 
 def default_db_path() -> pathlib.Path:
@@ -51,6 +62,13 @@ def fragmentation_metrics(text: str) -> dict[str, Any]:
     short = sum(1 for line in lines if len(line) <= 3)
     header_singletons = sum(1 for line in lines if line in VERTICAL_HEADER_SET)
     inline_header = int("觀其脈證知犯" in text or "觀\n其\n脈\n證" in text or "观其脉证知犯" in text)
+    pdf_noise_lines = sum(1 for line in lines if is_pdf_layout_noise(line))
+    duplicate_short_lines = sum(
+        1
+        for current, nxt in zip(lines, lines[1:])
+        if len(current) <= 6 and (current == nxt or compact(nxt).startswith(compact(current)))
+    )
+    has_pdf_backup = int(PDF_BACKUP_MARKER in text)
     ratio = short / len(lines) if lines else 0
     return {
         "line_count": len(lines),
@@ -58,7 +76,11 @@ def fragmentation_metrics(text: str) -> dict[str, Any]:
         "short_line_ratio": round(ratio, 3),
         "header_singletons": header_singletons,
         "inline_header": inline_header,
+        "pdf_noise_lines": pdf_noise_lines,
+        "duplicate_short_lines": duplicate_short_lines,
+        "has_pdf_backup": has_pdf_backup,
         "is_suspicious": bool((len(lines) >= 18 and ratio >= 0.28) or header_singletons >= 4 or inline_header),
+        "has_layout_noise": bool(pdf_noise_lines or duplicate_short_lines >= 2 or has_pdf_backup),
     }
 
 
@@ -68,6 +90,59 @@ def normalize_line(line: str) -> str:
     text = re.sub(r"[ 　]+", "", text)
     text = re.sub(r"([,，。；;:：]){2,}", r"\1", text)
     return text.strip()
+
+
+def is_pdf_layout_noise(line: str) -> bool:
+    text = re.sub(r"\s+", "", line.strip())
+    if not text:
+        return False
+    if text in {"呚"}:
+        return True
+    if "勤求古訓博采眾方" in text or "勤求古训博采众方" in text:
+        return True
+    return any(pattern.match(text) for pattern in PDF_LAYOUT_NOISE_PATTERNS)
+
+
+def clean_pdf_layout_text(text: str, item_name: str) -> tuple[str, str]:
+    current, marker, backup = text.partition(PDF_BACKUP_MARKER)
+    pdf_backup = f"{marker}{backup}".strip() if marker else ""
+    source_lines = [line.strip() for line in current.splitlines()]
+    item_key = compact(item_name)
+    output: list[str] = []
+    prior_compact_lines: set[str] = set()
+
+    for index, line in enumerate(source_lines):
+        if not line:
+            if output and output[-1]:
+                output.append("")
+            continue
+        if is_pdf_layout_noise(line):
+            continue
+        line = re.sub(r"[ 　]{2,}", " ", line).strip()
+        line_key = compact(line)
+        next_line = next((candidate.strip() for candidate in source_lines[index + 1 :] if candidate.strip()), "")
+        next_key = compact(next_line)
+        previous_key = compact(output[-1]) if output else ""
+
+        if line_key == previous_key:
+            continue
+        if item_key and index < 12 and line_key == item_key and any(item_key == compact(part) or compact(part).startswith(item_key) for part in output):
+            continue
+        if len(line_key) <= 6 and next_key.startswith(line_key) and len(next_key) > len(line_key):
+            continue
+        if len(line_key) <= 6 and line_key in prior_compact_lines and next_key != line_key:
+            continue
+
+        if output and len(output[-1]) == 1 and re.match(r"^[\u4e00-\u9fff]", line) and not re.match(r"^[，,。；;：:、）」』】]", line):
+            output[-1] = output[-1] + line
+        else:
+            output.append(line)
+        prior_compact_lines.add(line_key)
+
+    cleaned = "\n".join(output)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    cleaned = re.sub(r"([。！？；;])\n([，,。！？；;])", r"\1\2", cleaned)
+    return cleaned.strip(), pdf_backup
 
 
 def skip_header_run(lines: list[str], index: int) -> int:
@@ -195,6 +270,8 @@ def scan_and_clean(db_path: pathlib.Path, report_path: pathlib.Path) -> dict[str
         "backup": str(backup),
         "scanned": 0,
         "suspicious": 0,
+        "layout_noise": 0,
+        "pdf_backup_removed": 0,
         "updated": 0,
         "remaining_suspicious": 0,
         "updated_ids": [],
@@ -211,23 +288,35 @@ def scan_and_clean(db_path: pathlib.Path, report_path: pathlib.Path) -> dict[str
             """
         ).fetchall()
         for row in rows:
-            detail = parse_json(row["detail"])
-            if not is_classic_row(detail):
-                continue
-            stats["scanned"] += 1
             content = row["content"] or ""
             before = fragmentation_metrics(content)
-            if not before["is_suspicious"]:
+            detail = parse_json(row["detail"])
+            should_clean = is_classic_row(detail) or bool(before["has_pdf_backup"] or before["pdf_noise_lines"])
+            if not should_clean:
                 continue
-            stats["suspicious"] += 1
+            stats["scanned"] += 1
+            cleaned, pdf_backup = clean_pdf_layout_text(content, row["name"] or "")
+            if before["has_layout_noise"]:
+                stats["layout_noise"] += 1
+            if pdf_backup:
+                stats["pdf_backup_removed"] += 1
+
+            post_layout = fragmentation_metrics(cleaned)
+            if not post_layout["is_suspicious"] and cleaned == content:
+                continue
+            if post_layout["is_suspicious"]:
+                stats["suspicious"] += 1
             original_clause = str(detail.get("original_clause") or "").strip()
-            commentary = clean_commentary_text(content, original_clause)
-            cleaned = structured_content(original_clause, commentary, content.strip())
+            if post_layout["is_suspicious"]:
+                commentary = clean_commentary_text(cleaned, original_clause)
+                cleaned = structured_content(original_clause, commentary, cleaned.strip())
             after = fragmentation_metrics(cleaned)
             if cleaned and cleaned != content:
                 detail.setdefault("rawFragmentedBackup", content)
+                if pdf_backup:
+                    detail.setdefault("pdfBackup", pdf_backup)
                 detail["cleanup_method"] = "bulk_classic_fragmented_text_cleanup"
-                detail["manual_review_required"] = True
+                detail["manual_review_required"] = after["is_suspicious"]
                 detail["fragmentation_before"] = before
                 detail["fragmentation_after"] = after
                 tags = append_tag(row["tags"], "正文已整理")

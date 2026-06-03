@@ -1740,20 +1740,25 @@ fn insert_knowledge_item(
     object: &Map<String, Value>,
 ) -> AppResult<i64> {
     let now = Utc::now().to_rfc3339();
+    let item_type = text(object, "type").unwrap_or_else(|| target_type.to_string());
+    let name = text(object, "name").unwrap_or_default();
+    let content = text(object, "content")
+        .map(|value| sanitize_import_content(&value, &name))
+        .filter(|value| !value.trim().is_empty());
     transaction.execute(
         "INSERT INTO knowledge_items
          (type, code, name, alias, pinyin, category, summary, content, source_note, tags,
           data_status, completeness_status, content_version, is_favorite, detail, source_package, created_at, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'partial', 1, 0, ?12, ?13, ?14, ?15)",
         params![
-            text(object, "type").unwrap_or_else(|| target_type.to_string()),
+            item_type,
             text(object, "code"),
-            text(object, "name").unwrap_or_default(),
+            name,
             text(object, "alias"),
             text(object, "pinyin"),
             text(object, "category"),
             text(object, "summary"),
-            text(object, "content"),
+            content,
             text(object, "source_note"),
             text(object, "tags"),
             text(object, "data_status").unwrap_or_else(|| "imported".to_string()),
@@ -2115,6 +2120,85 @@ fn value_to_text(value: &Value) -> Option<String> {
     }
 }
 
+fn sanitize_import_content(content: &str, item_name: &str) -> String {
+    let current = content
+        .split("【原PDF对应页完整文本校对备份】")
+        .next()
+        .unwrap_or(content);
+    let source_lines = current.lines().map(str::trim).collect::<Vec<_>>();
+    let item_key = compact_text(item_name);
+    let mut output: Vec<String> = Vec::new();
+    let mut seen_short = HashSet::new();
+
+    for (index, line) in source_lines.iter().enumerate() {
+        if line.is_empty() {
+            if output.last().is_some_and(|line| !line.is_empty()) {
+                output.push(String::new());
+            }
+            continue;
+        }
+        if is_import_layout_noise(line) {
+            continue;
+        }
+        let normalized_line = line.split_whitespace().collect::<Vec<_>>().join(" ");
+        let line_key = compact_text(&normalized_line);
+        let next_key = source_lines
+            .iter()
+            .skip(index + 1)
+            .find(|candidate| !candidate.trim().is_empty())
+            .map(|candidate| compact_text(candidate))
+            .unwrap_or_default();
+        let previous_key = output.last().map(|line| compact_text(line)).unwrap_or_default();
+
+        if line_key == previous_key {
+            continue;
+        }
+        if !item_key.is_empty()
+            && index < 12
+            && line_key == item_key
+            && output
+                .iter()
+                .any(|part| compact_text(part) == item_key || compact_text(part).starts_with(&item_key))
+        {
+            continue;
+        }
+        if line_key.chars().count() <= 6 && next_key.starts_with(&line_key) && next_key.len() > line_key.len() {
+            continue;
+        }
+        if line_key.chars().count() <= 6 && seen_short.contains(&line_key) && next_key != line_key {
+            continue;
+        }
+
+        output.push(normalized_line);
+        if line_key.chars().count() <= 6 {
+            seen_short.insert(line_key);
+        }
+    }
+
+    let mut text = output.join("\n");
+    while text.contains("\n\n\n") {
+        text = text.replace("\n\n\n", "\n\n");
+    }
+    text.trim().to_string()
+}
+
+fn is_import_layout_noise(line: &str) -> bool {
+    let text = compact_text(line);
+    if text.is_empty() {
+        return false;
+    }
+    matches!(text.as_str(), "倪海厦注" | "倪海厦注《金匮》" | "倪海厦注金匮" | "倪注金匮" | "校排" | "呚")
+        || text.contains("勤求古訓博采眾方")
+        || text.contains("勤求古训博采众方")
+        || (text.contains("群龙无首") && text.contains("校排"))
+        || (text.starts_with("【PDF页码") && text.ends_with('】'))
+        || (text.ends_with("校排") && text.chars().all(|ch| ch.is_ascii_digit() || matches!(ch, '.' | '。' | '．') || ch == '校' || ch == '排'))
+}
+
+fn compact_text(value: &str) -> String {
+    value.chars().filter(|ch| !ch.is_whitespace()).collect()
+}
+
 fn detail_json(object: &Map<String, Value>) -> String {
     object
         .get("detail")
@@ -2171,6 +2255,7 @@ mod tests {
     use super::{
         confirm_import, import_csv, import_json, import_package_folder, import_quality_report,
         import_zip, preview_package_folder, preview_zip, rollback_import_batch,
+        sanitize_import_content,
     };
     use crate::db::connection::Database;
     use crate::models::data_pipeline::CreateImportRequest;
@@ -2188,6 +2273,20 @@ mod tests {
         let data_dir = std::env::temp_dir().join(format!("zhongyi-import-{test_name}-{unique}"));
         let database = Database::initialize(&data_dir).expect("initialize database");
         (data_dir, database)
+    }
+
+    #[test]
+    fn sanitize_import_content_removes_pdf_layout_noise() {
+        let content = "乌头汤方 治脚气疼痛,不可屈伸。\n乌头汤方\n麻黄\n麻黄三两\n倪海厦注\n倪海厦注《金匮》\n勤求古訓 博采眾方\n乌头\n呚\n五枚\n【原PDF对应页完整文本校对备份】\n【PDF页码106】\n倪海厦注\n校排";
+        let cleaned = sanitize_import_content(content, "乌头汤方");
+        assert!(cleaned.contains("乌头汤方 治脚气疼痛,不可屈伸。"));
+        assert!(cleaned.contains("麻黄三两"));
+        assert!(cleaned.contains("五枚"));
+        assert!(!cleaned.contains("倪海厦注"));
+        assert!(!cleaned.contains("勤求古訓"));
+        assert!(!cleaned.contains("原PDF对应页"));
+        assert!(!cleaned.contains("\n麻黄\n麻黄"));
+        assert!(!cleaned.contains("呚"));
     }
 
     fn write_folder_package(root: &std::path::Path, manifest: Option<&str>, knowledge_path: &str) {

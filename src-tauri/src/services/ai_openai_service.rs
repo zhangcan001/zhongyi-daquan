@@ -549,10 +549,47 @@ fn web_search(question: &str, timeout_seconds: Option<i64>) -> AppResult<Vec<Web
         return Ok(Vec::new());
     }
     let timeout = timeout_seconds.unwrap_or(30).clamp(1, 60);
-    match duckduckgo_lite_search(query, timeout) {
-        Ok(results) if !results.is_empty() => Ok(results),
-        _ => wikipedia_opensearch(query, timeout),
+    for search in [
+        bing_search as fn(&str, i64) -> AppResult<Vec<WebSearchResult>>,
+        duckduckgo_lite_search,
+        wikipedia_opensearch,
+    ] {
+        if let Ok(results) = search(query, timeout) {
+            if !results.is_empty() {
+                return Ok(results);
+            }
+        }
     }
+    Ok(search_entry_results(query))
+}
+
+fn http_client(timeout_seconds: i64) -> AppResult<Client> {
+    Client::builder()
+        .timeout(Duration::from_secs(timeout_seconds as u64))
+        .user_agent("Mozilla/5.0 zhongyi-daquan/0.1 ai-web-search")
+        .build()
+        .map_err(|_| AppError::Data("联网检索客户端初始化失败。".to_string()))
+}
+
+fn bing_search(query: &str, timeout_seconds: i64) -> AppResult<Vec<WebSearchResult>> {
+    let url = format!(
+        "https://www.bing.com/search?q={}",
+        percent_encode(query)
+    );
+    let response = http_client(timeout_seconds)?
+        .get(url)
+        .send()
+        .map_err(|_| AppError::Data("Bing 联网检索失败。".to_string()))?;
+    if !response.status().is_success() {
+        return Err(AppError::Data(format!(
+            "Bing 联网检索返回错误状态 {}。",
+            response.status().as_u16()
+        )));
+    }
+    let html = response
+        .text()
+        .map_err(|_| AppError::Data("Bing 联网检索结果读取失败。".to_string()))?;
+    Ok(parse_bing_results(&html).into_iter().take(5).collect())
 }
 
 fn duckduckgo_lite_search(query: &str, timeout_seconds: i64) -> AppResult<Vec<WebSearchResult>> {
@@ -560,12 +597,7 @@ fn duckduckgo_lite_search(query: &str, timeout_seconds: i64) -> AppResult<Vec<We
         "https://lite.duckduckgo.com/lite/?q={}",
         percent_encode(query)
     );
-    let client = Client::builder()
-        .timeout(Duration::from_secs(timeout_seconds as u64))
-        .user_agent("zhongyi-daquan/0.1 ai-web-search")
-        .build()
-        .map_err(|_| AppError::Data("联网检索客户端初始化失败。".to_string()))?;
-    let response = client
+    let response = http_client(timeout_seconds)?
         .get(url)
         .send()
         .map_err(|_| AppError::Data("联网检索失败，请检查网络连接。".to_string()))?;
@@ -586,12 +618,7 @@ fn wikipedia_opensearch(query: &str, timeout_seconds: i64) -> AppResult<Vec<WebS
         "https://zh.wikipedia.org/w/api.php?action=opensearch&search={}&limit=5&namespace=0&format=json",
         percent_encode(query)
     );
-    let client = Client::builder()
-        .timeout(Duration::from_secs(timeout_seconds as u64))
-        .user_agent("zhongyi-daquan/0.1 ai-web-search")
-        .build()
-        .map_err(|_| AppError::Data("联网检索客户端初始化失败。".to_string()))?;
-    let response = client
+    let response = http_client(timeout_seconds)?
         .get(url)
         .send()
         .map_err(|_| AppError::Data("联网检索失败，请检查网络连接。".to_string()))?;
@@ -637,6 +664,76 @@ fn wikipedia_opensearch(query: &str, timeout_seconds: i64) -> AppResult<Vec<WebS
         });
     }
     Ok(results)
+}
+
+fn parse_bing_results(html: &str) -> Vec<WebSearchResult> {
+    let mut results = Vec::new();
+    let mut cursor = 0;
+    while let Some(card_offset) = html[cursor..].find("b_algo") {
+        let card_start = cursor + card_offset;
+        let card_end = html[card_start..]
+            .find("</li>")
+            .map(|offset| card_start + offset)
+            .unwrap_or_else(|| (card_start + 4000).min(html.len()));
+        let card = &html[card_start..card_end];
+        let Some(href_offset) = card.find("href=\"") else {
+            cursor = card_end;
+            continue;
+        };
+        let href_start = href_offset + 6;
+        let Some(href_end_offset) = card[href_start..].find('"') else {
+            cursor = card_end;
+            continue;
+        };
+        let url = html_unescape(&card[href_start..href_start + href_end_offset]);
+        let title = card[href_start + href_end_offset..]
+            .find('>')
+            .and_then(|start_offset| {
+                let start = href_start + href_end_offset + start_offset + 1;
+                let end = card[start..].find("</a>").map(|offset| start + offset)?;
+                Some(html_unescape(&strip_tags(&card[start..end])))
+            })
+            .unwrap_or_default();
+        let snippet = card
+            .find("<p")
+            .and_then(|p_offset| {
+                let start = card[p_offset..].find('>').map(|offset| p_offset + offset + 1)?;
+                let end = card[start..].find("</p>").map(|offset| start + offset)?;
+                Some(html_unescape(&strip_tags(&card[start..end])))
+            })
+            .unwrap_or_default();
+        if !title.trim().is_empty()
+            && url.starts_with("http")
+            && !results.iter().any(|existing: &WebSearchResult| existing.url == url)
+        {
+            results.push(WebSearchResult {
+                title: truncate(title.trim(), 120),
+                url,
+                snippet: truncate(snippet.trim(), 500),
+            });
+        }
+        cursor = card_end;
+        if results.len() >= 8 {
+            break;
+        }
+    }
+    results
+}
+
+fn search_entry_results(query: &str) -> Vec<WebSearchResult> {
+    let encoded = percent_encode(query);
+    vec![
+        WebSearchResult {
+            title: format!("Bing 在线搜索：{query}"),
+            url: format!("https://www.bing.com/search?q={encoded}"),
+            snippet: "联网摘要源暂未返回可解析内容，已提供在线搜索入口供核对。".to_string(),
+        },
+        WebSearchResult {
+            title: format!("搜狗在线搜索：{query}"),
+            url: format!("https://www.sogou.com/web?query={encoded}"),
+            snippet: "备用中文搜索入口。".to_string(),
+        },
+    ]
 }
 
 fn parse_duckduckgo_lite_results(html: &str) -> Vec<WebSearchResult> {
@@ -764,6 +861,11 @@ fn task_warnings(
     }
     if web_sources.is_empty() {
         vec!["联网检索未返回可用摘要，本次回答主要依赖本地资料。".to_string()]
+    } else if web_sources
+        .iter()
+        .all(|source| source.snippet.contains("暂未返回可解析内容") || source.snippet.contains("备用中文搜索入口"))
+    {
+        vec!["联网检索未返回可解析摘要，已提供在线搜索入口供核对。".to_string()]
     } else {
         vec!["已启用联网检索，网页资料会作为外部来源与本地资料分开引用。".to_string()]
     }
@@ -972,6 +1074,21 @@ mod tests {
         assert_eq!(results[0].title, "Example & Title");
         assert_eq!(results[0].url, "https://example.com/page?a=1");
         assert!(results[0].snippet.contains("summary"));
+    }
+
+    #[test]
+    fn bing_parser_extracts_result_cards() {
+        let html = r#"
+          <li class="b_algo">
+            <h2><a href="https://example.com/tcm">栝篓桂枝汤方 - 示例</a></h2>
+            <p>栝篓桂枝汤方相关资料摘要。</p>
+          </li>
+        "#;
+        let results = parse_bing_results(html);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].url, "https://example.com/tcm");
+        assert!(results[0].title.contains("栝篓桂枝汤方"));
+        assert!(results[0].snippet.contains("相关资料摘要"));
     }
 
     fn temp_data_dir(test_name: &str) -> PathBuf {

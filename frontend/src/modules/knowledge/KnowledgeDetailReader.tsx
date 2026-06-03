@@ -250,6 +250,16 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
         {genericAiAnswer?.answer ? (
           <div className="ai-formula-result">
             <div className="reader-content">{genericAiAnswer.answer}</div>
+            {genericAiAnswer.warnings?.length ? (
+              <div className="formula-field">
+                <strong>运行提示</strong>
+                <ul>
+                  {genericAiAnswer.warnings.map((warning, index) => (
+                    <li key={`${warning}-${index}`}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </section>

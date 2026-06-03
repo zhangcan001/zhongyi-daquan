@@ -68,6 +68,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "herb_structured_properties",
         sql: include_str!("../../migrations/012_herb_structured_properties.sql"),
     },
+    Migration {
+        version: 13,
+        name: "herb_classic_sections",
+        sql: include_str!("../../migrations/013_herb_classic_sections.sql"),
+    },
 ];
 
 pub fn run(connection: &Connection) -> AppResult<()> {

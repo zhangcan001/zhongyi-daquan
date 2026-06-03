@@ -31,8 +31,10 @@ const columnsByType: Partial<Record<KnowledgeType, GridColumn[]>> = {
     { key: "meridians", label: "归经", width: "150px" },
     { key: "channelTropism", label: "归经/脏腑", width: "150px" },
     { key: "toxicity", label: "毒性", width: "120px" },
+    { key: "origin", label: "产地/来源", width: "220px" },
     { key: "effects", label: "功效", width: "220px" },
     { key: "indications", label: "主治", width: "220px" },
+    { key: "classicApplications", label: "经方应用", width: "220px" },
   ],
   formula: [
     { key: "name", label: "名称", width: "160px" },

@@ -23,6 +23,9 @@ HERB_COLUMNS = {
     "five_flavors": "TEXT",
     "channel_tropism": "TEXT",
     "toxicity": "TEXT",
+    "origin": "TEXT",
+    "processing": "TEXT",
+    "classic_applications": "TEXT",
     "property_notes": "TEXT",
 }
 
@@ -34,11 +37,12 @@ ORGANS = ["心包", "三焦", "大肠", "小肠", "膀胱", "心", "肝", "脾",
 LABELS = [
     "性味",
     "本经原文",
+    "产地",
     "主治",
+    "仲景",
     "用量",
     "禁忌",
     "炮制",
-    "产地",
     "别录",
     "甄权",
     "大明",
@@ -190,6 +194,31 @@ def current_item_content(text: str) -> str:
     return clean_text(value)
 
 
+def split_current_and_backup(text: str) -> tuple[str, str]:
+    current, separator, backup = text.partition("【原PDF对应页完整文本校对备份】")
+    return clean_text(current), clean_text(f"{separator}{backup}") if separator else ""
+
+
+def extract_summary(content: str, fallback: str | None) -> str:
+    match = re.search(r"——([^。；;\n]+)", content)
+    if match:
+        return clean_text(match.group(1))
+    return clean_text(fallback)
+
+
+def extract_effects(detail: dict[str, Any], content: str, nature_flavor: str) -> str:
+    existing = value_from_detail(detail, "effects", "功效")
+    if existing:
+        return existing
+    section = labeled_section(content, "功效")
+    if section:
+        return section
+    match = re.search(r"功能([^。；;\n]+)", labeled_section(content, "性味") or nature_flavor)
+    if match:
+        return clean_text(match.group(1))
+    return ""
+
+
 def detail_with_updates(detail: dict[str, Any], updates: dict[str, str]) -> str:
     for key, value in updates.items():
         if value:
@@ -221,6 +250,12 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         VALUES (12, 'herb_structured_properties', datetime('now'))
         """
     )
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO schema_migrations (version, name, applied_at)
+        VALUES (13, 'herb_classic_sections', datetime('now'))
+        """
+    )
 
 
 def append_tags(tags: str | None, four_qi: str, five_flavors: str, channels: str, toxicity: str) -> str:
@@ -232,7 +267,9 @@ def append_tags(tags: str | None, four_qi: str, five_flavors: str, channels: str
     return unique_join([clean_text(tags), *additions])
 
 
-def refresh_search(conn: sqlite3.Connection, item_id: int, row: sqlite3.Row, tags: str) -> None:
+def refresh_search(
+    conn: sqlite3.Connection, item_id: int, row: sqlite3.Row, tags: str, content: str, summary: str
+) -> None:
     conn.execute("DELETE FROM knowledge_fts WHERE rowid = ?", (item_id,))
     conn.execute(
         """
@@ -246,8 +283,8 @@ def refresh_search(conn: sqlite3.Connection, item_id: int, row: sqlite3.Row, tag
             row["alias"],
             row["pinyin"],
             row["category"],
-            row["summary"],
-            row["content"],
+            summary,
+            content,
             tags,
         ),
     )
@@ -270,12 +307,91 @@ def refresh_search(conn: sqlite3.Connection, item_id: int, row: sqlite3.Row, tag
             row["name"],
             row["pinyin"],
             row["category"],
-            row["summary"],
+            summary,
             tags,
             row["data_status"],
             row["is_favorite"],
         ),
     )
+
+
+def load_supplemental_herbs() -> list[dict[str, Any]]:
+    path = pathlib.Path("data-seed/herbs.supplemental.json")
+    if not path.exists():
+        return []
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def upsert_supplemental_herbs(conn: sqlite3.Connection) -> int:
+    count = 0
+    for herb in load_supplemental_herbs():
+        name = clean_text(herb.get("name"))
+        if not name:
+            continue
+        detail = herb.get("detail") if isinstance(herb.get("detail"), dict) else {}
+        content = clean_text(herb.get("content"))
+        summary = clean_text(herb.get("summary"))
+        tags = clean_text(herb.get("tags"))
+        existing = conn.execute(
+            "SELECT id FROM knowledge_items WHERE type = 'herb' AND name = ?1",
+            (name,),
+        ).fetchone()
+        if existing:
+            item_id = int(existing[0])
+            conn.execute(
+                """
+                UPDATE knowledge_items
+                SET alias = COALESCE(NULLIF(?2, ''), alias),
+                    category = COALESCE(NULLIF(?3, ''), category),
+                    summary = ?4,
+                    content = ?5,
+                    source_note = COALESCE(NULLIF(?6, ''), source_note),
+                    tags = COALESCE(NULLIF(?7, ''), tags),
+                    detail = ?8,
+                    data_status = 'reviewed',
+                    completeness_status = 'complete',
+                    updated_at = datetime('now')
+                WHERE id = ?1
+                """,
+                (
+                    item_id,
+                    clean_text(herb.get("alias")),
+                    clean_text(herb.get("category")),
+                    summary,
+                    content,
+                    clean_text(herb.get("source_note")),
+                    tags,
+                    json.dumps(detail, ensure_ascii=False, separators=(",", ":")),
+                ),
+            )
+        else:
+            cursor = conn.execute(
+                """
+                INSERT INTO knowledge_items
+                  (type, code, name, alias, pinyin, category, summary, content, source_note, tags,
+                   data_status, completeness_status, content_version, is_favorite, detail, import_batch_id,
+                   source_package, created_at, updated_at)
+                VALUES
+                  ('herb', ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9,
+                   'reviewed', 'complete', 1, 0, ?10, NULL,
+                   'supplemental-herbs', datetime('now'), datetime('now'))
+                """,
+                (
+                    clean_text(herb.get("code")) or f"HERB-SUP-{name}",
+                    name,
+                    clean_text(herb.get("alias")),
+                    clean_text(herb.get("pinyin")),
+                    clean_text(herb.get("category")),
+                    summary,
+                    content,
+                    clean_text(herb.get("source_note")),
+                    tags,
+                    json.dumps(detail, ensure_ascii=False, separators=(",", ":")),
+                ),
+            )
+            item_id = int(cursor.lastrowid)
+        count += 1
+    return count
 
 
 def enrich(db_path: pathlib.Path) -> dict[str, int]:
@@ -291,9 +407,14 @@ def enrich(db_path: pathlib.Path) -> dict[str, int]:
         "five_flavors": 0,
         "channel_tropism": 0,
         "toxicity": 0,
+        "origin": 0,
+        "classic_applications": 0,
+        "content_cleaned": 0,
+        "supplemental_upserted": 0,
     }
     with conn:
         ensure_schema(conn)
+        stats["supplemental_upserted"] = upsert_supplemental_herbs(conn)
         rows = conn.execute(
             """
             SELECT id, type, code, name, alias, pinyin, category, summary, content, tags,
@@ -307,7 +428,12 @@ def enrich(db_path: pathlib.Path) -> dict[str, int]:
             stats["herbs"] += 1
             item_id = int(row["id"])
             detail = parse_json(row["detail"])
-            content = current_item_content(clean_text(row["content"]))
+            original_content = clean_text(row["content"])
+            content, pdf_backup = split_current_and_backup(original_content)
+            if content != original_content:
+                stats["content_cleaned"] += 1
+                detail.setdefault("pdfBackup", pdf_backup)
+            summary = extract_summary(content, row["summary"])
 
             nature_flavor, nature_source = extract_nature_flavor(detail, content)
             four_qi = value_from_detail(detail, "four_qi", "fourQi") or extract_terms(
@@ -319,13 +445,18 @@ def enrich(db_path: pathlib.Path) -> dict[str, int]:
             channel_tropism, channel_source = extract_channels(detail, content)
             meridians = value_from_detail(detail, "meridians", "归经") or channel_tropism
             toxicity = extract_toxicity(detail, nature_flavor, content)
-            effects = value_from_detail(detail, "effects", "功效") or labeled_section(content, "主治")
+            origin = value_from_detail(detail, "origin", "产地") or labeled_section(content, "产地")
+            effects = extract_effects(detail, content, nature_flavor)
             indications = value_from_detail(detail, "indications", "主治") or labeled_section(content, "主治")
             dosage = value_from_detail(detail, "dosage", "用量") or labeled_section(content, "用量")
             contraindications = value_from_detail(detail, "contraindications", "禁忌") or labeled_section(
                 content, "禁忌"
             )
             compatibility = value_from_detail(detail, "compatibility", "配伍")
+            processing = value_from_detail(detail, "processing", "炮制") or labeled_section(content, "炮制")
+            classic_applications = value_from_detail(
+                detail, "classic_applications", "classicApplications", "仲景"
+            ) or labeled_section(content, "仲景")
             notes = value_from_detail(detail, "notes", "other_notes", "otherNotes", "ni_note", "niNote")
 
             source_parts = [part for part in [nature_source, channel_source] if part]
@@ -344,11 +475,14 @@ def enrich(db_path: pathlib.Path) -> dict[str, int]:
                     "meridians": meridians,
                     "channelTropism": channel_tropism,
                     "toxicity": toxicity,
+                    "origin": origin,
                     "effects": effects,
                     "indications": indications,
                     "dosage": dosage,
                     "contraindications": contraindications,
                     "compatibility": compatibility,
+                    "processing": processing,
+                    "classicApplications": classic_applications,
                     "notes": notes,
                     "propertyNotes": property_notes,
                 },
@@ -359,9 +493,9 @@ def enrich(db_path: pathlib.Path) -> dict[str, int]:
                 """
                 INSERT INTO herb_details
                   (item_id, nature_flavor, four_qi, five_flavors, meridians, channel_tropism,
-                   toxicity, effects, indications, dosage, contraindications, compatibility,
-                   notes, property_notes)
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+                   toxicity, origin, effects, indications, dosage, contraindications, compatibility,
+                   processing, classic_applications, notes, property_notes)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
                 ON CONFLICT(item_id) DO UPDATE SET
                   nature_flavor = excluded.nature_flavor,
                   four_qi = excluded.four_qi,
@@ -369,11 +503,14 @@ def enrich(db_path: pathlib.Path) -> dict[str, int]:
                   meridians = excluded.meridians,
                   channel_tropism = excluded.channel_tropism,
                   toxicity = excluded.toxicity,
+                  origin = excluded.origin,
                   effects = excluded.effects,
                   indications = excluded.indications,
                   dosage = excluded.dosage,
                   contraindications = excluded.contraindications,
                   compatibility = excluded.compatibility,
+                  processing = excluded.processing,
+                  classic_applications = excluded.classic_applications,
                   notes = excluded.notes,
                   property_notes = excluded.property_notes
                 """,
@@ -385,11 +522,14 @@ def enrich(db_path: pathlib.Path) -> dict[str, int]:
                     meridians or None,
                     channel_tropism or None,
                     toxicity or None,
+                    origin or None,
                     effects or None,
                     indications or None,
                     dosage or None,
                     contraindications or None,
                     compatibility or None,
+                    processing or None,
+                    classic_applications or None,
                     notes or None,
                     property_notes or None,
                 ),
@@ -397,12 +537,12 @@ def enrich(db_path: pathlib.Path) -> dict[str, int]:
             conn.execute(
                 """
                 UPDATE knowledge_items
-                SET detail = ?2, tags = ?3, updated_at = datetime('now')
+                SET detail = ?2, tags = ?3, content = ?4, summary = ?5, updated_at = datetime('now')
                 WHERE id = ?1
                 """,
-                (item_id, detail_json, tags),
+                (item_id, detail_json, tags, content, summary),
             )
-            refresh_search(conn, item_id, row, tags)
+            refresh_search(conn, item_id, row, tags, content, summary)
 
             stats["detail_rows"] += 1
             if four_qi:
@@ -413,6 +553,10 @@ def enrich(db_path: pathlib.Path) -> dict[str, int]:
                 stats["channel_tropism"] += 1
             if toxicity:
                 stats["toxicity"] += 1
+            if origin:
+                stats["origin"] += 1
+            if classic_applications:
+                stats["classic_applications"] += 1
 
     conn.close()
     stats["backup_created"] = 1

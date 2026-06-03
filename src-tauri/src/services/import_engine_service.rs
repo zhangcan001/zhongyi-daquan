@@ -655,9 +655,12 @@ fn alias_target(source: &str) -> Option<&'static String> {
                 (&["归经"][..], "detail.meridians"),
                 (&["归脏腑", "归经脏腑", "入经"][..], "detail.channel_tropism"),
                 (&["毒性"][..], "detail.toxicity"),
+                (&["产地", "来源产地", "药材来源"][..], "detail.origin"),
                 (&["功效"][..], "detail.effects"),
                 (&["主治"][..], "detail.indications"),
                 (&["禁忌"][..], "detail.contraindications"),
+                (&["炮制"][..], "detail.processing"),
+                (&["仲景", "经方应用", "经典应用"][..], "detail.classic_applications"),
                 (&["组成", "方药", "药物组成"][..], "detail.composition"),
                 (&["用法"][..], "detail.usage"),
                 (&["方解"][..], "detail.explanation"),
@@ -855,9 +858,12 @@ fn candidate_fields(target_type: &str) -> Vec<&'static str> {
             "detail.meridians",
             "detail.channel_tropism",
             "detail.toxicity",
+            "detail.origin",
             "detail.effects",
             "detail.indications",
             "detail.contraindications",
+            "detail.processing",
+            "detail.classic_applications",
         ]),
         "方剂" | "formula" => fields.extend([
             "detail.composition",
@@ -941,8 +947,17 @@ fn type_prior_score(target_type: &str, target: &str) -> f64 {
     match (target_type, target) {
         (
             "中药" | "herb",
-            "nature_flavor" | "four_qi" | "five_flavors" | "meridians" | "channel_tropism"
-            | "toxicity" | "effects" | "indications",
+            "nature_flavor"
+            | "four_qi"
+            | "five_flavors"
+            | "meridians"
+            | "channel_tropism"
+            | "toxicity"
+            | "origin"
+            | "effects"
+            | "indications"
+            | "processing"
+            | "classic_applications",
         ) => 1.0,
         ("方剂" | "formula", "composition" | "usage" | "explanation" | "indications") => 1.0,
         ("穴位" | "acupoint", "standard_location" | "locating_method" | "body_region") => 1.0,

@@ -145,10 +145,12 @@ export function DashboardPage({ status, error, activeView, onNavigate }: Dashboa
 }
 
 function Metric({ label, value }: { label: string; value: string | number | null | undefined }) {
+  const displayValue = value ?? "读取中";
+  const isLongValue = String(displayValue).length > 14;
   return (
     <div>
       <span>{label}</span>
-      <strong>{value ?? "读取中"}</strong>
+      <strong className={isLongValue ? "long-value" : undefined}>{displayValue}</strong>
     </div>
   );
 }

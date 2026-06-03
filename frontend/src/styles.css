@@ -2640,6 +2640,8 @@ body {
 
 .summary-grid div {
   min-height: 82px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .summary-grid span,
@@ -2654,6 +2656,19 @@ body {
 
 .summary-grid strong {
   color: #f4fbff;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.18;
+}
+
+.summary-grid strong.long-value {
+  display: -webkit-box;
+  font-size: 15px;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .action-grid button {

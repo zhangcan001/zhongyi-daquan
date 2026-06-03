@@ -63,6 +63,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "ai_openai_compatible_v020",
         sql: include_str!("../../migrations/011_ai_openai_compatible_v020.sql"),
     },
+    Migration {
+        version: 12,
+        name: "herb_structured_properties",
+        sql: include_str!("../../migrations/012_herb_structured_properties.sql"),
+    },
 ];
 
 pub fn run(connection: &Connection) -> AppResult<()> {

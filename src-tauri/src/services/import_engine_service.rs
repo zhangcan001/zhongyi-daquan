@@ -650,7 +650,11 @@ fn alias_target(source: &str) -> Option<&'static String> {
                 (&["标签", "tags", "关键词", "keywords"][..], "tags"),
                 (&["类型", "type", "知识类型"][..], "type"),
                 (&["性味"][..], "detail.nature_flavor"),
+                (&["四气", "寒热温凉", "寒热属性"][..], "detail.four_qi"),
+                (&["五味"][..], "detail.five_flavors"),
                 (&["归经"][..], "detail.meridians"),
+                (&["归脏腑", "归经脏腑", "入经"][..], "detail.channel_tropism"),
+                (&["毒性"][..], "detail.toxicity"),
                 (&["功效"][..], "detail.effects"),
                 (&["主治"][..], "detail.indications"),
                 (&["禁忌"][..], "detail.contraindications"),
@@ -846,7 +850,11 @@ fn candidate_fields(target_type: &str) -> Vec<&'static str> {
     match target_type {
         "中药" | "herb" => fields.extend([
             "detail.nature_flavor",
+            "detail.four_qi",
+            "detail.five_flavors",
             "detail.meridians",
+            "detail.channel_tropism",
+            "detail.toxicity",
             "detail.effects",
             "detail.indications",
             "detail.contraindications",
@@ -931,7 +939,11 @@ fn context_score(target: &str, rows: &[Map<String, Value>]) -> f64 {
 fn type_prior_score(target_type: &str, target: &str) -> f64 {
     let target = target.strip_prefix("detail.").unwrap_or(target);
     match (target_type, target) {
-        ("中药" | "herb", "nature_flavor" | "meridians" | "effects" | "indications") => 1.0,
+        (
+            "中药" | "herb",
+            "nature_flavor" | "four_qi" | "five_flavors" | "meridians" | "channel_tropism"
+            | "toxicity" | "effects" | "indications",
+        ) => 1.0,
         ("方剂" | "formula", "composition" | "usage" | "explanation" | "indications") => 1.0,
         ("穴位" | "acupoint", "standard_location" | "locating_method" | "body_region") => 1.0,
         (_, "name" | "type" | "content" | "source_note" | "tags") => 0.8,

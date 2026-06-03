@@ -121,13 +121,18 @@ fn schema_for(item_type: &str) -> Option<DetailSchema> {
             table: "herb_details",
             fields: &[
                 "nature_flavor",
+                "four_qi",
+                "five_flavors",
                 "meridians",
+                "channel_tropism",
+                "toxicity",
                 "effects",
                 "indications",
                 "dosage",
                 "contraindications",
                 "compatibility",
                 "notes",
+                "property_notes",
             ],
         }),
         "formula" => Some(DetailSchema {

@@ -1114,13 +1114,18 @@ fn detail_table_columns(item_type: &str) -> Option<(&'static str, &'static [&'st
             "herb_details",
             &[
                 "nature_flavor",
+                "four_qi",
+                "five_flavors",
                 "meridians",
+                "channel_tropism",
+                "toxicity",
                 "effects",
                 "indications",
                 "dosage",
                 "contraindications",
                 "compatibility",
                 "notes",
+                "property_notes",
             ],
         )),
         "formula" => Some((

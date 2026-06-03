@@ -2011,9 +2011,9 @@ fn insert_detail(
         "中药" | "herb" => {
             transaction.execute(
                 "INSERT OR REPLACE INTO herb_details
-                 (item_id, nature_flavor, meridians, effects, indications, dosage, contraindications, compatibility, notes)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                params![item_id, text(object, "nature_flavor"), text(object, "meridians"), text(object, "effects"), text(object, "indications"), text(object, "dosage"), text(object, "contraindications"), text(object, "compatibility"), text(object, "notes")],
+                 (item_id, nature_flavor, four_qi, five_flavors, meridians, channel_tropism, toxicity, effects, indications, dosage, contraindications, compatibility, notes, property_notes)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                params![item_id, text(object, "nature_flavor"), text(object, "four_qi").or_else(|| text(object, "fourQi")), text(object, "five_flavors").or_else(|| text(object, "fiveFlavors")), text(object, "meridians"), text(object, "channel_tropism").or_else(|| text(object, "channelTropism")), text(object, "toxicity"), text(object, "effects"), text(object, "indications"), text(object, "dosage"), text(object, "contraindications"), text(object, "compatibility"), text(object, "notes"), text(object, "property_notes").or_else(|| text(object, "propertyNotes"))],
             )?;
         }
         "方剂" | "formula" => {

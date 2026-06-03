@@ -33,13 +33,18 @@ pub struct KnowledgeItem {
 pub struct HerbDetail {
     pub item_id: i64,
     pub nature_flavor: Option<String>,
+    pub four_qi: Option<String>,
+    pub five_flavors: Option<String>,
     pub meridians: Option<String>,
+    pub channel_tropism: Option<String>,
+    pub toxicity: Option<String>,
     pub effects: Option<String>,
     pub indications: Option<String>,
     pub dosage: Option<String>,
     pub contraindications: Option<String>,
     pub compatibility: Option<String>,
     pub notes: Option<String>,
+    pub property_notes: Option<String>,
 }
 
 #[allow(dead_code)]

@@ -11,13 +11,18 @@ export const detailFields: Record<KnowledgeType, DetailField[]> = {
   herb: [
     { key: "bencao_original", label: "本经原文", kind: "textarea" },
     { key: "nature_flavor", label: "性味" },
+    { key: "fourQi", label: "四气" },
+    { key: "fiveFlavors", label: "五味" },
     { key: "meridians", label: "归经" },
+    { key: "channelTropism", label: "归经 / 脏腑" },
+    { key: "toxicity", label: "毒性" },
     { key: "effects", label: "功效", kind: "textarea" },
     { key: "dosage", label: "用量" },
     { key: "contraindications", label: "禁忌", kind: "textarea" },
     { key: "processing", label: "炮制", kind: "textarea" },
     { key: "ni_note", label: "倪注", kind: "textarea" },
     { key: "other_notes", label: "其他注解", kind: "textarea" },
+    { key: "propertyNotes", label: "性味归经备注", kind: "textarea" },
     { key: "indications", label: "主治", kind: "textarea" },
   ],
   formula: [

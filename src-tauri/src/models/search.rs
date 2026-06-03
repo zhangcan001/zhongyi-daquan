@@ -90,6 +90,7 @@ pub struct EnhancedSearchResult {
     pub source_title: Option<String>,
     pub source_note: Option<String>,
     pub tags: Option<String>,
+    pub four_qi: Option<String>,
     pub has_annotations: bool,
     pub annotation_count: i64,
     pub annotation_snippet: Option<String>,

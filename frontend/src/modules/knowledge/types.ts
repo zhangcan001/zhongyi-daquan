@@ -116,6 +116,7 @@ export type EnhancedSearchResult = {
   sourceTitle?: string | null;
   sourceNote?: string | null;
   tags?: string | null;
+  fourQi?: string | null;
   hasAnnotations: boolean;
   annotationCount: number;
   annotationSnippet?: string | null;

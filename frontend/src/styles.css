@@ -2355,6 +2355,95 @@ h3 {
   color: var(--muted);
 }
 
+.herb-nature-name {
+  font-weight: 800;
+  transition: color 140ms ease, text-shadow 140ms ease;
+}
+
+.herb-nature-deep-cold {
+  color: #355cff;
+}
+
+.herb-nature-cold {
+  color: #57a6ff;
+}
+
+.herb-nature-mild-cold {
+  color: #a6e7ff;
+}
+
+.herb-nature-neutral {
+  color: #f7fbff;
+}
+
+.herb-nature-mild-warm {
+  color: #ffb2ba;
+}
+
+.herb-nature-warm {
+  color: #ff7a7f;
+}
+
+.herb-nature-hot {
+  color: #ff4e4e;
+}
+
+.herb-nature-deep-hot {
+  color: #d30f2d;
+}
+
+.result-badges {
+  display: inline-flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.nature-chip {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: rgba(247, 251, 255, 0.08);
+  padding: 3px 8px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.nature-chip.herb-nature-deep-cold {
+  background: rgba(53, 92, 255, 0.14);
+}
+
+.nature-chip.herb-nature-cold {
+  background: rgba(87, 166, 255, 0.13);
+}
+
+.nature-chip.herb-nature-mild-cold {
+  background: rgba(166, 231, 255, 0.12);
+}
+
+.nature-chip.herb-nature-neutral {
+  background: rgba(247, 251, 255, 0.09);
+}
+
+.nature-chip.herb-nature-mild-warm {
+  background: rgba(255, 178, 186, 0.12);
+}
+
+.nature-chip.herb-nature-warm {
+  background: rgba(255, 122, 127, 0.13);
+}
+
+.nature-chip.herb-nature-hot {
+  background: rgba(255, 78, 78, 0.14);
+}
+
+.nature-chip.herb-nature-deep-hot {
+  background: rgba(211, 15, 45, 0.16);
+}
+
 @media (max-width: 760px) {
   .app-shell {
     width: 100%;

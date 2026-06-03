@@ -7,6 +7,7 @@ use crate::models::search::{
 };
 use crate::repositories::{performance_repository, search_repository};
 use rusqlite::{params, OptionalExtension};
+use serde_json::Value;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -280,10 +281,11 @@ fn load_enhanced_result(
     database.with_connection(|connection| {
         let item = connection
             .query_row(
-                "SELECT id, type, code, name, category, summary, content, source_note,
-                        tags, detail, import_batch_id, source_package
-                 FROM knowledge_items
-                 WHERE id = ?1",
+                "SELECT ki.id, ki.type, ki.code, ki.name, ki.category, ki.summary, ki.content, ki.source_note,
+                        ki.tags, ki.detail, ki.import_batch_id, ki.source_package, hd.four_qi
+                 FROM knowledge_items ki
+                 LEFT JOIN herb_details hd ON hd.item_id = ki.id
+                 WHERE ki.id = ?1",
                 params![item_id],
                 |row| {
                     Ok((
@@ -299,6 +301,7 @@ fn load_enhanced_result(
                         row.get::<_, Option<String>>(9)?,
                         row.get::<_, Option<String>>(10)?,
                         row.get::<_, Option<String>>(11)?,
+                        row.get::<_, Option<String>>(12)?,
                     ))
                 },
             )
@@ -316,6 +319,7 @@ fn load_enhanced_result(
             detail,
             import_batch_id,
             source_package,
+            four_qi,
         )) = item
         else {
             return Ok(None);
@@ -346,6 +350,7 @@ fn load_enhanced_result(
             source_title: first_source_title.or_else(|| source_package.clone()),
             source_note,
             tags,
+            four_qi: four_qi.or_else(|| four_qi_from_detail(detail.as_deref())),
             has_annotations: annotation_count > 0,
             annotation_count,
             annotation_snippet,
@@ -424,6 +429,27 @@ fn first_annotation_snippet(
 ) -> AppResult<Option<String>> {
     database.with_connection(|connection| {
         Ok(annotation_summary_for_item(connection, item_id, query)?.2)
+    })
+}
+
+fn four_qi_from_detail(detail: Option<&str>) -> Option<String> {
+    let value = detail.and_then(|text| serde_json::from_str::<Value>(text).ok())?;
+    [
+        "fourQi",
+        "four_qi",
+        "四气",
+        "natureFlavor",
+        "nature_flavor",
+        "性味",
+    ]
+    .iter()
+    .find_map(|key| {
+        value
+            .get(key)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+            .map(ToOwned::to_owned)
     })
 }
 

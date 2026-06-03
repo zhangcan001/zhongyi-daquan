@@ -8,6 +8,7 @@ import {
   updateKnowledgeItem,
 } from "../modules/knowledge/api";
 import { KnowledgeDetailReader } from "../modules/knowledge/KnowledgeDetailReader";
+import { herbNatureClass, herbNatureFromItem } from "../modules/knowledge/natureColor";
 import { detailFields, emptyKnowledgeInput } from "../modules/knowledge/schema";
 import {
   completenessOptions,
@@ -207,21 +208,12 @@ export function KnowledgeWorkspace() {
 
         <div className="knowledge-list" aria-busy={loading}>
           {items.map((item) => (
-            <button
-              className={item.id === selectedId ? "knowledge-row active" : "knowledge-row"}
+            <KnowledgeListRow
+              item={item}
               key={item.id}
-              type="button"
-              onClick={() => item.id && loadDetail(item.id)}
-            >
-              <span>
-                <strong>{item.name}</strong>
-                <small>{[item.code, item.category, item.sourceNote].filter(Boolean).join(" / ") || "未填写编号"}</small>
-              </span>
-              <span className="row-meta">
-                {item.isFavorite ? "收藏" : ""}
-                {item.dataStatus}
-              </span>
-            </button>
+              active={item.id === selectedId}
+              onOpen={() => item.id && loadDetail(item.id)}
+            />
           ))}
           {items.length === 0 ? <p className="empty-text">暂无知识条目</p> : null}
         </div>
@@ -395,5 +387,30 @@ export function KnowledgeWorkspace() {
         </details>
       </div>
     </section>
+  );
+}
+
+function KnowledgeListRow({
+  item,
+  active,
+  onOpen,
+}: {
+  item: KnowledgeItem;
+  active: boolean;
+  onOpen: () => void;
+}) {
+  const nature = herbNatureFromItem(item);
+  return (
+    <button className={active ? "knowledge-row active" : "knowledge-row"} type="button" onClick={onOpen}>
+      <span>
+        <strong className={herbNatureClass(nature)}>{item.name}</strong>
+        <small>{[item.code, item.category, item.sourceNote].filter(Boolean).join(" / ") || "未填写编号"}</small>
+      </span>
+      <span className="row-meta">
+        {nature ? <em className={`nature-chip herb-nature-${nature.tone}`}>{nature.label}</em> : null}
+        {item.isFavorite ? "收藏" : ""}
+        {item.dataStatus}
+      </span>
+    </button>
   );
 }

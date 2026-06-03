@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { searchKnowledgeEnhanced } from "../modules/knowledge/api";
 import { KnowledgeDetailReader } from "../modules/knowledge/KnowledgeDetailReader";
+import { herbNatureClass, parseNatureText } from "../modules/knowledge/natureColor";
 import type { EnhancedSearchResponse, EnhancedSearchResult } from "../modules/knowledge/types";
 
 const filters = ["全部", "中药", "方剂", "穴位", "经络", "针灸", "原典", "注解"];
@@ -151,11 +152,15 @@ function SearchCard({
   onOpen: () => void;
 }) {
   const source = [item.sourceTitle, item.sourceNote].filter(Boolean).join(" | ");
+  const nature = item.itemType === "herb" ? parseNatureText(item.fourQi ?? "") : null;
   return (
     <button className={active ? "result-card active" : "result-card"} type="button" onClick={onOpen}>
       <span className="result-title-row">
-        <strong>{highlight(item.name, query)}</strong>
-        <em>{item.typeLabel}</em>
+        <strong className={herbNatureClass(nature)}>{highlight(item.name, query)}</strong>
+        <span className="result-badges">
+          <em>{item.typeLabel}</em>
+          {nature ? <em className={`nature-chip herb-nature-${nature.tone}`}>{nature.label}</em> : null}
+        </span>
       </span>
       <span>{[item.category, item.code].filter(Boolean).join(" / ") || "未记录分类"}</span>
       {item.summary ? <small>{highlight(item.summary, query)}</small> : null}

@@ -212,24 +212,27 @@ fn build_context(
         .unwrap_or(6000)
         .clamp(500, 30_000) as usize;
     let mut items = Vec::new();
+    let intent = SearchIntent::from_question(question);
     if let Some(item_id) = related_item_id {
         database.with_connection(|connection| {
             if let Some(item) = knowledge_repository::get_by_id(connection, item_id)? {
-                items.push(AiContextItem {
-                    item_id,
-                    item_type: item.item_type,
-                    name: item.name,
-                    source_title: item.source_package,
-                    source_note: item.source_note,
-                    snippet: truncate(
-                        &[item.summary, item.content, item.tags]
-                            .into_iter()
-                            .flatten()
-                            .collect::<Vec<_>>()
-                            .join("\n"),
-                        900,
-                    ),
-                });
+                if intent.allows_type(&item.item_type) {
+                    items.push(AiContextItem {
+                        item_id,
+                        item_type: item.item_type,
+                        name: item.name,
+                        source_title: item.source_package,
+                        source_note: item.source_note,
+                        snippet: truncate(
+                            &[item.summary, item.content, item.tags]
+                                .into_iter()
+                                .flatten()
+                                .collect::<Vec<_>>()
+                                .join("\n"),
+                            900,
+                        ),
+                    });
+                }
             }
             Ok(())
         })?;
@@ -269,7 +272,9 @@ fn build_context(
                 })?;
             for item in rows {
                 let item = item?;
-                if !items.iter().any(|existing| existing.item_id == item.item_id) {
+                if intent.allows_type(&item.item_type)
+                    && !items.iter().any(|existing| existing.item_id == item.item_id)
+                {
                     items.push(item);
                 }
             }
@@ -331,9 +336,6 @@ fn extract_question(request: &AiTaskRequest) -> String {
 fn query_terms(question: &str) -> Vec<String> {
     let mut terms = Vec::new();
     let full = question.trim();
-    if !full.is_empty() {
-        terms.push(full.to_string());
-    }
     for formula_name in formula_names_from_text(full) {
         if !terms.iter().any(|term| term == &formula_name) {
             terms.push(formula_name);
@@ -347,6 +349,9 @@ fn query_terms(question: &str) -> Vec<String> {
         "少阴病",
         "厥阴病",
         "上热下寒",
+        "长期咳嗽",
+        "久咳",
+        "咳嗽",
     ] {
         if full.contains(marker) && !terms.iter().any(|term| term == marker) {
             terms.push(marker.to_string());
@@ -360,6 +365,16 @@ fn query_terms(question: &str) -> Vec<String> {
             )
     }) {
         let token = token
+            .replace("如果", "")
+            .replace("请问", "")
+            .replace("应该", "")
+            .replace("可以", "")
+            .replace("什么药", "")
+            .replace("用药", "")
+            .replace("用什么", "")
+            .replace("怎么治", "")
+            .replace("治疗", "")
+            .replace("长期", "")
             .trim_matches(|ch: char| {
                 matches!(
                     ch,
@@ -376,14 +391,59 @@ fn query_terms(question: &str) -> Vec<String> {
                         | '的'
                         | '组'
                         | '成'
+                        | '用'
+                        | '药'
+                        | '治'
                 )
             })
-            .trim();
-        if token.chars().count() >= 2 && !terms.iter().any(|term| term == token) {
-            terms.push(token.to_string());
+            .trim()
+            .to_string();
+        if token.chars().count() >= 2 && !terms.iter().any(|term| term == &token) {
+            terms.push(token);
         }
     }
+    if !full.is_empty() && terms.is_empty() {
+        terms.push(full.to_string());
+    }
     terms
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SearchIntent {
+    MedicineOrFormula,
+    Acupuncture,
+    General,
+}
+
+impl SearchIntent {
+    fn from_question(question: &str) -> Self {
+        if question.contains("针")
+            || question.contains("灸")
+            || question.contains("穴")
+            || question.contains("经络")
+        {
+            Self::Acupuncture
+        } else if question.contains("药")
+            || question.contains("方")
+            || question.contains("经方")
+            || question.contains("咳嗽")
+            || question.contains("治疗")
+            || question.contains("怎么治")
+        {
+            Self::MedicineOrFormula
+        } else {
+            Self::General
+        }
+    }
+
+    fn allows_type(self, item_type: &str) -> bool {
+        match self {
+            Self::MedicineOrFormula => {
+                !matches!(item_type, "acupuncture" | "acupoint" | "meridian")
+            }
+            Self::Acupuncture | Self::General => true,
+        }
+    }
 }
 
 fn formula_names_from_text(text: &str) -> Vec<String> {
@@ -589,6 +649,41 @@ mod tests {
         let prompt = build_user_prompt("local_qa", "桂枝汤什么组成", &context);
         assert!(prompt.contains("原方组成"));
         assert!(prompt.contains("4人纪-伤寒论.pdf"));
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn medicine_question_excludes_acupuncture_context_and_uses_cough_terms() {
+        let data_dir = temp_data_dir("ai-rag-cough-medicine");
+        let database = Database::initialize(&data_dir).expect("database");
+        database
+            .with_connection(|connection| {
+                connection.execute(
+                    "INSERT INTO knowledge_items
+                     (type, name, summary, content, source_note, tags, data_status, completeness_status, content_version, is_favorite, detail, created_at, updated_at)
+                     VALUES ('acupuncture', '怀孕忌针、安胎堕胎与胎位不正', '孕期针灸禁忌', '用药二字只作测试噪声；本文不涉及长期咳嗽。', '针灸讲义｜PDF页码20', '针灸,孕期', 'imported', 'complete', 1, 0, '{}', datetime('now'), datetime('now'))",
+                    [],
+                )?;
+                connection.execute(
+                    "INSERT INTO knowledge_items
+                     (type, name, summary, content, source_note, tags, data_status, completeness_status, content_version, is_favorite, detail, created_at, updated_at)
+                     VALUES ('formula', '咳嗽参考方', '长期咳嗽资料片段', '本地资料记录：咳嗽相关方剂候选，需辨证参考，不作个人处方。', '本地讲义｜PDF页码55', '咳嗽,方剂', 'imported', 'complete', 1, 0, '{}', datetime('now'), datetime('now'))",
+                    [],
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        let settings = AiProviderSettings {
+            max_context_items: Some(5),
+            max_context_chars: Some(2000),
+            ..AiProviderSettings::default()
+        };
+        let context =
+            build_context(&database, &settings, "如果长期咳嗽，用什么药", None).expect("context");
+        assert!(context.iter().any(|item| item.name == "咳嗽参考方"));
+        assert!(!context
+            .iter()
+            .any(|item| item.name.contains("怀孕忌针") || item.item_type == "acupuncture"));
         let _ = fs::remove_dir_all(data_dir);
     }
 

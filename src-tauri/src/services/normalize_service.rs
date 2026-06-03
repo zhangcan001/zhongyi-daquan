@@ -1,6 +1,7 @@
 use crate::db::connection::Database;
 use crate::errors::AppResult;
 use crate::repositories::standard_term_repository;
+use pinyin::ToPinyin;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 
@@ -294,11 +295,17 @@ fn normalize_category(category: &str) -> String {
 }
 
 fn simple_pinyin_placeholder(name: &str) -> String {
-    // TODO: 接入正式拼音库；当前仅提供稳定占位，避免导入链路缺字段。
     if name.is_ascii() {
         name.to_ascii_lowercase()
     } else {
-        format!("pinyin-{}", name.chars().count())
+        name.to_pinyin()
+            .map(|pinyin| {
+                pinyin
+                    .map(|item| item.plain().to_string())
+                    .unwrap_or_default()
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 }
 

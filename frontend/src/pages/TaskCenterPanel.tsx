@@ -44,6 +44,14 @@ export function TaskCenterPanel() {
     refreshJobs().catch((cause) => setMessage(String(cause)));
   }, []);
 
+  useEffect(() => {
+    if (!jobs.some((job) => job.status === "pending" || job.status === "running")) return;
+    const timer = window.setInterval(() => {
+      refreshJobs().catch((cause) => setMessage(String(cause)));
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [jobs]);
+
   const runAction = async <T,>(action: string, command: string, args?: Record<string, unknown>) => {
     setBusyAction(action);
     setMessage("任务执行中，请稍候。");
@@ -99,7 +107,7 @@ export function TaskCenterPanel() {
         </button>
         <button
           type="button"
-          onClick={() => runAction<MaintenanceReport>("rebuild", "run_rebuild_search_index_job")}
+          onClick={() => runAction<BackgroundJob>("rebuild", "start_rebuild_search_index_job")}
           disabled={busyAction !== null}
         >
           重建索引
@@ -224,6 +232,9 @@ function formatReport(report: unknown): string {
   if (isRestoreReport(report)) {
     return `恢复完成：${report.rebuildSearchIndexNote}`;
   }
+  if (isBackgroundJob(report)) {
+    return `后台任务已启动：#${report.id} ${jobTypeLabels[report.jobType] ?? report.jobType}`;
+  }
   return "任务已完成。";
 }
 
@@ -237,4 +248,8 @@ function isMaintenanceReport(report: unknown): report is MaintenanceReport {
 
 function isRestoreReport(report: unknown): report is RestoreReport {
   return Boolean(report && typeof report === "object" && "restoredFrom" in report);
+}
+
+function isBackgroundJob(report: unknown): report is BackgroundJob {
+  return Boolean(report && typeof report === "object" && "jobType" in report && "progress" in report);
 }

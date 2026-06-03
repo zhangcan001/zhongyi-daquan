@@ -5,6 +5,7 @@ use crate::models::data_pipeline::{
     ImportQualityReport, ImportRunReport, ImportRunSummary, RollbackImportResult,
     RollbackImportRunResult, SaveMappingTemplateRequest, StagingPage,
 };
+use crate::models::runtime::BackgroundJob;
 use crate::services::{field_mapping_service, import_orchestrator_service, import_project_service};
 use crate::AppState;
 use tauri::State;
@@ -89,6 +90,14 @@ pub fn execute_import_plan(
     plan: ImportPlan,
 ) -> AppResult<ExecuteImportPlanResult> {
     import_orchestrator_service::execute_import_plan(&state.database, plan)
+}
+
+#[tauri::command]
+pub fn execute_import_plan_background(
+    state: State<'_, AppState>,
+    plan: ImportPlan,
+) -> AppResult<BackgroundJob> {
+    import_orchestrator_service::start_execute_import_plan_job(&state.database, plan)
 }
 
 #[tauri::command]

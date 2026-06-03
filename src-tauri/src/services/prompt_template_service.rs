@@ -1,8 +1,10 @@
 use crate::errors::AppResult;
 use crate::models::ai::{AiCommandResponse, AI_DISABLED_MESSAGE};
 
+#[allow(dead_code)]
 pub struct PromptTemplateService;
 
+#[allow(dead_code)]
 impl PromptTemplateService {
     pub fn placeholder_status() -> AppResult<AiCommandResponse> {
         Ok(AiCommandResponse {

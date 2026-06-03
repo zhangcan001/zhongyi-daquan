@@ -1,11 +1,12 @@
 use crate::db::connection::Database;
 use crate::errors::AppResult;
-use crate::models::runtime::{CleanOldPerformanceLogsRequest, MaintenanceReport};
+use crate::models::runtime::{BackgroundJob, CleanOldPerformanceLogsRequest, MaintenanceReport};
 use crate::repositories::{audit_repository, performance_repository};
 use crate::services::{background_job_service, search_index_service};
 use chrono::Utc;
 use std::fs;
 use std::path::Path;
+use std::thread;
 
 pub fn rebuild_search_index_job(database: &Database) -> AppResult<MaintenanceReport> {
     let job = background_job_service::create_internal_job(database, "rebuild_search_index", None)?;
@@ -28,6 +29,29 @@ pub fn rebuild_search_index_job(database: &Database) -> AppResult<MaintenanceRep
         })
     })();
     finish_or_fail(database, job.id, result)
+}
+
+pub fn start_rebuild_search_index_job(database: &Database) -> AppResult<BackgroundJob> {
+    let job = background_job_service::create_internal_job(database, "rebuild_search_index", None)?;
+    let job_id = job.id;
+    let database = database.reopen()?;
+
+    thread::spawn(move || {
+        let result = (|| -> AppResult<()> {
+            background_job_service::set_progress(&database, job_id, 10.0)?;
+            let response = search_index_service::rebuild_search_index(&database)?;
+            background_job_service::set_progress(&database, job_id, 90.0)?;
+            let result_json = serde_json::to_string(&response)?;
+            background_job_service::success_with_json(&database, job_id, &result_json)?;
+            Ok(())
+        })();
+
+        if let Err(err) = result {
+            let _ = background_job_service::fail_with_message(&database, job_id, &err.to_string());
+        }
+    });
+
+    Ok(job)
 }
 
 pub fn optimize_database(database: &Database) -> AppResult<MaintenanceReport> {

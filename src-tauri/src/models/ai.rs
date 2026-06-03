@@ -64,6 +64,7 @@ pub struct SaveAiProviderSettingsRequest {
     pub enabled: Option<bool>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiTaskRequest {

@@ -39,6 +39,16 @@ impl Database {
         f(&guard)
     }
 
+    pub fn reopen(&self) -> AppResult<Self> {
+        let connection = Connection::open(&self.path)?;
+        initialize_pragmas(&connection)?;
+        migrations::run(&connection)?;
+        Ok(Self {
+            connection: Mutex::new(connection),
+            path: self.path.clone(),
+        })
+    }
+
     pub fn replace_database_file(&self, replacement_path: &Path) -> AppResult<()> {
         let mut guard = self
             .connection

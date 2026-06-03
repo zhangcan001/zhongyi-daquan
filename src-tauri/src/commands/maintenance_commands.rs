@@ -1,5 +1,5 @@
 use crate::errors::AppResult;
-use crate::models::runtime::{CleanOldPerformanceLogsRequest, MaintenanceReport};
+use crate::models::runtime::{BackgroundJob, CleanOldPerformanceLogsRequest, MaintenanceReport};
 use crate::services::maintenance_service;
 use crate::AppState;
 use tauri::State;
@@ -7,6 +7,11 @@ use tauri::State;
 #[tauri::command]
 pub fn run_rebuild_search_index_job(state: State<'_, AppState>) -> AppResult<MaintenanceReport> {
     maintenance_service::rebuild_search_index_job(&state.database)
+}
+
+#[tauri::command]
+pub fn start_rebuild_search_index_job(state: State<'_, AppState>) -> AppResult<BackgroundJob> {
+    maintenance_service::start_rebuild_search_index_job(&state.database)
 }
 
 #[tauri::command]

@@ -9,6 +9,7 @@ import type {
   ImportRunSummary,
   RollbackImportRunResult,
 } from "../modules/importPipeline/types";
+import type { BackgroundJob } from "../modules/runtime/types";
 
 type ImportStep = "pick" | "analyze" | "plan" | "report";
 
@@ -30,6 +31,10 @@ export function ImportStagingPanel() {
   const [advancedContent, setAdvancedContent] = useState(sampleJson);
   const [advancedKind, setAdvancedKind] = useState<"json" | "csv">("json");
   const [advancedPreview, setAdvancedPreview] = useState<ImportParsedPreview | null>(null);
+  const [activeJob, setActiveJob] = useState<BackgroundJob | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [isRollingBack, setIsRollingBack] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -100,6 +105,7 @@ export function ImportStagingPanel() {
     setPackagePath(selectedPath);
     setFileName(selectedPath.split(/[\\/]/).filter(Boolean).pop() ?? "标准数据包");
     setStep("analyze");
+    setIsAnalyzing(true);
     try {
       const nextPlan = await invoke<ImportPlan>("preview_import_plan", { packagePath: selectedPath });
       setPlan(nextPlan);
@@ -109,15 +115,21 @@ export function ImportStagingPanel() {
       setPlan(null);
       setError(String(cause));
       setStep("pick");
+    } finally {
+      setIsAnalyzing(false);
     }
   }
 
   async function executePlan() {
-    if (!plan) return;
+    if (!plan || isExecuting) return;
     setError("");
-    setMessage("");
+    setMessage("已创建导入后台任务，正在执行。");
+    setIsExecuting(true);
     try {
-      const result = await invoke<ExecuteImportPlanResult>("execute_import_plan", { plan });
+      const job = await invoke<BackgroundJob>("execute_import_plan_background", { plan });
+      setActiveJob(job);
+      const completedJob = await waitForJob(job.id, setActiveJob);
+      const result = parseImportJobResult(completedJob);
       setReport(result);
       setStep("report");
       setMessage("导入完成，搜索索引已重建。");
@@ -127,13 +139,16 @@ export function ImportStagingPanel() {
       }
     } catch (cause) {
       setError(String(cause));
+    } finally {
+      setIsExecuting(false);
     }
   }
 
   async function rollbackCurrentRun() {
-    if (!report?.importRunId) return;
+    if (!report?.importRunId || isRollingBack) return;
     if (!window.confirm("确认回滚本次导入？系统只撤销本批次记录的新增、注解和补空字段。")) return;
     setError("");
+    setIsRollingBack(true);
     try {
       const result = await invoke<RollbackImportRunResult>("rollback_import_run", {
         importRunId: report.importRunId,
@@ -148,6 +163,8 @@ export function ImportStagingPanel() {
       setRunReport(await invoke<ImportRunReport>("get_import_run_report", { importRunId: report.importRunId }));
     } catch (cause) {
       setError(String(cause));
+    } finally {
+      setIsRollingBack(false);
     }
   }
 
@@ -156,6 +173,7 @@ export function ImportStagingPanel() {
     setPlan(null);
     setReport(null);
     setRunReport(null);
+    setActiveJob(null);
     setPackagePath("");
     setFileName("");
     setMessage("");
@@ -180,8 +198,12 @@ export function ImportStagingPanel() {
       </div>
 
       <div className="import-actions">
-        <button type="button" onClick={() => choosePackage("zip")}>选择 ZIP 数据包</button>
-        <button type="button" onClick={() => choosePackage("folder")}>选择已解压数据包文件夹</button>
+        <button type="button" disabled={isAnalyzing || isExecuting} onClick={() => choosePackage("zip")}>
+          {isAnalyzing ? "正在分析..." : "选择 ZIP 数据包"}
+        </button>
+        <button type="button" disabled={isAnalyzing || isExecuting} onClick={() => choosePackage("folder")}>
+          选择已解压数据包文件夹
+        </button>
         <label className="file-button">
           选择单个 JSON / CSV 文件，高级入口
           <input type="file" accept=".json,.csv,application/json,text/csv" onChange={(event) => chooseAdvancedFile(event.target.files?.[0] ?? null)} />
@@ -209,9 +231,21 @@ export function ImportStagingPanel() {
       ) : null}
 
       <div className="import-actions primary-actions">
-        <button type="button" disabled={!plan || Boolean(report)} onClick={executePlan}>开始导入</button>
-        <button type="button" onClick={cancelImport}>取消</button>
+        <button type="button" disabled={!plan || Boolean(report) || isExecuting} onClick={executePlan}>
+          {isExecuting ? "导入中..." : "开始导入"}
+        </button>
+        <button type="button" disabled={isExecuting || isRollingBack} onClick={cancelImport}>取消</button>
       </div>
+
+      {activeJob ? (
+        <div className="preview-panel">
+          <h3>后台任务</h3>
+          <div className="progress-cell">
+            <progress value={activeJob.progress} max={100} />
+            <span>#{activeJob.id} {jobStatusLabel(activeJob.status)} {Math.round(activeJob.progress)}%</span>
+          </div>
+        </div>
+      ) : null}
 
       {report ? (
         <div className="preview-panel">
@@ -225,7 +259,9 @@ export function ImportStagingPanel() {
             <Metric label="搜索索引" value={report.searchIndexRebuilt ? "已重建" : "未重建"} />
           </div>
           <div className="import-actions">
-            <button type="button" disabled={!report.importRunId} onClick={rollbackCurrentRun}>一键回滚本次导入</button>
+            <button type="button" disabled={!report.importRunId || isRollingBack} onClick={rollbackCurrentRun}>
+              {isRollingBack ? "回滚中..." : "一键回滚本次导入"}
+            </button>
           </div>
           {runReport ? (
             <details className="advanced-details">
@@ -379,6 +415,44 @@ function Metric({ label, value }: { label: string; value: number | string }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+async function waitForJob(
+  jobId: number,
+  onUpdate: (job: BackgroundJob) => void,
+): Promise<BackgroundJob> {
+  for (let attempt = 0; attempt < 360; attempt += 1) {
+    const job = await invoke<BackgroundJob>("get_job", { jobId });
+    onUpdate(job);
+    if (job.status === "success") return job;
+    if (job.status === "failed") {
+      throw new Error(job.errorMessage ?? "后台导入任务失败。");
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 1000));
+  }
+  throw new Error("后台导入任务仍在执行，请到任务中心查看进度。");
+}
+
+function parseImportJobResult(job: BackgroundJob): ExecuteImportPlanResult {
+  if (!job.resultJson) {
+    throw new Error("后台任务完成但未返回导入报告。");
+  }
+  return JSON.parse(job.resultJson) as ExecuteImportPlanResult;
+}
+
+function jobStatusLabel(status: string) {
+  switch (status) {
+    case "pending":
+      return "等待中";
+    case "running":
+      return "运行中";
+    case "success":
+      return "成功";
+    case "failed":
+      return "失败";
+    default:
+      return status;
+  }
 }
 
 function readableIntent(intent?: string | null) {

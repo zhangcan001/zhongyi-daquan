@@ -15,6 +15,7 @@ pub fn placeholder_response() -> AppResult<AiPlaceholderResponse> {
 
 pub struct AiPlaceholderService;
 
+#[allow(dead_code)]
 impl AiPlaceholderService {
     pub fn test_connection() -> AppResult<AiCommandResponse> {
         PromptTemplateService::placeholder_status()

@@ -1,8 +1,10 @@
 use crate::errors::AppResult;
 use crate::models::ai::{AiCommandResponse, AI_DISABLED_MESSAGE};
 
+#[allow(dead_code)]
 pub struct AiSafetyService;
 
+#[allow(dead_code)]
 impl AiSafetyService {
     pub fn blocked_placeholder() -> AppResult<AiCommandResponse> {
         Ok(AiCommandResponse {

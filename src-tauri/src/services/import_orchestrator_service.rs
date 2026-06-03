@@ -4,15 +4,17 @@ use crate::models::data_pipeline::{
     ExecuteImportPlanResult, ImportPlan, ImportPlanAction, ImportRunReport, ImportRunSummary,
     RollbackImportRunResult,
 };
+use crate::models::runtime::BackgroundJob;
 use crate::repositories::search_repository;
 use crate::services::{
-    ai_import_assist_service, import_engine_service, import_project_service, normalize_service,
-    search_index_service,
+    ai_import_assist_service, background_job_service, import_engine_service,
+    import_project_service, normalize_service, search_index_service,
 };
 use chrono::Utc;
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
+use std::thread;
 
 pub fn preview_import_plan(database: &Database, package_path: &str) -> AppResult<ImportPlan> {
     let parsed = import_project_service::parse_path_import_package(package_path)?;
@@ -274,6 +276,40 @@ pub fn execute_import_plan(
         can_rollback: true,
         warnings,
     })
+}
+
+pub fn start_execute_import_plan_job(
+    database: &Database,
+    plan: ImportPlan,
+) -> AppResult<BackgroundJob> {
+    let params_json = serde_json::json!({
+        "action": "execute_import_plan",
+        "planId": plan.plan_id,
+        "packageName": plan.package_name,
+        "totalRecords": plan.total_records
+    })
+    .to_string();
+    let job =
+        background_job_service::create_internal_job(database, "import_batch", Some(&params_json))?;
+    let job_id = job.id;
+    let database = database.reopen()?;
+
+    thread::spawn(move || {
+        let result = (|| -> AppResult<()> {
+            background_job_service::set_progress(&database, job_id, 5.0)?;
+            let imported = execute_import_plan(&database, plan)?;
+            background_job_service::set_progress(&database, job_id, 90.0)?;
+            let result_json = serde_json::to_string(&imported)?;
+            background_job_service::success_with_json(&database, job_id, &result_json)?;
+            Ok(())
+        })();
+
+        if let Err(err) = result {
+            let _ = background_job_service::fail_with_message(&database, job_id, &err.to_string());
+        }
+    });
+
+    Ok(job)
 }
 
 pub fn list_import_runs(database: &Database) -> AppResult<Vec<ImportRunSummary>> {

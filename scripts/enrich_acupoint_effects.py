@@ -5,6 +5,8 @@ import sqlite3
 import time
 
 SAFETY = "仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。"
+NEEDLING_SAFETY = "针刺深度、方向和角度没有可脱离个体情况的统一数字；须由合格针灸专业人员依据标准定位、体型胖瘦、局部解剖、禁忌与教材规范判断。本库不提供可照做的下针深度。"
+SOURCE_NOTE = "参考 WHO Western Pacific Regional Office《Standard Acupuncture Nomenclature, 2nd ed》(1993) 所列十四经标准经穴编号/名称；作用范围按经络脏腑归属作传统学习归纳。"
 
 SCOPES = {
     "LU": ("宣肺理气、肃降肺气、调理咽喉与胸部气机。", "传统常用于肺系、咽喉、胸部及上肢内侧相关病证的学习归纳。"),
@@ -21,6 +23,23 @@ SCOPES = {
     "LR": ("疏肝理气、调经和血、平抑肝阳。", "传统常用于肝胆、情志、胁肋、妇科及下肢内侧相关病证的学习归纳。"),
     "GV": ("统摄督脉、振奋阳气、调理头项脊背与神志。", "传统常用于头项、脊柱、背部、阳气与神志相关病证的学习归纳。"),
     "CV": ("统摄任脉、调理阴液与下焦、和中固本。", "传统常用于腹部、泌尿生殖、妇科、脾胃与任脉循行相关病证的学习归纳。"),
+}
+
+MERIDIAN_META = {
+    "LU": ("手太阴肺经", "十二正经", "阴", "手", "肺", "手阳明大肠经"),
+    "LI": ("手阳明大肠经", "十二正经", "阳", "手", "大肠", "手太阴肺经"),
+    "ST": ("足阳明胃经", "十二正经", "阳", "足", "胃", "足太阴脾经"),
+    "SP": ("足太阴脾经", "十二正经", "阴", "足", "脾", "足阳明胃经"),
+    "HT": ("手少阴心经", "十二正经", "阴", "手", "心", "手太阳小肠经"),
+    "SI": ("手太阳小肠经", "十二正经", "阳", "手", "小肠", "手少阴心经"),
+    "BL": ("足太阳膀胱经", "十二正经", "阳", "足", "膀胱", "足少阴肾经"),
+    "KI": ("足少阴肾经", "十二正经", "阴", "足", "肾", "足太阳膀胱经"),
+    "PC": ("手厥阴心包经", "十二正经", "阴", "手", "心包", "手少阳三焦经"),
+    "TE": ("手少阳三焦经", "十二正经", "阳", "手", "三焦", "手厥阴心包经"),
+    "GB": ("足少阳胆经", "十二正经", "阳", "足", "胆", "足厥阴肝经"),
+    "LR": ("足厥阴肝经", "十二正经", "阴", "足", "肝", "足少阳胆经"),
+    "GV": ("督脉", "奇经八脉", "阳脉之海", "躯干正中", "脑、脊柱、诸阳经", ""),
+    "CV": ("任脉", "奇经八脉", "阴脉之海", "躯干正中", "胞宫、下焦、诸阴经", ""),
 }
 
 
@@ -52,8 +71,47 @@ def enrich_item(item: dict) -> tuple[str, str]:
     detail["meridian_name"] = meridian_name
     detail["functions"] = functions
     detail["indications"] = indications
+    detail["needling_summary"] = NEEDLING_SAFETY
     detail["precautions"] = SAFETY
     return functions, indications
+
+
+def build_meridian_seed() -> list[dict]:
+    seed = []
+    for code, (name, category, yin_yang, hand_foot, organ, paired) in MERIDIAN_META.items():
+        organ_text = f"传统经络归属联系：{organ}。" if organ else "传统经络归属需结合任督脉理论学习。"
+        content = (
+            f"{name}，国际代码 {code}，类别：{category}。"
+            f"阴阳属性：{yin_yang or '未单列'}；手足属性：{hand_foot or '未单列'}。"
+            f"{organ_text}"
+            f"{'表里经：' + paired + '。' if paired else ''}"
+            f"{SAFETY}"
+        )
+        seed.append(
+            {
+                "type": "meridian",
+                "code": code,
+                "name": name,
+                "pinyin": "",
+                "category": category,
+                "summary": f"{name}，{category}，联系脏腑：{organ or '任督脉系统'}。",
+                "content": content,
+                "source_note": SOURCE_NOTE,
+                "tags": ["经络", category, code, organ],
+                "detail": {
+                    "meridian_code": code,
+                    "category": category,
+                    "yin_yang": yin_yang,
+                    "hand_foot": hand_foot,
+                    "organ_relation": organ,
+                    "paired_meridian": paired,
+                    "pathway_text": "",
+                    "main_indications": "按经络循行、所属脏腑与传统辨证体系作学习归纳。",
+                    "notes": SAFETY,
+                },
+            }
+        )
+    return seed
 
 
 def main() -> None:
@@ -62,6 +120,9 @@ def main() -> None:
     for item in items:
         enrich_item(item)
     seed_path.write_text(json.dumps(items, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    meridian_seed = build_meridian_seed()
+    meridian_seed_path = pathlib.Path("data-seed/meridians.full.json")
+    meridian_seed_path.write_text(json.dumps(meridian_seed, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     db = app_database()
     backup = db.parent.parent / "backups" / f"zhongyi-before-acupoint-effects-{time.strftime('%Y%m%d%H%M%S')}.db"
@@ -82,6 +143,7 @@ def main() -> None:
                     "meridianCode": detail["meridian_code"],
                     "functions": detail["functions"],
                     "indications": detail["indications"],
+                    "needlingSummary": detail["needling_summary"],
                     "precautions": detail["precautions"],
                     "riskLevel": detail.get("risk_level", "learning_only"),
                 },
@@ -106,10 +168,10 @@ def main() -> None:
             conn.execute(
                 """
                 UPDATE acupoint_details
-                   SET functions = ?, indications = ?, precautions = ?
+                   SET functions = ?, indications = ?, needling_summary = ?, precautions = ?
                  WHERE item_id = ?
                 """,
-                (detail["functions"], detail["indications"], detail["precautions"], item_id),
+                (detail["functions"], detail["indications"], detail["needling_summary"], detail["precautions"], item_id),
             )
             conn.execute("DELETE FROM knowledge_fts WHERE rowid = ?", (item_id,))
             conn.execute(
@@ -128,17 +190,95 @@ def main() -> None:
                 """,
                 (item["summary"], tags, now, item_id),
             )
+        for item in meridian_seed:
+            detail = item["detail"]
+            detail_json = json.dumps(
+                {
+                    "category": detail["category"],
+                    "yinYang": detail["yin_yang"],
+                    "handFoot": detail["hand_foot"],
+                    "organRelation": detail["organ_relation"],
+                    "pairedMeridian": detail["paired_meridian"],
+                    "mainIndications": detail["main_indications"],
+                    "notes": detail["notes"],
+                },
+                ensure_ascii=False,
+            )
+            tags = ",".join(tag for tag in item["tags"] if tag)
+            row = conn.execute(
+                "SELECT id FROM knowledge_items WHERE type = 'meridian' AND code = ?",
+                (item["code"],),
+            ).fetchone()
+            if not row:
+                continue
+            item_id = row[0]
+            conn.execute(
+                """
+                UPDATE knowledge_items
+                   SET summary = ?, content = ?, source_note = ?, detail = ?, tags = ?, updated_at = ?
+                 WHERE id = ?
+                """,
+                (item["summary"], item["content"], item["source_note"], detail_json, tags, now, item_id),
+            )
+            conn.execute(
+                """
+                UPDATE meridian_details
+                   SET category = ?, yin_yang = ?, hand_foot = ?, organ_relation = ?,
+                       paired_meridian = ?, main_indications = ?, notes = ?
+                 WHERE item_id = ?
+                """,
+                (
+                    detail["category"],
+                    detail["yin_yang"],
+                    detail["hand_foot"],
+                    detail["organ_relation"],
+                    detail["paired_meridian"],
+                    detail["main_indications"],
+                    detail["notes"],
+                    item_id,
+                ),
+            )
+            conn.execute("DELETE FROM knowledge_fts WHERE rowid = ?", (item_id,))
+            conn.execute(
+                """
+                INSERT INTO knowledge_fts(rowid, name, code, alias, pinyin, category, summary, content, tags)
+                SELECT id, name, code, alias, pinyin, category, summary, content, tags
+                  FROM knowledge_items WHERE id = ?
+                """,
+                (item_id,),
+            )
+            conn.execute(
+                """
+                UPDATE knowledge_list_view_cache
+                   SET summary = ?, tags = ?, updated_at = ?
+                 WHERE item_id = ?
+                """,
+                (item["summary"], tags, now, item_id),
+            )
+
         conn.execute(
             """
             INSERT INTO audit_logs(action, target_type, after_json, created_at)
             VALUES ('enrich_acupoint_meridian_effects', 'acupoint', ?, ?)
             """,
-            (json.dumps({"acupoints": len(items), "mode": "meridian_scope_learning_reference"}, ensure_ascii=False), now),
+            (
+                json.dumps(
+                    {
+                        "acupoints": len(items),
+                        "meridians": len(meridian_seed),
+                        "mode": "meridian_scope_learning_reference",
+                        "needlingDepth": "professional_judgment_required",
+                    },
+                    ensure_ascii=False,
+                ),
+                now,
+            ),
         )
 
     result = {
         "backup": str(backup),
         "seedUpdated": str(seed_path),
+        "meridianSeedUpdated": str(meridian_seed_path),
         "functionsFilled": conn.execute(
             "SELECT COUNT(*) FROM acupoint_details WHERE functions IS NOT NULL AND trim(functions) != ''"
         ).fetchone()[0],
@@ -153,6 +293,9 @@ def main() -> None:
              WHERE ki.code = 'ST36'
             """
         ).fetchone(),
+        "meridiansWithOrgans": conn.execute(
+            "SELECT COUNT(*) FROM meridian_details WHERE organ_relation IS NOT NULL AND trim(organ_relation) != ''"
+        ).fetchone()[0],
     }
     conn.close()
     print(json.dumps(result, ensure_ascii=False, indent=2))

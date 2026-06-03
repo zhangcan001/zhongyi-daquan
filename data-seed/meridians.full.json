@@ -1,0 +1,380 @@
+[
+  {
+    "type": "meridian",
+    "code": "LU",
+    "name": "手太阴肺经",
+    "pinyin": "",
+    "category": "十二正经",
+    "summary": "手太阴肺经，十二正经，联系脏腑：肺。",
+    "content": "手太阴肺经，国际代码 LU，类别：十二正经。阴阳属性：阴；手足属性：手。传统经络归属联系：肺。表里经：手阳明大肠经。仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。",
+    "source_note": "参考 WHO Western Pacific Regional Office《Standard Acupuncture Nomenclature, 2nd ed》(1993) 所列十四经标准经穴编号/名称；作用范围按经络脏腑归属作传统学习归纳。",
+    "tags": [
+      "经络",
+      "十二正经",
+      "LU",
+      "肺"
+    ],
+    "detail": {
+      "meridian_code": "LU",
+      "category": "十二正经",
+      "yin_yang": "阴",
+      "hand_foot": "手",
+      "organ_relation": "肺",
+      "paired_meridian": "手阳明大肠经",
+      "pathway_text": "",
+      "main_indications": "按经络循行、所属脏腑与传统辨证体系作学习归纳。",
+      "notes": "仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。"
+    }
+  },
+  {
+    "type": "meridian",
+    "code": "LI",
+    "name": "手阳明大肠经",
+    "pinyin": "",
+    "category": "十二正经",
+    "summary": "手阳明大肠经，十二正经，联系脏腑：大肠。",
+    "content": "手阳明大肠经，国际代码 LI，类别：十二正经。阴阳属性：阳；手足属性：手。传统经络归属联系：大肠。表里经：手太阴肺经。仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。",
+    "source_note": "参考 WHO Western Pacific Regional Office《Standard Acupuncture Nomenclature, 2nd ed》(1993) 所列十四经标准经穴编号/名称；作用范围按经络脏腑归属作传统学习归纳。",
+    "tags": [
+      "经络",
+      "十二正经",
+      "LI",
+      "大肠"
+    ],
+    "detail": {
+      "meridian_code": "LI",
+      "category": "十二正经",
+      "yin_yang": "阳",
+      "hand_foot": "手",
+      "organ_relation": "大肠",
+      "paired_meridian": "手太阴肺经",
+      "pathway_text": "",
+      "main_indications": "按经络循行、所属脏腑与传统辨证体系作学习归纳。",
+      "notes": "仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。"
+    }
+  },
+  {
+    "type": "meridian",
+    "code": "ST",
+    "name": "足阳明胃经",
+    "pinyin": "",
+    "category": "十二正经",
+    "summary": "足阳明胃经，十二正经，联系脏腑：胃。",
+    "content": "足阳明胃经，国际代码 ST，类别：十二正经。阴阳属性：阳；手足属性：足。传统经络归属联系：胃。表里经：足太阴脾经。仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。",
+    "source_note": "参考 WHO Western Pacific Regional Office《Standard Acupuncture Nomenclature, 2nd ed》(1993) 所列十四经标准经穴编号/名称；作用范围按经络脏腑归属作传统学习归纳。",
+    "tags": [
+      "经络",
+      "十二正经",
+      "ST",
+      "胃"
+    ],
+    "detail": {
+      "meridian_code": "ST",
+      "category": "十二正经",
+      "yin_yang": "阳",
+      "hand_foot": "足",
+      "organ_relation": "胃",
+      "paired_meridian": "足太阴脾经",
+      "pathway_text": "",
+      "main_indications": "按经络循行、所属脏腑与传统辨证体系作学习归纳。",
+      "notes": "仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。"
+    }
+  },
+  {
+    "type": "meridian",
+    "code": "SP",
+    "name": "足太阴脾经",
+    "pinyin": "",
+    "category": "十二正经",
+    "summary": "足太阴脾经，十二正经，联系脏腑：脾。",
+    "content": "足太阴脾经，国际代码 SP，类别：十二正经。阴阳属性：阴；手足属性：足。传统经络归属联系：脾。表里经：足阳明胃经。仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。",
+    "source_note": "参考 WHO Western Pacific Regional Office《Standard Acupuncture Nomenclature, 2nd ed》(1993) 所列十四经标准经穴编号/名称；作用范围按经络脏腑归属作传统学习归纳。",
+    "tags": [
+      "经络",
+      "十二正经",
+      "SP",
+      "脾"
+    ],
+    "detail": {
+      "meridian_code": "SP",
+      "category": "十二正经",
+      "yin_yang": "阴",
+      "hand_foot": "足",
+      "organ_relation": "脾",
+      "paired_meridian": "足阳明胃经",
+      "pathway_text": "",
+      "main_indications": "按经络循行、所属脏腑与传统辨证体系作学习归纳。",
+      "notes": "仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。"
+    }
+  },
+  {
+    "type": "meridian",
+    "code": "HT",
+    "name": "手少阴心经",
+    "pinyin": "",
+    "category": "十二正经",
+    "summary": "手少阴心经，十二正经，联系脏腑：心。",
+    "content": "手少阴心经，国际代码 HT，类别：十二正经。阴阳属性：阴；手足属性：手。传统经络归属联系：心。表里经：手太阳小肠经。仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。",
+    "source_note": "参考 WHO Western Pacific Regional Office《Standard Acupuncture Nomenclature, 2nd ed》(1993) 所列十四经标准经穴编号/名称；作用范围按经络脏腑归属作传统学习归纳。",
+    "tags": [
+      "经络",
+      "十二正经",
+      "HT",
+      "心"
+    ],
+    "detail": {
+      "meridian_code": "HT",
+      "category": "十二正经",
+      "yin_yang": "阴",
+      "hand_foot": "手",
+      "organ_relation": "心",
+      "paired_meridian": "手太阳小肠经",
+      "pathway_text": "",
+      "main_indications": "按经络循行、所属脏腑与传统辨证体系作学习归纳。",
+      "notes": "仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。"
+    }
+  },
+  {
+    "type": "meridian",
+    "code": "SI",
+    "name": "手太阳小肠经",
+    "pinyin": "",
+    "category": "十二正经",
+    "summary": "手太阳小肠经，十二正经，联系脏腑：小肠。",
+    "content": "手太阳小肠经，国际代码 SI，类别：十二正经。阴阳属性：阳；手足属性：手。传统经络归属联系：小肠。表里经：手少阴心经。仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。",
+    "source_note": "参考 WHO Western Pacific Regional Office《Standard Acupuncture Nomenclature, 2nd ed》(1993) 所列十四经标准经穴编号/名称；作用范围按经络脏腑归属作传统学习归纳。",
+    "tags": [
+      "经络",
+      "十二正经",
+      "SI",
+      "小肠"
+    ],
+    "detail": {
+      "meridian_code": "SI",
+      "category": "十二正经",
+      "yin_yang": "阳",
+      "hand_foot": "手",
+      "organ_relation": "小肠",
+      "paired_meridian": "手少阴心经",
+      "pathway_text": "",
+      "main_indications": "按经络循行、所属脏腑与传统辨证体系作学习归纳。",
+      "notes": "仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。"
+    }
+  },
+  {
+    "type": "meridian",
+    "code": "BL",
+    "name": "足太阳膀胱经",
+    "pinyin": "",
+    "category": "十二正经",
+    "summary": "足太阳膀胱经，十二正经，联系脏腑：膀胱。",
+    "content": "足太阳膀胱经，国际代码 BL，类别：十二正经。阴阳属性：阳；手足属性：足。传统经络归属联系：膀胱。表里经：足少阴肾经。仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。",
+    "source_note": "参考 WHO Western Pacific Regional Office《Standard Acupuncture Nomenclature, 2nd ed》(1993) 所列十四经标准经穴编号/名称；作用范围按经络脏腑归属作传统学习归纳。",
+    "tags": [
+      "经络",
+      "十二正经",
+      "BL",
+      "膀胱"
+    ],
+    "detail": {
+      "meridian_code": "BL",
+      "category": "十二正经",
+      "yin_yang": "阳",
+      "hand_foot": "足",
+      "organ_relation": "膀胱",
+      "paired_meridian": "足少阴肾经",
+      "pathway_text": "",
+      "main_indications": "按经络循行、所属脏腑与传统辨证体系作学习归纳。",
+      "notes": "仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。"
+    }
+  },
+  {
+    "type": "meridian",
+    "code": "KI",
+    "name": "足少阴肾经",
+    "pinyin": "",
+    "category": "十二正经",
+    "summary": "足少阴肾经，十二正经，联系脏腑：肾。",
+    "content": "足少阴肾经，国际代码 KI，类别：十二正经。阴阳属性：阴；手足属性：足。传统经络归属联系：肾。表里经：足太阳膀胱经。仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。",
+    "source_note": "参考 WHO Western Pacific Regional Office《Standard Acupuncture Nomenclature, 2nd ed》(1993) 所列十四经标准经穴编号/名称；作用范围按经络脏腑归属作传统学习归纳。",
+    "tags": [
+      "经络",
+      "十二正经",
+      "KI",
+      "肾"
+    ],
+    "detail": {
+      "meridian_code": "KI",
+      "category": "十二正经",
+      "yin_yang": "阴",
+      "hand_foot": "足",
+      "organ_relation": "肾",
+      "paired_meridian": "足太阳膀胱经",
+      "pathway_text": "",
+      "main_indications": "按经络循行、所属脏腑与传统辨证体系作学习归纳。",
+      "notes": "仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。"
+    }
+  },
+  {
+    "type": "meridian",
+    "code": "PC",
+    "name": "手厥阴心包经",
+    "pinyin": "",
+    "category": "十二正经",
+    "summary": "手厥阴心包经，十二正经，联系脏腑：心包。",
+    "content": "手厥阴心包经，国际代码 PC，类别：十二正经。阴阳属性：阴；手足属性：手。传统经络归属联系：心包。表里经：手少阳三焦经。仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。",
+    "source_note": "参考 WHO Western Pacific Regional Office《Standard Acupuncture Nomenclature, 2nd ed》(1993) 所列十四经标准经穴编号/名称；作用范围按经络脏腑归属作传统学习归纳。",
+    "tags": [
+      "经络",
+      "十二正经",
+      "PC",
+      "心包"
+    ],
+    "detail": {
+      "meridian_code": "PC",
+      "category": "十二正经",
+      "yin_yang": "阴",
+      "hand_foot": "手",
+      "organ_relation": "心包",
+      "paired_meridian": "手少阳三焦经",
+      "pathway_text": "",
+      "main_indications": "按经络循行、所属脏腑与传统辨证体系作学习归纳。",
+      "notes": "仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。"
+    }
+  },
+  {
+    "type": "meridian",
+    "code": "TE",
+    "name": "手少阳三焦经",
+    "pinyin": "",
+    "category": "十二正经",
+    "summary": "手少阳三焦经，十二正经，联系脏腑：三焦。",
+    "content": "手少阳三焦经，国际代码 TE，类别：十二正经。阴阳属性：阳；手足属性：手。传统经络归属联系：三焦。表里经：手厥阴心包经。仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。",
+    "source_note": "参考 WHO Western Pacific Regional Office《Standard Acupuncture Nomenclature, 2nd ed》(1993) 所列十四经标准经穴编号/名称；作用范围按经络脏腑归属作传统学习归纳。",
+    "tags": [
+      "经络",
+      "十二正经",
+      "TE",
+      "三焦"
+    ],
+    "detail": {
+      "meridian_code": "TE",
+      "category": "十二正经",
+      "yin_yang": "阳",
+      "hand_foot": "手",
+      "organ_relation": "三焦",
+      "paired_meridian": "手厥阴心包经",
+      "pathway_text": "",
+      "main_indications": "按经络循行、所属脏腑与传统辨证体系作学习归纳。",
+      "notes": "仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。"
+    }
+  },
+  {
+    "type": "meridian",
+    "code": "GB",
+    "name": "足少阳胆经",
+    "pinyin": "",
+    "category": "十二正经",
+    "summary": "足少阳胆经，十二正经，联系脏腑：胆。",
+    "content": "足少阳胆经，国际代码 GB，类别：十二正经。阴阳属性：阳；手足属性：足。传统经络归属联系：胆。表里经：足厥阴肝经。仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。",
+    "source_note": "参考 WHO Western Pacific Regional Office《Standard Acupuncture Nomenclature, 2nd ed》(1993) 所列十四经标准经穴编号/名称；作用范围按经络脏腑归属作传统学习归纳。",
+    "tags": [
+      "经络",
+      "十二正经",
+      "GB",
+      "胆"
+    ],
+    "detail": {
+      "meridian_code": "GB",
+      "category": "十二正经",
+      "yin_yang": "阳",
+      "hand_foot": "足",
+      "organ_relation": "胆",
+      "paired_meridian": "足厥阴肝经",
+      "pathway_text": "",
+      "main_indications": "按经络循行、所属脏腑与传统辨证体系作学习归纳。",
+      "notes": "仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。"
+    }
+  },
+  {
+    "type": "meridian",
+    "code": "LR",
+    "name": "足厥阴肝经",
+    "pinyin": "",
+    "category": "十二正经",
+    "summary": "足厥阴肝经，十二正经，联系脏腑：肝。",
+    "content": "足厥阴肝经，国际代码 LR，类别：十二正经。阴阳属性：阴；手足属性：足。传统经络归属联系：肝。表里经：足少阳胆经。仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。",
+    "source_note": "参考 WHO Western Pacific Regional Office《Standard Acupuncture Nomenclature, 2nd ed》(1993) 所列十四经标准经穴编号/名称；作用范围按经络脏腑归属作传统学习归纳。",
+    "tags": [
+      "经络",
+      "十二正经",
+      "LR",
+      "肝"
+    ],
+    "detail": {
+      "meridian_code": "LR",
+      "category": "十二正经",
+      "yin_yang": "阴",
+      "hand_foot": "足",
+      "organ_relation": "肝",
+      "paired_meridian": "足少阳胆经",
+      "pathway_text": "",
+      "main_indications": "按经络循行、所属脏腑与传统辨证体系作学习归纳。",
+      "notes": "仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。"
+    }
+  },
+  {
+    "type": "meridian",
+    "code": "GV",
+    "name": "督脉",
+    "pinyin": "",
+    "category": "奇经八脉",
+    "summary": "督脉，奇经八脉，联系脏腑：脑、脊柱、诸阳经。",
+    "content": "督脉，国际代码 GV，类别：奇经八脉。阴阳属性：阳脉之海；手足属性：躯干正中。传统经络归属联系：脑、脊柱、诸阳经。仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。",
+    "source_note": "参考 WHO Western Pacific Regional Office《Standard Acupuncture Nomenclature, 2nd ed》(1993) 所列十四经标准经穴编号/名称；作用范围按经络脏腑归属作传统学习归纳。",
+    "tags": [
+      "经络",
+      "奇经八脉",
+      "GV",
+      "脑、脊柱、诸阳经"
+    ],
+    "detail": {
+      "meridian_code": "GV",
+      "category": "奇经八脉",
+      "yin_yang": "阳脉之海",
+      "hand_foot": "躯干正中",
+      "organ_relation": "脑、脊柱、诸阳经",
+      "paired_meridian": "",
+      "pathway_text": "",
+      "main_indications": "按经络循行、所属脏腑与传统辨证体系作学习归纳。",
+      "notes": "仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。"
+    }
+  },
+  {
+    "type": "meridian",
+    "code": "CV",
+    "name": "任脉",
+    "pinyin": "",
+    "category": "奇经八脉",
+    "summary": "任脉，奇经八脉，联系脏腑：胞宫、下焦、诸阴经。",
+    "content": "任脉，国际代码 CV，类别：奇经八脉。阴阳属性：阴脉之海；手足属性：躯干正中。传统经络归属联系：胞宫、下焦、诸阴经。仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。",
+    "source_note": "参考 WHO Western Pacific Regional Office《Standard Acupuncture Nomenclature, 2nd ed》(1993) 所列十四经标准经穴编号/名称；作用范围按经络脏腑归属作传统学习归纳。",
+    "tags": [
+      "经络",
+      "奇经八脉",
+      "CV",
+      "胞宫、下焦、诸阴经"
+    ],
+    "detail": {
+      "meridian_code": "CV",
+      "category": "奇经八脉",
+      "yin_yang": "阴脉之海",
+      "hand_foot": "躯干正中",
+      "organ_relation": "胞宫、下焦、诸阴经",
+      "paired_meridian": "",
+      "pathway_text": "",
+      "main_indications": "按经络循行、所属脏腑与传统辨证体系作学习归纳。",
+      "notes": "仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。"
+    }
+  }
+]

@@ -2097,7 +2097,20 @@ h3 {
 .dashboard-ai .inline-action-row input {
   min-height: 50px;
   border-color: var(--line-strong);
+  background: rgba(2, 8, 18, 0.94);
+  color: #f7fbff;
+  caret-color: var(--primary);
   font-size: 16px;
+}
+
+.dashboard-ai .inline-action-row input::placeholder {
+  color: rgba(185, 208, 220, 0.72);
+}
+
+.dashboard-ai .inline-action-row input:focus-visible {
+  border-color: rgba(99, 217, 239, 0.72);
+  background: rgba(2, 8, 18, 0.98);
+  color: #ffffff;
 }
 
 .dashboard-ai .inline-action-row button {

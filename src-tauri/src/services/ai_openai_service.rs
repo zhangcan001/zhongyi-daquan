@@ -234,40 +234,44 @@ fn build_context(
             Ok(())
         })?;
     }
-    let like = format!("%{}%", question.trim());
     database.with_connection(|connection| {
-        let mut statement = connection.prepare(
-            "SELECT id, type, name, summary, content, source_note, tags, source_package
-             FROM knowledge_items
-             WHERE name LIKE ?1 OR summary LIKE ?1 OR content LIKE ?1 OR source_note LIKE ?1 OR tags LIKE ?1 OR detail LIKE ?1
-             ORDER BY CASE WHEN type = 'formula' THEN 0 ELSE 1 END, updated_at DESC
-             LIMIT ?2",
-        )?;
-        let rows = statement.query_map(rusqlite::params![like, (max_items * 3) as i64], |row| {
-            Ok(AiContextItem {
-                item_id: row.get(0)?,
-                item_type: row.get(1)?,
-                name: row.get(2)?,
-                source_title: row.get(7)?,
-                source_note: row.get(5)?,
-                snippet: truncate(
-                    &[
-                        row.get::<_, Option<String>>(3)?,
-                        row.get::<_, Option<String>>(4)?,
-                        row.get::<_, Option<String>>(6)?,
-                    ]
-                    .into_iter()
-                    .flatten()
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-                    900,
-                ),
-            })
-        })?;
-        for item in rows {
-            let item = item?;
-            if !items.iter().any(|existing| existing.item_id == item.item_id) {
-                items.push(item);
+        for term in query_terms(question) {
+            let like = format!("%{}%", term);
+            let mut statement = connection.prepare(
+                "SELECT id, type, name, summary, content, source_note, tags, source_package, detail
+                 FROM knowledge_items
+                 WHERE name LIKE ?1 OR summary LIKE ?1 OR content LIKE ?1 OR source_note LIKE ?1 OR tags LIKE ?1 OR detail LIKE ?1
+                 ORDER BY CASE WHEN type = 'formula' THEN 0 ELSE 1 END, updated_at DESC
+                 LIMIT ?2",
+            )?;
+            let rows =
+                statement.query_map(rusqlite::params![like, (max_items * 3) as i64], |row| {
+                    Ok(AiContextItem {
+                        item_id: row.get(0)?,
+                        item_type: row.get(1)?,
+                        name: row.get(2)?,
+                        source_title: row.get(7)?,
+                        source_note: row.get(5)?,
+                        snippet: truncate(
+                            &[
+                                row.get::<_, Option<String>>(3)?,
+                                row.get::<_, Option<String>>(4)?,
+                                row.get::<_, Option<String>>(6)?,
+                                row.get::<_, Option<String>>(8)?,
+                            ]
+                            .into_iter()
+                            .flatten()
+                            .collect::<Vec<_>>()
+                            .join("\n"),
+                            1200,
+                        ),
+                    })
+                })?;
+            for item in rows {
+                let item = item?;
+                if !items.iter().any(|existing| existing.item_id == item.item_id) {
+                    items.push(item);
+                }
             }
         }
         Ok(())
@@ -322,6 +326,102 @@ fn extract_question(request: &AiTaskRequest) -> String {
                 .map(str::to_string)
         })
         .unwrap_or_else(|| request.input_json.clone().unwrap_or_default())
+}
+
+fn query_terms(question: &str) -> Vec<String> {
+    let mut terms = Vec::new();
+    let full = question.trim();
+    if !full.is_empty() {
+        terms.push(full.to_string());
+    }
+    for formula_name in formula_names_from_text(full) {
+        if !terms.iter().any(|term| term == &formula_name) {
+            terms.push(formula_name);
+        }
+    }
+    for marker in [
+        "太阳病",
+        "少阳病",
+        "阳明病",
+        "太阴病",
+        "少阴病",
+        "厥阴病",
+        "上热下寒",
+    ] {
+        if full.contains(marker) && !terms.iter().any(|term| term == marker) {
+            terms.push(marker.to_string());
+        }
+    }
+    for token in full.split(|ch: char| {
+        ch.is_whitespace()
+            || matches!(
+                ch,
+                '，' | '。' | '、' | '；' | ';' | ':' | '：' | '？' | '?' | '！' | '!'
+            )
+    }) {
+        let token = token
+            .trim_matches(|ch: char| {
+                matches!(
+                    ch,
+                    '有' | '哪'
+                        | '些'
+                        | '可'
+                        | '以'
+                        | '参'
+                        | '考'
+                        | '什'
+                        | '么'
+                        | '方'
+                        | '向'
+                        | '的'
+                        | '组'
+                        | '成'
+                )
+            })
+            .trim();
+        if token.chars().count() >= 2 && !terms.iter().any(|term| term == token) {
+            terms.push(token.to_string());
+        }
+    }
+    terms
+}
+
+fn formula_names_from_text(text: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    let chars = text.chars().collect::<Vec<_>>();
+    for (index, ch) in chars.iter().enumerate() {
+        if matches!(ch, '汤' | '丸' | '散' | '方' | '饮' | '剂') {
+            let start = index.saturating_sub(8);
+            let window = &chars[start..=index];
+            let split = window.iter().rposition(|c| {
+                c.is_whitespace()
+                    || matches!(
+                        *c,
+                        '，' | '。'
+                            | '、'
+                            | '；'
+                            | ';'
+                            | ':'
+                            | '：'
+                            | '“'
+                            | '”'
+                            | '"'
+                            | '\''
+                            | '？'
+                            | '?'
+                            | '！'
+                            | '!'
+                    )
+            });
+            let name_start = split.map(|idx| idx + 1).unwrap_or(0);
+            let name = window[name_start..].iter().collect::<String>();
+            let name = name.trim().to_string();
+            if name.chars().count() >= 2 && !names.contains(&name) {
+                names.push(name);
+            }
+        }
+    }
+    names
 }
 
 fn safety_warnings(task_type: &str) -> Vec<String> {
@@ -459,6 +559,36 @@ mod tests {
         let prompt = build_user_prompt("local_qa", "桂枝汤组成是什么？", &context);
         assert!(prompt.contains("来源"));
         assert!(prompt.contains("桂枝汤"));
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn rag_context_uses_formula_name_when_question_contains_extra_words() {
+        let data_dir = temp_data_dir("ai-rag-formula-term");
+        let database = Database::initialize(&data_dir).expect("database");
+        database
+            .with_connection(|connection| {
+                connection.execute(
+                    "INSERT INTO knowledge_items
+                     (type, name, summary, content, source_note, tags, data_status, completeness_status, content_version, is_favorite, detail, created_at, updated_at)
+                     VALUES ('formula', '桂枝汤', '太阳病方剂', '原方组成：桂枝三两 芍药三两 甘草二两 生姜三两 大枣十二枚。', '4人纪-伤寒论.pdf｜PDF页码12', '桂枝汤,太阳病', 'imported', 'complete', 1, 0, '{}', datetime('now'), datetime('now'))",
+                    [],
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        let settings = AiProviderSettings {
+            max_context_items: Some(3),
+            max_context_chars: Some(1200),
+            ..AiProviderSettings::default()
+        };
+        let context = build_context(&database, &settings, "桂枝汤什么组成", None).expect("context");
+        assert!(context
+            .iter()
+            .any(|item| { item.name == "桂枝汤" && item.snippet.contains("桂枝三两") }));
+        let prompt = build_user_prompt("local_qa", "桂枝汤什么组成", &context);
+        assert!(prompt.contains("原方组成"));
+        assert!(prompt.contains("4人纪-伤寒论.pdf"));
         let _ = fs::remove_dir_all(data_dir);
     }
 

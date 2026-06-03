@@ -20,7 +20,7 @@ const defaultSettings: SaveAiProviderSettingsRequest = {
   temperature: 0.2,
   maxContextItems: 6,
   maxContextChars: 6000,
-  onlyUseLocalContext: true,
+  onlyUseLocalContext: false,
   safetyMode: "strict",
   enabled: false,
 };
@@ -119,7 +119,7 @@ export function AiSettingsPanel() {
       <div className="section-heading">
         <div>
           <h2>AI 设置</h2>
-          <p>AI 默认关闭。开启后，仅在你主动点击 AI 功能时发送当前问题和本地检索片段。</p>
+          <p>AI 默认关闭。开启后，仅在你主动点击 AI 功能时发送当前问题、检索片段和已启用的联网摘要。</p>
         </div>
         <span className={form.enabled ? "status-pill" : "status-pill muted"}>
           {form.enabled ? "已启用" : "默认关闭"}
@@ -218,6 +218,17 @@ export function AiSettingsPanel() {
             value={form.temperature ?? 0.2}
             onChange={(event) => updateField("temperature", Number(event.target.value))}
           />
+        </label>
+
+        <label>
+          检索范围
+          <select
+            value={form.onlyUseLocalContext ? "local" : "web"}
+            onChange={(event) => updateField("onlyUseLocalContext", event.target.value === "local")}
+          >
+            <option value="local">仅本地知识库</option>
+            <option value="web">本地 + 联网查询</option>
+          </select>
         </label>
 
         <label>

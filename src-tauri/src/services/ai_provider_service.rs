@@ -48,7 +48,7 @@ fn normalize_request(request: SaveAiProviderSettingsRequest) -> SaveAiProviderSe
         temperature: request.temperature.or(Some(0.2)),
         max_context_items: request.max_context_items.or(Some(6)),
         max_context_chars: request.max_context_chars.or(Some(6000)),
-        only_use_local_context: Some(request.only_use_local_context.unwrap_or(true)),
+        only_use_local_context: Some(request.only_use_local_context.unwrap_or(false)),
         safety_mode: normalize_optional(request.safety_mode).or(Some("strict".to_string())),
         enabled: request.enabled,
     }

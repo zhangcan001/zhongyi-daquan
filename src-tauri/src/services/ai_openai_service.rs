@@ -9,6 +9,7 @@ use serde_json::{json, Value};
 use std::time::Duration;
 
 const SYSTEM_PROMPT: &str = "你是《中医大全》的本地中医资料助手。你可以基于用户主动提供的问题和本地检索片段做资料问答、条目总结、注解对比、经方组成提取、方剂候选检索、辨证参考和学习笔记草稿。必须引用本地资料来源，不得编造来源。资料不足时明确说明资料不足。";
+const WEB_SYSTEM_PROMPT: &str = "你是《中医大全》的资料助手。你可以同时使用本地知识库片段和联网检索摘要回答。必须区分本地来源与网页来源，不得编造来源。网页资料只能作为外部参考；当本地资料和网页资料冲突时，要明确标出差异。资料不足时明确说明资料不足。";
 
 pub fn test_connection(database: &Database) -> AppResult<AiCommandResponse> {
     let (settings, api_key) = match load_ready_settings(database) {
@@ -69,23 +70,41 @@ pub fn run_task(database: &Database, request: AiTaskRequest) -> AppResult<AiComm
     let task_type = request.task_type.trim();
     let question = extract_question(&request);
     let context = build_context(database, &settings, &question, request.related_item_id)?;
-    let citations = context
+    let web_sources = if settings.only_use_local_context {
+        Vec::new()
+    } else {
+        web_search(&question, settings.timeout_seconds)?
+    };
+    let mut citations = context
         .iter()
         .map(|item| AiCitation {
             title: item.source_title.clone(),
             note: item.source_note.clone(),
         })
         .collect::<Vec<_>>();
-    let user_prompt = build_user_prompt(task_type, &question, &context);
-    let answer = call_chat(&settings, &api_key, SYSTEM_PROMPT, &user_prompt)?;
+    citations.extend(web_sources.iter().map(|source| AiCitation {
+        title: Some(format!("网页：{}", source.title)),
+        note: Some(source.url.clone()),
+    }));
+    let user_prompt = build_user_prompt(task_type, &question, &context, &web_sources);
+    let system_prompt = if settings.only_use_local_context {
+        SYSTEM_PROMPT
+    } else {
+        WEB_SYSTEM_PROMPT
+    };
+    let answer = call_chat(&settings, &api_key, system_prompt, &user_prompt)?;
     Ok(response(
         true,
         "completed",
-        "AI 回答已生成。",
+        if settings.only_use_local_context {
+            "AI 回答已生成。"
+        } else {
+            "AI 回答已生成，已尝试联网检索。"
+        },
         Some(answer.clone()),
         citations,
         context,
-        safety_warnings(task_type),
+        task_warnings(task_type, settings.only_use_local_context, &web_sources),
     ))
 }
 
@@ -293,7 +312,12 @@ fn build_context(
     Ok(clipped)
 }
 
-fn build_user_prompt(task_type: &str, question: &str, context: &[AiContextItem]) -> String {
+fn build_user_prompt(
+    task_type: &str,
+    question: &str,
+    context: &[AiContextItem],
+    web_sources: &[WebSearchResult],
+) -> String {
     let context_text = context
         .iter()
         .enumerate()
@@ -310,8 +334,22 @@ fn build_user_prompt(task_type: &str, question: &str, context: &[AiContextItem])
         })
         .collect::<Vec<_>>()
         .join("\n\n");
+    let web_text = web_sources
+        .iter()
+        .enumerate()
+        .map(|(index, source)| {
+            format!(
+                "[W{}] {}｜{}\n{}",
+                index + 1,
+                source.title,
+                source.url,
+                source.snippet
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n");
     format!(
-        "任务类型：{task_type}\n用户问题：{question}\n\n本地检索片段：\n{context_text}\n\n请基于上述本地片段回答，并列出引用来源。资料不足时直接说明资料不足。"
+        "任务类型：{task_type}\n用户问题：{question}\n\n本地检索片段：\n{context_text}\n\n联网检索摘要：\n{web_text}\n\n请基于上述资料回答，并在文末列出引用来源。若使用网页资料，需标注网页标题或 URL；资料不足时直接说明资料不足。"
     )
 }
 
@@ -482,9 +520,237 @@ fn formula_names_from_text(text: &str) -> Vec<String> {
     names
 }
 
-fn safety_warnings(task_type: &str) -> Vec<String> {
+#[derive(Debug, Clone)]
+struct WebSearchResult {
+    title: String,
+    url: String,
+    snippet: String,
+}
+
+fn web_search(question: &str, timeout_seconds: Option<i64>) -> AppResult<Vec<WebSearchResult>> {
+    let query = question.trim();
+    if query.is_empty() {
+        return Ok(Vec::new());
+    }
+    let timeout = timeout_seconds.unwrap_or(30).clamp(1, 60);
+    match duckduckgo_lite_search(query, timeout) {
+        Ok(results) if !results.is_empty() => Ok(results),
+        _ => wikipedia_opensearch(query, timeout),
+    }
+}
+
+fn duckduckgo_lite_search(query: &str, timeout_seconds: i64) -> AppResult<Vec<WebSearchResult>> {
+    let url = format!(
+        "https://lite.duckduckgo.com/lite/?q={}",
+        percent_encode(query)
+    );
+    let client = Client::builder()
+        .timeout(Duration::from_secs(timeout_seconds as u64))
+        .user_agent("zhongyi-daquan/0.1 ai-web-search")
+        .build()
+        .map_err(|_| AppError::Data("联网检索客户端初始化失败。".to_string()))?;
+    let response = client
+        .get(url)
+        .send()
+        .map_err(|_| AppError::Data("联网检索失败，请检查网络连接。".to_string()))?;
+    if !response.status().is_success() {
+        return Err(AppError::Data(format!(
+            "联网检索返回错误状态 {}。",
+            response.status().as_u16()
+        )));
+    }
+    let html = response
+        .text()
+        .map_err(|_| AppError::Data("联网检索结果读取失败。".to_string()))?;
+    Ok(parse_duckduckgo_lite_results(&html).into_iter().take(5).collect())
+}
+
+fn wikipedia_opensearch(query: &str, timeout_seconds: i64) -> AppResult<Vec<WebSearchResult>> {
+    let url = format!(
+        "https://zh.wikipedia.org/w/api.php?action=opensearch&search={}&limit=5&namespace=0&format=json",
+        percent_encode(query)
+    );
+    let client = Client::builder()
+        .timeout(Duration::from_secs(timeout_seconds as u64))
+        .user_agent("zhongyi-daquan/0.1 ai-web-search")
+        .build()
+        .map_err(|_| AppError::Data("联网检索客户端初始化失败。".to_string()))?;
+    let response = client
+        .get(url)
+        .send()
+        .map_err(|_| AppError::Data("联网检索失败，请检查网络连接。".to_string()))?;
+    if !response.status().is_success() {
+        return Err(AppError::Data(format!(
+            "联网检索返回错误状态 {}。",
+            response.status().as_u16()
+        )));
+    }
+    let value: Value = response
+        .json()
+        .map_err(|_| AppError::Data("联网检索结果解析失败。".to_string()))?;
+    let titles = value
+        .get(1)
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let snippets = value
+        .get(2)
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let urls = value
+        .get(3)
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let mut results = Vec::new();
+    for index in 0..titles.len().min(urls.len()) {
+        let title = titles[index].as_str().unwrap_or_default().trim();
+        let url = urls[index].as_str().unwrap_or_default().trim();
+        if title.is_empty() || url.is_empty() {
+            continue;
+        }
+        results.push(WebSearchResult {
+            title: format!("维基百科：{}", truncate(title, 100)),
+            url: url.to_string(),
+            snippet: snippets
+                .get(index)
+                .and_then(Value::as_str)
+                .map(|snippet| truncate(snippet.trim(), 500))
+                .unwrap_or_default(),
+        });
+    }
+    Ok(results)
+}
+
+fn parse_duckduckgo_lite_results(html: &str) -> Vec<WebSearchResult> {
+    let mut results = Vec::new();
+    let mut cursor = 0;
+    while let Some(link_offset) = html[cursor..].find("result-link") {
+        let link_start = cursor + link_offset;
+        let Some(href_offset) = html[link_start..].find("href=\"") else {
+            break;
+        };
+        let href_start = link_start + href_offset + 6;
+        let Some(href_end_offset) = html[href_start..].find('"') else {
+            break;
+        };
+        let href = html_unescape(&html[href_start..href_start + href_end_offset]);
+        let Some(title_start_offset) = html[href_start + href_end_offset..].find('>') else {
+            break;
+        };
+        let title_start = href_start + href_end_offset + title_start_offset + 1;
+        let Some(title_end_offset) = html[title_start..].find("</a>") else {
+            break;
+        };
+        let title = html_unescape(&strip_tags(&html[title_start..title_start + title_end_offset]));
+        let next_cursor = title_start + title_end_offset;
+        let snippet = html[next_cursor..]
+            .find("result-snippet")
+            .and_then(|snippet_offset| {
+                let start = next_cursor + snippet_offset;
+                let tag_end = html[start..].find('>')? + start + 1;
+                let end = html[tag_end..].find("</").map(|offset| tag_end + offset)?;
+                Some(html_unescape(&strip_tags(&html[tag_end..end])))
+            })
+            .unwrap_or_default();
+        let url = clean_duckduckgo_url(&href);
+        if !title.trim().is_empty()
+            && !url.trim().is_empty()
+            && !results.iter().any(|existing: &WebSearchResult| existing.url == url)
+        {
+            results.push(WebSearchResult {
+                title: truncate(title.trim(), 120),
+                url,
+                snippet: truncate(snippet.trim(), 500),
+            });
+        }
+        cursor = next_cursor;
+        if results.len() >= 8 {
+            break;
+        }
+    }
+    results
+}
+
+fn clean_duckduckgo_url(url: &str) -> String {
+    if let Some(index) = url.find("uddg=") {
+        let tail = &url[index + 5..];
+        let end = tail.find('&').unwrap_or(tail.len());
+        return percent_decode(&tail[..end]);
+    }
+    url.to_string()
+}
+
+fn percent_encode(value: &str) -> String {
+    let mut output = String::new();
+    for byte in value.as_bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(*byte, b'-' | b'_' | b'.' | b'~') {
+            output.push(*byte as char);
+        } else {
+            output.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    output
+}
+
+fn percent_decode(value: &str) -> String {
+    let mut bytes = Vec::new();
+    let raw = value.as_bytes();
+    let mut index = 0;
+    while index < raw.len() {
+        if raw[index] == b'%' && index + 2 < raw.len() {
+            if let Ok(hex) = u8::from_str_radix(&value[index + 1..index + 3], 16) {
+                bytes.push(hex);
+                index += 3;
+                continue;
+            }
+        }
+        bytes.push(raw[index]);
+        index += 1;
+    }
+    String::from_utf8_lossy(&bytes).to_string()
+}
+
+fn strip_tags(value: &str) -> String {
+    let mut output = String::new();
+    let mut in_tag = false;
+    for ch in value.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => output.push(ch),
+            _ => {}
+        }
+    }
+    output
+}
+
+fn html_unescape(value: &str) -> String {
+    value
+        .replace("&amp;", "&")
+        .replace("&quot;", "\"")
+        .replace("&#x27;", "'")
+        .replace("&#39;", "'")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&nbsp;", " ")
+}
+
+fn task_warnings(
+    task_type: &str,
+    only_use_local_context: bool,
+    web_sources: &[WebSearchResult],
+) -> Vec<String> {
     let _ = task_type;
-    Vec::new()
+    if only_use_local_context {
+        return Vec::new();
+    }
+    if web_sources.is_empty() {
+        vec!["联网检索未返回可用摘要，本次回答主要依赖本地资料。".to_string()]
+    } else {
+        vec!["已启用联网检索，网页资料会作为外部来源与本地资料分开引用。".to_string()]
+    }
 }
 
 fn response(
@@ -608,7 +874,7 @@ mod tests {
             .unwrap_or_default()
             .contains("PDF页码12"));
         assert!(context[0].snippet.chars().count() <= 83);
-        let prompt = build_user_prompt("local_qa", "桂枝汤组成是什么？", &context);
+        let prompt = build_user_prompt("local_qa", "桂枝汤组成是什么？", &context, &[]);
         assert!(prompt.contains("来源"));
         assert!(prompt.contains("桂枝汤"));
         let _ = fs::remove_dir_all(data_dir);
@@ -638,7 +904,7 @@ mod tests {
         assert!(context
             .iter()
             .any(|item| { item.name == "桂枝汤" && item.snippet.contains("桂枝三两") }));
-        let prompt = build_user_prompt("local_qa", "桂枝汤什么组成", &context);
+        let prompt = build_user_prompt("local_qa", "桂枝汤什么组成", &context, &[]);
         assert!(prompt.contains("原方组成"));
         assert!(prompt.contains("4人纪-伤寒论.pdf"));
         let _ = fs::remove_dir_all(data_dir);
@@ -677,6 +943,19 @@ mod tests {
             .iter()
             .any(|item| item.name.contains("怀孕忌针") || item.item_type == "acupuncture"));
         let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn web_search_parser_extracts_title_url_and_snippet() {
+        let html = r#"
+            <a rel="nofollow" class="result-link" href="/l/?kh=-1&amp;uddg=https%3A%2F%2Fexample.com%2Fpage%3Fa%3D1">Example &amp; Title</a>
+            <td class="result-snippet">A useful &lt;b&gt;summary&lt;/b&gt; from the web.</td>
+        "#;
+        let results = parse_duckduckgo_lite_results(html);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].title, "Example & Title");
+        assert_eq!(results[0].url, "https://example.com/page?a=1");
+        assert!(results[0].snippet.contains("summary"));
     }
 
     fn temp_data_dir(test_name: &str) -> PathBuf {

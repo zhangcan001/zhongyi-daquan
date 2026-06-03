@@ -37,7 +37,7 @@ impl Default for AiProviderSettings {
             temperature: Some(0.2),
             max_context_items: Some(6),
             max_context_chars: Some(6000),
-            only_use_local_context: true,
+            only_use_local_context: false,
             safety_mode: "strict".to_string(),
             enabled: false,
             created_at: None,

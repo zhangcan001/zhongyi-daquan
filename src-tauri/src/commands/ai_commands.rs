@@ -3,6 +3,7 @@ use crate::models::ai::{
     AiCommandResponse, AiPlaceholderResponse, AiProviderSettingsResponse, AiTaskRequest,
     SaveAiProviderSettingsRequest,
 };
+use crate::services::ai_formula_service::{self, FormulaAiAnswer, FormulaAiRequest};
 use crate::services::ai_placeholder_service::{self, AiPlaceholderService};
 use crate::services::ai_provider_service::AiProviderService;
 use crate::AppState;
@@ -46,6 +47,14 @@ pub fn get_ai_task_status(task_id: i64) -> AppResult<AiCommandResponse> {
 #[tauri::command]
 pub fn cancel_ai_task(task_id: i64) -> AppResult<AiCommandResponse> {
     AiPlaceholderService::cancel_task(task_id)
+}
+
+#[tauri::command]
+pub fn answer_formula_ai_question(
+    state: State<'_, AppState>,
+    request: FormulaAiRequest,
+) -> AppResult<FormulaAiAnswer> {
+    ai_formula_service::answer_formula_question(&state.database, request)
 }
 
 #[cfg(test)]

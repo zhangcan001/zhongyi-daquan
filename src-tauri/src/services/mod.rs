@@ -1,4 +1,5 @@
 pub mod ai_draft_service;
+pub mod ai_formula_service;
 pub mod ai_import_assist_service;
 pub mod ai_placeholder_service;
 pub mod ai_provider_service;

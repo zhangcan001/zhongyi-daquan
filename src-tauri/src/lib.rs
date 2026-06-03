@@ -38,6 +38,7 @@ pub fn run() {
             commands::ai_commands::run_ai_task,
             commands::ai_commands::get_ai_task_status,
             commands::ai_commands::cancel_ai_task,
+            commands::ai_commands::answer_formula_ai_question,
             commands::knowledge_commands::list_knowledge_items,
             commands::knowledge_commands::get_knowledge_detail,
             commands::knowledge_commands::create_knowledge_item,

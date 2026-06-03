@@ -862,6 +862,69 @@ h3 {
   padding: 0 12px;
 }
 
+.ai-reader-actions {
+  align-items: stretch;
+}
+
+.ai-reader-actions button:disabled {
+  color: #7c8780;
+  background: #eef1ec;
+}
+
+.ai-formula-result {
+  display: grid;
+  gap: 12px;
+}
+
+.formula-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #d5dfd0;
+  border-radius: 8px;
+  background: #fbfdf9;
+  padding: 14px;
+}
+
+.formula-card-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #e3e8df;
+  padding-bottom: 8px;
+}
+
+.formula-card-title h4 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.formula-card-title span {
+  color: #66736c;
+  font-size: 13px;
+}
+
+.formula-field {
+  display: grid;
+  gap: 5px;
+}
+
+.formula-field strong {
+  color: #274634;
+}
+
+.formula-field p,
+.formula-field ul {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.68;
+}
+
+.formula-field ul {
+  padding-left: 20px;
+}
+
 .reader-section {
   display: grid;
   gap: 10px;

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { FormulaAiAnswer, FormulaAiRequest } from "../ai/types";
 import type {
   GridSaveResponse,
   DashboardStats,
@@ -84,4 +85,8 @@ export function getDashboardStats() {
 
 export function saveGridDirtyRows(itemType: KnowledgeType, rows: KnowledgeInput[]) {
   return invoke<GridSaveResponse>("save_grid_dirty_rows", { request: { itemType, rows } });
+}
+
+export function answerFormulaAiQuestion(request: FormulaAiRequest) {
+  return invoke<FormulaAiAnswer>("answer_formula_ai_question", { request });
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  answerFormulaAiQuestion,
   deleteUserNote,
   getKnowledgeDetail,
   recordRecentView,
@@ -7,6 +8,7 @@ import {
   toggleFavorite,
 } from "./api";
 import { detailFields } from "./schema";
+import type { FormulaAiAnswer, FormulaCard } from "../ai/types";
 import type { KnowledgeAnnotation, KnowledgeDetailResponse, KnowledgeType, UserNote } from "./types";
 
 type Props = {
@@ -32,6 +34,8 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
   const [detail, setDetail] = useState<KnowledgeDetailResponse | null>(null);
   const [message, setMessage] = useState("");
   const [noteText, setNoteText] = useState("");
+  const [aiAnswer, setAiAnswer] = useState<FormulaAiAnswer | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
 
   useEffect(() => {
     if (!itemId) {
@@ -42,6 +46,7 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
       .then((response) => {
         setDetail(response);
         setNoteText(response.notes[0]?.noteText ?? "");
+        setAiAnswer(null);
         return recordRecentView(itemId);
       })
       .catch((error) => setMessage(String(error)));
@@ -119,6 +124,25 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
       .catch((error) => setMessage(String(error)));
   }
 
+  function askFormulaAi(mode: string, question: string) {
+    if (!item.id) return;
+    setIsAiLoading(true);
+    setMessage("");
+    answerFormulaAiQuestion({
+      question,
+      relatedItemId: item.id,
+      mode,
+    })
+      .then((response) => {
+        setAiAnswer(response);
+        setMessage("AI 本地方剂资料卡已生成");
+      })
+      .catch((error) => setMessage(String(error)))
+      .finally(() => setIsAiLoading(false));
+  }
+
+  const isFormula = item.itemType === "formula";
+
   return (
     <article className="reader-shell">
       <div className="reader-title-row">
@@ -141,6 +165,63 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
           </button>
         </div>
       </div>
+
+      <section className="reader-section">
+        <h3>AI 知识库助手</h3>
+        <div className="reader-actions ai-reader-actions">
+          {isFormula ? (
+            <>
+              <button
+                type="button"
+                disabled={isAiLoading}
+                onClick={() => askFormulaAi("explain_formula", `AI 解释此方：${item.name}`)}
+              >
+                AI 解释此方
+              </button>
+              <button
+                type="button"
+                disabled={isAiLoading}
+                onClick={() => askFormulaAi("extract_original_formula", `${item.name}组成是什么？`)}
+              >
+                AI 提取原方组成
+              </button>
+              <button
+                type="button"
+                disabled={isAiLoading}
+                onClick={() => askFormulaAi("summarize_formula_meaning", `AI 总结方义：${item.name}`)}
+              >
+                AI 总结方义
+              </button>
+              <button
+                type="button"
+                disabled={isAiLoading}
+                onClick={() => askFormulaAi("compare_annotations", `AI 对比相关注解：${item.name}`)}
+              >
+                AI 对比相关注解
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                disabled={isAiLoading}
+                onClick={() => askFormulaAi("related_formula_candidates", `${item.name}相关方剂候选，并列出方剂组成`)}
+              >
+                相关方剂候选
+              </button>
+              <button
+                type="button"
+                disabled={isAiLoading}
+                onClick={() => askFormulaAi("include_formula_composition", `${item.name}相关方剂，方剂组成一并列出`)}
+              >
+                方剂组成一并列出
+              </button>
+            </>
+          )}
+        </div>
+        {isAiLoading ? <p className="empty-text">正在检索本地方剂资料...</p> : null}
+        {aiAnswer ? <FormulaAiResult answer={aiAnswer} /> : null}
+      </section>
 
       <section className="reader-section">
         <h3>主信息</h3>
@@ -217,6 +298,80 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
       </section>
       {message ? <p className="ai-message">{message}</p> : null}
     </article>
+  );
+}
+
+function FormulaAiResult({ answer }: { answer: FormulaAiAnswer }) {
+  if (!answer.formulaCards.length) {
+    return (
+      <div className="ai-formula-result">
+        <p>本地资料中未检索到完整组成。</p>
+        <p className="safety-note">没有来源支撑的方剂组成不会编造。</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="ai-formula-result">
+      {answer.formulaCards.map((card) => (
+        <FormulaCardView key={`${card.itemId ?? card.formulaName}-${card.formulaName}`} card={card} />
+      ))}
+      <p className="safety-note">
+        以上为本地资料中的原方信息和学习参考，不等同于针对个人的处方执行指令。实际用药、剂量换算、加减和疗程需由专业中医师结合面诊确认。
+      </p>
+    </div>
+  );
+}
+
+function FormulaCardView({ card }: { card: FormulaCard }) {
+  return (
+    <section className="formula-card">
+      <div className="formula-card-title">
+        <h4>{card.formulaName}</h4>
+        {card.relatedPattern ? <span>{card.relatedPattern}</span> : null}
+      </div>
+
+      <FormulaField title="原方组成" value={card.composition} missingText="本地资料中未检索到完整组成" />
+      <FormulaField title="药材比例" value={card.ratio} />
+      <FormulaField title="原文煎服法" value={card.decoctionMethod || card.usage} />
+      <FormulaField title="适用条文 / 证候" value={card.indications || card.originalText} />
+      <FormulaField title="注解摘要" value={card.explanation || card.annotationSnippets.join("\n")} />
+      <FormulaField title="谨慎或不适用情况" value={card.contraindications} />
+
+      <div className="formula-field">
+        <strong>来源</strong>
+        {card.sources.length ? (
+          <ul>
+            {card.sources.map((source, index) => (
+              <li key={`${source.title ?? ""}-${source.note ?? ""}-${index}`}>
+                {[source.title, source.note].filter(Boolean).join("｜")}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>未记录来源</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function FormulaField({
+  title,
+  value,
+  missingText,
+}: {
+  title: string;
+  value?: string | null;
+  missingText?: string;
+}) {
+  const text = value?.trim();
+  if (!text && !missingText) return null;
+  return (
+    <div className="formula-field">
+      <strong>{title}</strong>
+      <p>{text || missingText}</p>
+    </div>
   );
 }
 

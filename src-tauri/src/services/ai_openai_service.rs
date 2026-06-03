@@ -548,7 +548,7 @@ fn web_search(question: &str, timeout_seconds: Option<i64>) -> AppResult<Vec<Web
     if query.is_empty() {
         return Ok(Vec::new());
     }
-    let timeout = timeout_seconds.unwrap_or(30).clamp(1, 60);
+    let timeout = timeout_seconds.unwrap_or(30).clamp(1, 8);
     for search in [
         bing_search as fn(&str, i64) -> AppResult<Vec<WebSearchResult>>,
         duckduckgo_lite_search,

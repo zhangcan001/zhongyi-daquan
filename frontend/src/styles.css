@@ -564,6 +564,33 @@ dd {
   font-weight: 700;
 }
 
+.loading-line {
+  position: relative;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(126, 199, 220, 0.14);
+}
+
+.loading-line::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 42%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
+  content: "";
+  animation: loading-line-move 1s ease-in-out infinite;
+}
+
+@keyframes loading-line-move {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(260%);
+  }
+}
+
 .workspace-split {
   display: grid;
   grid-template-columns: minmax(280px, clamp(300px, 30vw, 380px)) minmax(560px, 1fr);

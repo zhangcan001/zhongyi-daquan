@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { searchKnowledgeEnhanced } from "../modules/knowledge/api";
 import { KnowledgeDetailReader } from "../modules/knowledge/KnowledgeDetailReader";
 import type { EnhancedSearchResponse, EnhancedSearchResult } from "../modules/knowledge/types";
@@ -12,6 +12,17 @@ export function SearchPanel() {
   const [response, setResponse] = useState<EnhancedSearchResponse | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [message, setMessage] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const searchRequestId = useRef(0);
+
+  useEffect(() => {
+    const keyword = query.trim();
+    if (keyword.length < 2) return;
+    const timer = window.setTimeout(() => {
+      runSearch(keyword, filter);
+    }, 420);
+    return () => window.clearTimeout(timer);
+  }, [filter, query]);
 
   async function runSearch(nextQuery = query, nextFilter = filter) {
     const keyword = nextQuery.trim();
@@ -19,6 +30,9 @@ export function SearchPanel() {
       setMessage("请输入搜索关键词");
       return;
     }
+    const requestId = searchRequestId.current + 1;
+    searchRequestId.current = requestId;
+    setIsSearching(true);
     setMessage("搜索中...");
     try {
       const result = await searchKnowledgeEnhanced({
@@ -27,19 +41,22 @@ export function SearchPanel() {
         page: 1,
         pageSize: 60,
       });
+      if (requestId !== searchRequestId.current) return;
       setResponse(result);
       setSelectedId(firstResultId(result));
       setMessage(`命中 ${result.total} 条，用时 ${result.durationMs}ms。`);
     } catch (cause) {
+      if (requestId !== searchRequestId.current) return;
       setMessage(String(cause));
+    } finally {
+      if (requestId === searchRequestId.current) {
+        setIsSearching(false);
+      }
     }
   }
 
   function chooseFilter(nextFilter: string) {
     setFilter(nextFilter);
-    if (query.trim()) {
-      runSearch(query, nextFilter);
-    }
   }
 
   return (
@@ -55,8 +72,8 @@ export function SearchPanel() {
           }}
           placeholder="搜索中药、方剂、穴位、经络、原典、注解……"
         />
-        <button type="button" onClick={() => runSearch()}>
-          搜索
+        <button type="button" onClick={() => runSearch()} disabled={isSearching}>
+          {isSearching ? "搜索中" : "搜索"}
         </button>
       </div>
 
@@ -84,6 +101,7 @@ export function SearchPanel() {
       </div>
 
       {message ? <span>{message}</span> : null}
+      {isSearching ? <div className="loading-line" aria-live="polite" /> : null}
 
       {response && response.total === 0 ? (
         <div className="empty-suggestions">

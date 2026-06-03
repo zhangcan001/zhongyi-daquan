@@ -92,6 +92,9 @@ export const detailFields: Record<KnowledgeType, DetailField[]> = {
   ],
   acupoint: [
     { key: "acupoint_code", label: "穴位编号" },
+    { key: "meridianName", label: "所属经络" },
+    { key: "functions", label: "传统作用", kind: "textarea", safetyNote: "传统针灸学习资料，不作为治疗建议。" },
+    { key: "indications", label: "传统主治范围", kind: "textarea", safetyNote: "需结合专业辨证与定位，勿自行操作。" },
     { key: "standard_location", label: "标准定位", kind: "textarea" },
     { key: "locating_method", label: "定位方法", kind: "textarea" },
     { key: "needling_summary", label: "针刺摘要", kind: "textarea" },

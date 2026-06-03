@@ -59,7 +59,7 @@ export function DashboardPage({ status, error, activeView, onNavigate }: Dashboa
       <section className="topbar">
         <div>
           <h1>中医大全学习工作台</h1>
-          <p>用于中医知识学习、资料整理与本地记录；不提供诊断、开方、在线问诊或针灸操作指导。</p>
+          <p>集中检索中药、方剂、穴位、经络与原典条文，整理本地资料和学习笔记。</p>
         </div>
         <div className="status-pill">{status?.databaseReady ? "数据库就绪" : "初始化中"}</div>
       </section>

@@ -163,149 +163,152 @@ export function AiSettingsPanel() {
         ) : null}
       </section>
 
-      <div className="ai-form-grid">
-        <label>
-          启用 AI
-          <select
-            value={form.enabled ? "true" : "false"}
-            onChange={(event) => updateField("enabled", event.target.value === "true")}
-          >
-            <option value="false">关闭</option>
-            <option value="true">开启</option>
-          </select>
-        </label>
+      <details className="advanced-details ai-config-details">
+        <summary>模型与联网设置</summary>
+        <div className="ai-form-grid">
+          <label>
+            启用 AI
+            <select
+              value={form.enabled ? "true" : "false"}
+              onChange={(event) => updateField("enabled", event.target.value === "true")}
+            >
+              <option value="false">关闭</option>
+              <option value="true">开启</option>
+            </select>
+          </label>
 
-        <label>
-          Provider Type
-          <select value={form.providerType} onChange={(event) => updateField("providerType", event.target.value)}>
-            <option value="disabled">disabled</option>
-            <option value="openai_compatible">openai_compatible</option>
-          </select>
-        </label>
+          <label>
+            Provider Type
+            <select value={form.providerType} onChange={(event) => updateField("providerType", event.target.value)}>
+              <option value="disabled">disabled</option>
+              <option value="openai_compatible">openai_compatible</option>
+            </select>
+          </label>
 
-        <label>
-          Provider Name
-          <input
-            value={form.providerName ?? ""}
-            onChange={(event) => updateField("providerName", event.target.value)}
-            placeholder="本地占位名称"
-          />
-        </label>
-
-        <label>
-          Base URL
-          <input
-            value={form.baseUrl ?? ""}
-            onChange={(event) => updateField("baseUrl", event.target.value)}
-            placeholder="仅保存，不连接"
-          />
-        </label>
-
-        <label>
-          API Key
-          <span className="api-key-row">
+          <label>
+            Provider Name
             <input
-              type={showApiKey ? "text" : "password"}
-              value={form.apiKey ?? ""}
-              onChange={(event) => updateField("apiKey", event.target.value)}
-              placeholder={hasApiKey ? "已配置，留空则不覆盖" : "请输入 API Key"}
+              value={form.providerName ?? ""}
+              onChange={(event) => updateField("providerName", event.target.value)}
+              placeholder="本地占位名称"
             />
-            <button type="button" onClick={() => setShowApiKey((value) => !value)}>
-              {showApiKey ? "隐藏" : "显示"}
-            </button>
-          </span>
-          <small>API Key 状态：{apiKeyStatus}</small>
-        </label>
+          </label>
 
-        <label>
-          Model Name
-          <input
-            value={form.modelName ?? ""}
-            onChange={(event) => updateField("modelName", event.target.value)}
-            placeholder="仅保存，不调用"
-          />
-        </label>
+          <label>
+            Base URL
+            <input
+              value={form.baseUrl ?? ""}
+              onChange={(event) => updateField("baseUrl", event.target.value)}
+              placeholder="OpenAI-compatible Base URL"
+            />
+          </label>
 
-        <label>
-          Timeout Seconds
-          <input
-            min={1}
-            type="number"
-            value={form.timeoutSeconds ?? 30}
-            onChange={(event) => updateField("timeoutSeconds", Number(event.target.value))}
-          />
-        </label>
+          <label>
+            API Key
+            <span className="api-key-row">
+              <input
+                type={showApiKey ? "text" : "password"}
+                value={form.apiKey ?? ""}
+                onChange={(event) => updateField("apiKey", event.target.value)}
+                placeholder={hasApiKey ? "已配置，留空则不覆盖" : "请输入 API Key"}
+              />
+              <button type="button" onClick={() => setShowApiKey((value) => !value)}>
+                {showApiKey ? "隐藏" : "显示"}
+              </button>
+            </span>
+            <small>API Key 状态：{apiKeyStatus}</small>
+          </label>
 
-        <label>
-          Max Tokens
-          <input
-            min={1}
-            type="number"
-            value={form.maxTokens ?? 1024}
-            onChange={(event) => updateField("maxTokens", Number(event.target.value))}
-          />
-        </label>
+          <label>
+            Model Name
+            <input
+              value={form.modelName ?? ""}
+              onChange={(event) => updateField("modelName", event.target.value)}
+              placeholder="例如 gpt-4.1-mini"
+            />
+          </label>
 
-        <label>
-          Temperature
-          <input
-            max={2}
-            min={0}
-            step={0.1}
-            type="number"
-            value={form.temperature ?? 0.2}
-            onChange={(event) => updateField("temperature", Number(event.target.value))}
-          />
-        </label>
+          <label>
+            检索范围
+            <select
+              value={form.onlyUseLocalContext ? "local" : "web"}
+              onChange={(event) => updateField("onlyUseLocalContext", event.target.value === "local")}
+            >
+              <option value="local">仅本地知识库</option>
+              <option value="web">本地 + 联网查询</option>
+            </select>
+          </label>
 
-        <label>
-          检索范围
-          <select
-            value={form.onlyUseLocalContext ? "local" : "web"}
-            onChange={(event) => updateField("onlyUseLocalContext", event.target.value === "local")}
-          >
-            <option value="local">仅本地知识库</option>
-            <option value="web">本地 + 联网查询</option>
-          </select>
-        </label>
+          <label>
+            Timeout Seconds
+            <input
+              min={1}
+              type="number"
+              value={form.timeoutSeconds ?? 30}
+              onChange={(event) => updateField("timeoutSeconds", Number(event.target.value))}
+            />
+          </label>
 
-        <label>
-          Max Context Items
-          <input
-            min={1}
-            max={20}
-            type="number"
-            value={form.maxContextItems ?? 6}
-            onChange={(event) => updateField("maxContextItems", Number(event.target.value))}
-          />
-        </label>
+          <label>
+            Max Tokens
+            <input
+              min={1}
+              type="number"
+              value={form.maxTokens ?? 1024}
+              onChange={(event) => updateField("maxTokens", Number(event.target.value))}
+            />
+          </label>
 
-        <label>
-          Max Context Chars
-          <input
-            min={500}
-            max={30000}
-            type="number"
-            value={form.maxContextChars ?? 6000}
-            onChange={(event) => updateField("maxContextChars", Number(event.target.value))}
-          />
-        </label>
-      </div>
+          <label>
+            Temperature
+            <input
+              max={2}
+              min={0}
+              step={0.1}
+              type="number"
+              value={form.temperature ?? 0.2}
+              onChange={(event) => updateField("temperature", Number(event.target.value))}
+            />
+          </label>
 
-      <div className="ai-actions">
-        <button type="button" onClick={saveSettings} disabled={isSaving}>
-          {isSaving ? "保存中" : "保存配置"}
-        </button>
-        <button type="button" onClick={testConnection} disabled={isTesting}>
-          {isTesting ? "测试中" : "测试连接"}
-        </button>
-        <button type="button" onClick={clearApiKey} disabled={!hasApiKey}>
-          清除 API Key
-        </button>
-      </div>
+          <label>
+            Max Context Items
+            <input
+              min={1}
+              max={20}
+              type="number"
+              value={form.maxContextItems ?? 6}
+              onChange={(event) => updateField("maxContextItems", Number(event.target.value))}
+            />
+          </label>
 
-      {error ? <p className="error-text">{error}</p> : null}
-      <p className="ai-message">{message}</p>
+          <label>
+            Max Context Chars
+            <input
+              min={500}
+              max={30000}
+              type="number"
+              value={form.maxContextChars ?? 6000}
+              onChange={(event) => updateField("maxContextChars", Number(event.target.value))}
+            />
+          </label>
+        </div>
+
+        <div className="ai-actions">
+          <button type="button" onClick={saveSettings} disabled={isSaving}>
+            {isSaving ? "保存中" : "保存配置"}
+          </button>
+          <button type="button" onClick={testConnection} disabled={isTesting}>
+            {isTesting ? "测试中" : "测试连接"}
+          </button>
+          <button type="button" onClick={clearApiKey} disabled={!hasApiKey}>
+            清除 API Key
+          </button>
+        </div>
+
+        {error ? <p className="error-text">{error}</p> : null}
+        <p className="ai-message">{message}</p>
+      </details>
     </section>
   );
 }

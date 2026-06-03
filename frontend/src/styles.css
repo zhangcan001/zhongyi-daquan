@@ -1709,3 +1709,366 @@ progress {
     display: grid;
   }
 }
+
+/* Comfort pass: calmer cyberpunk, stronger hierarchy, less visual noise */
+:root {
+  --bg: #070b13;
+  --surface: rgba(13, 19, 31, 0.96);
+  --surface-strong: rgba(17, 25, 39, 0.98);
+  --surface-soft: rgba(20, 30, 46, 0.88);
+  --line: rgba(126, 199, 220, 0.2);
+  --line-strong: rgba(126, 199, 220, 0.42);
+  --text: #eef7fb;
+  --muted: #a7bac5;
+  --primary: #63d9ef;
+  --secondary: #c48cff;
+  --accent: #d8f56a;
+  --warning: #f5bd55;
+  --danger: #ff7f96;
+  --glow-cyan: 0 0 0 rgba(0, 0, 0, 0);
+  --glow-magenta: 0 0 0 rgba(0, 0, 0, 0);
+  --shadow-panel: 0 10px 28px rgba(0, 0, 0, 0.22);
+}
+
+body {
+  background:
+    linear-gradient(180deg, rgba(99, 217, 239, 0.05), transparent 260px),
+    linear-gradient(135deg, #070b13 0%, #0a1220 56%, #100d1a 100%);
+  background-size: auto;
+}
+
+body::before {
+  display: none;
+}
+
+.app-shell {
+  width: min(1280px, calc(100vw - 40px));
+  padding: 24px 0 40px;
+}
+
+.topbar {
+  align-items: center;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(13, 19, 31, 0.72);
+}
+
+h1 {
+  margin-bottom: 6px;
+  font-size: clamp(25px, 3vw, 34px);
+  text-shadow: none;
+}
+
+h2 {
+  margin-bottom: 10px;
+  font-size: 19px;
+}
+
+h3 {
+  margin: 16px 0 10px;
+}
+
+.main-tabs {
+  gap: 8px;
+  margin: 14px 0;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(5, 9, 16, 0.62);
+}
+
+.main-tabs button {
+  min-height: 40px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.main-tabs button.active {
+  border-color: var(--line-strong);
+  background: rgba(99, 217, 239, 0.14);
+  color: var(--primary);
+  box-shadow: none;
+}
+
+.panel,
+.section-band,
+.list-pane,
+.detail-pane,
+.reader-shell,
+.formula-card,
+.advanced-details,
+.empty-suggestions,
+.compact-result-list div,
+.summary-strip span,
+.summary-grid div,
+.annotation-block,
+.grid-entry-shell,
+.staging-table-wrap {
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-panel);
+}
+
+.section-band,
+.panel {
+  padding: 18px;
+}
+
+.section-band {
+  margin-top: 14px;
+}
+
+.section-heading {
+  align-items: center;
+}
+
+.section-heading p,
+.topbar p {
+  line-height: 1.55;
+}
+
+.dashboard-ai {
+  border-color: rgba(99, 217, 239, 0.34);
+  background: linear-gradient(180deg, rgba(23, 34, 52, 0.98), rgba(13, 19, 31, 0.98));
+  box-shadow: var(--shadow-panel);
+}
+
+.dashboard-ai .ai-assistant-box {
+  margin-top: 12px;
+  border-color: rgba(99, 217, 239, 0.22);
+  background: rgba(7, 11, 19, 0.7);
+  box-shadow: none;
+}
+
+.dashboard-ai .ai-assistant-box h3 {
+  color: var(--text);
+  text-shadow: none;
+}
+
+.dashboard-ai .inline-action-row input {
+  min-height: 50px;
+  border-color: var(--line-strong);
+  font-size: 16px;
+}
+
+.dashboard-ai .inline-action-row button {
+  min-width: 92px;
+  border-color: rgba(99, 217, 239, 0.62);
+  background: rgba(99, 217, 239, 0.16);
+  color: var(--primary);
+  box-shadow: none;
+}
+
+.ai-config-details {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: rgba(7, 11, 19, 0.48);
+  box-shadow: none;
+}
+
+.ai-config-details summary {
+  color: var(--muted);
+}
+
+.ai-form-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.search-panel input,
+.ai-form-grid input,
+.ai-form-grid select,
+.restore-row input,
+.filter-row input,
+.filter-row select,
+.form-grid input,
+.form-grid select,
+.form-grid textarea,
+.wide-field textarea,
+.grid-actions select,
+.import-grid input,
+.import-grid select,
+.mapping-row input,
+.staged-field textarea,
+.stacked-field textarea,
+.note-editor,
+.grid-cell input,
+.grid-cell select {
+  border-color: rgba(126, 199, 220, 0.24);
+  border-radius: 8px;
+  background: rgba(7, 11, 19, 0.72);
+}
+
+.main-tabs button,
+.section-heading button,
+.detail-actions button,
+.grid-actions button,
+.pager button,
+.inline-action-row button,
+.quick-searches button,
+.compact-result-list button,
+.filter-pills button,
+.type-grid button,
+.action-grid button,
+.ai-actions button,
+.api-key-row button,
+.task-center button,
+.import-actions button,
+.file-button,
+.reader-actions button {
+  border-radius: 8px;
+  background: rgba(17, 25, 39, 0.82);
+  box-shadow: none;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.main-tabs button:hover,
+.section-heading button:hover,
+.detail-actions button:hover,
+.grid-actions button:hover,
+.pager button:hover,
+.inline-action-row button:hover,
+.quick-searches button:hover,
+.compact-result-list button:hover,
+.filter-pills button:hover,
+.type-grid button:hover,
+.action-grid button:hover,
+.ai-actions button:hover,
+.api-key-row button:hover,
+.task-center button:hover,
+.import-actions button:hover,
+.file-button:hover,
+.reader-actions button:hover {
+  border-color: var(--line-strong);
+  background: rgba(99, 217, 239, 0.1);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.section-heading button:first-of-type,
+.detail-actions button:first-of-type,
+.grid-actions button:last-of-type,
+.filter-pills button.active {
+  border-color: rgba(99, 217, 239, 0.58);
+  background: rgba(99, 217, 239, 0.16);
+  color: var(--primary);
+  box-shadow: none;
+}
+
+.action-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.action-grid button {
+  min-height: 64px;
+  text-align: left;
+}
+
+.summary-grid div {
+  padding: 14px;
+}
+
+.summary-grid strong {
+  font-size: 21px;
+}
+
+.workspace-grid {
+  gap: 14px;
+  margin: 14px 0;
+}
+
+.workspace-split {
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.list-pane {
+  top: 12px;
+  max-height: calc(100vh - 24px);
+}
+
+.filter-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.8fr) minmax(120px, 0.8fr) minmax(160px, 1.4fr);
+  gap: 8px;
+}
+
+.knowledge-list,
+.grouped-results,
+.compact-result-list {
+  gap: 7px;
+}
+
+.knowledge-row,
+.result-card,
+.field-list div {
+  border-radius: 8px;
+  background: rgba(17, 25, 39, 0.76);
+}
+
+.knowledge-row.active,
+.result-card.active {
+  border-color: rgba(99, 217, 239, 0.62);
+  background: rgba(99, 217, 239, 0.12);
+  box-shadow: none;
+}
+
+.reader-shell {
+  gap: 12px;
+  background: rgba(13, 19, 31, 0.98);
+}
+
+.reader-title-row {
+  align-items: center;
+}
+
+.reader-title-row h2 {
+  font-size: 22px;
+}
+
+.reader-summary {
+  border-left-color: var(--primary);
+  color: #d9edf4;
+}
+
+.field-list {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.annotation-block {
+  background: rgba(17, 25, 39, 0.76);
+}
+
+.status-pill,
+.status-pill.muted {
+  box-shadow: none;
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    width: 100%;
+    padding: 12px 12px 28px;
+  }
+
+  .topbar {
+    padding: 16px;
+  }
+
+  .section-band,
+  .panel,
+  .list-pane,
+  .detail-pane {
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    padding: 14px;
+  }
+
+  .filter-row {
+    grid-template-columns: 1fr;
+  }
+
+  .main-tabs {
+    padding: 4px;
+  }
+}

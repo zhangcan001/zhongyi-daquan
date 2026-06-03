@@ -2072,6 +2072,69 @@ h3 {
   box-shadow: none;
 }
 
+.executive-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-color: rgba(126, 199, 220, 0.18);
+  background: rgba(17, 25, 39, 0.62);
+}
+
+.executive-strip div {
+  display: grid;
+  gap: 4px;
+}
+
+.executive-strip span {
+  color: var(--muted);
+}
+
+.tools-console {
+  display: grid;
+  gap: 14px;
+}
+
+.tool-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.tool-panel > summary {
+  padding: 16px 18px;
+  border-bottom: 1px solid transparent;
+  color: var(--text);
+  font-size: 17px;
+}
+
+.tool-panel[open] > summary {
+  border-bottom-color: var(--line);
+}
+
+.tool-panel > .section-band,
+.tool-panel > .import-panel,
+.tool-panel > .grid-entry-shell,
+.tool-panel > .grid-actions,
+.tool-panel > .grid-footer {
+  margin: 14px;
+}
+
+.tool-panel .section-band,
+.tool-panel .panel {
+  box-shadow: none;
+}
+
+.edit-details {
+  margin-top: 14px;
+  padding: 14px;
+  background: rgba(7, 11, 19, 0.42);
+  box-shadow: none;
+}
+
+.edit-details > summary {
+  color: var(--muted);
+}
+
 @media (max-width: 760px) {
   .app-shell {
     width: 100%;
@@ -2097,5 +2160,9 @@ h3 {
 
   .main-tabs {
     padding: 4px;
+  }
+
+  .executive-strip {
+    display: grid;
   }
 }

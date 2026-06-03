@@ -258,6 +258,9 @@ export function KnowledgeWorkspace() {
           <KnowledgeDetailReader itemId={selectedId} query={query} onChanged={loadList} />
         ) : null}
 
+        <details className="advanced-details edit-details" open={mode === "create"}>
+          <summary>{mode === "create" ? "填写新知识条目" : "整理与编辑字段"}</summary>
+
         <div className="form-grid">
           <label>
             类型
@@ -389,6 +392,7 @@ export function KnowledgeWorkspace() {
           <span>版本历史：{versions} 条</span>
         </div>
         {message ? <p className="ai-message">{message}</p> : null}
+        </details>
       </div>
     </section>
   );

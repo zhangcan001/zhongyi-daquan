@@ -1,14 +1,11 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import type { AppView } from "../App";
 import type { AppStatus } from "../modules/app/types";
 import { getDashboardStats, listFavorites, listRecentViews } from "../modules/knowledge/api";
 import type { DashboardStats, FavoriteItem, RecentView } from "../modules/knowledge/types";
 import { AiSettingsPanel } from "./AiSettingsPanel";
-import { RelationReviewPanel } from "./RelationReviewPanel";
 import { SearchPanel } from "./SearchPanel";
-import { TaskCenterPanel } from "./TaskCenterPanel";
-
-type AppView = "dashboard" | "knowledge" | "grid" | "import";
 
 type DashboardPageProps = {
   status: AppStatus | null;
@@ -36,8 +33,6 @@ const quickEntries: Array<{ label: string; hint: string; view: AppView }> = [
   { label: "经络", hint: "查循行、脏腑关联和相关穴位", view: "knowledge" },
   { label: "原典", hint: "查章节、条文和讲解", view: "knowledge" },
   { label: "人纪讲义", hint: "查看已导入注解资料", view: "knowledge" },
-  { label: "智能导入中心", hint: "导入标准数据包", view: "import" },
-  { label: "导入历史", hint: "查看报告与回滚入口", view: "import" },
 ];
 
 export function DashboardPage({ status, error, activeView, onNavigate }: DashboardPageProps) {
@@ -71,11 +66,8 @@ export function DashboardPage({ status, error, activeView, onNavigate }: Dashboa
         <button className={activeView === "knowledge" ? "active" : ""} type="button" onClick={() => onNavigate("knowledge")}>
           知识库
         </button>
-        <button className={activeView === "grid" ? "active" : ""} type="button" onClick={() => onNavigate("grid")}>
-          表格录入
-        </button>
-        <button className={activeView === "import" ? "active" : ""} type="button" onClick={() => onNavigate("import")}>
-          智能导入中心
+        <button className={activeView === "tools" ? "active" : ""} type="button" onClick={() => onNavigate("tools")}>
+          高级工具
         </button>
       </nav>
 
@@ -107,9 +99,9 @@ export function DashboardPage({ status, error, activeView, onNavigate }: Dashboa
             <div className="summary-grid">
               <Metric label="知识条目" value={stats?.knowledgeCount} />
               <Metric label="注解资料" value={stats?.annotationCount} />
-              <Metric label="最近导入批次" value={importRuns[0]?.packageName || importRuns[0]?.id || "无"} />
               <Metric label="收藏数量" value={stats?.favoriteCount} />
               <Metric label="最近查看" value={stats?.recentViewCount} />
+              <Metric label="最近导入" value={importRuns[0]?.packageName || importRuns[0]?.id || "无"} />
               <Metric label="版本" value={status?.version ?? "读取中"} />
             </div>
           </section>
@@ -139,34 +131,13 @@ export function DashboardPage({ status, error, activeView, onNavigate }: Dashboa
             </div>
           </section>
 
-          <section className="section-band">
-            <div className="section-heading">
-              <div>
-                <h2>导入历史</h2>
-                <p>查看最近导入批次；报告与回滚在智能导入中心处理，回滚前会二次确认。</p>
-              </div>
-              <button type="button" onClick={() => onNavigate("import")}>
-                进入导入中心
-              </button>
+          <section className="section-band executive-strip">
+            <div>
+              <strong>资料维护入口已收纳</strong>
+              <span>导入、表格录入、关系审查和数据库维护统一放在“高级工具”。</span>
             </div>
-            <SimpleList
-              empty="暂无导入批次"
-              rows={importRuns.map((run) => ({
-                key: run.id,
-                title: run.packageName || `导入批次 #${run.id}`,
-                meta: [
-                  run.importIntent,
-                  run.status,
-                  `主条目 ${run.createCount}`,
-                  `注解 ${run.attachAnnotationCount}`,
-                  run.rolledBackAt ? "已回滚" : "可查看报告",
-                ].join(" / "),
-              }))}
-            />
+            <button type="button" onClick={() => onNavigate("tools")}>进入高级工具</button>
           </section>
-
-          <RelationReviewPanel />
-          <TaskCenterPanel />
         </>
       ) : null}
     </>

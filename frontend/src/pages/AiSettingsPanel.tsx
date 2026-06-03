@@ -118,8 +118,8 @@ export function AiSettingsPanel() {
     <section className="section-band ai-settings dashboard-ai">
       <div className="section-heading">
         <div>
-          <h2>AI 设置</h2>
-          <p>AI 默认关闭。开启后，仅在你主动点击 AI 功能时发送当前问题、检索片段和已启用的联网摘要。</p>
+          <h2>AI 研究助手</h2>
+          <p>结合本地知识库与联网摘要，快速整理方剂、穴位、经络和原典资料。</p>
         </div>
         <span className={form.enabled ? "status-pill" : "status-pill muted"}>
           {form.enabled ? "已启用" : "默认关闭"}
@@ -127,7 +127,7 @@ export function AiSettingsPanel() {
       </div>
 
       <section className="ai-assistant-box">
-        <h3>AI 知识库助手</h3>
+        <h3>资料问答</h3>
         <div className="inline-action-row">
           <input
             value={assistantQuestion}

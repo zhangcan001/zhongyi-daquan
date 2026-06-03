@@ -30,6 +30,5 @@
     "knowledge_items",
     "classic_passages",
     "search_terms"
-  ],
-  "safety_notice": "本数据包仅用于中医经典文本学习、资料整理与本地记录，不构成医疗诊断、治疗建议或处方依据。"
+  ]
 }

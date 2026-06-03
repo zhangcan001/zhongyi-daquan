@@ -125,10 +125,6 @@ export function AiSettingsPanel() {
           {form.enabled ? "已启用" : "默认关闭"}
         </span>
       </div>
-      <p className="safety-note">
-        AI 默认关闭。开启后，软件只会在你主动点击 AI 功能时，发送当前问题和本地检索到的相关片段到你配置的接口。不会上传整个数据库、原始 PDF 或私人数据包。
-      </p>
-
       <div className="ai-form-grid">
         <label>
           启用 AI
@@ -287,7 +283,6 @@ export function AiSettingsPanel() {
             </ul>
           </div>
         ) : null}
-        {assistantAnswer?.safetyNotice ? <p className="safety-note">{assistantAnswer.safetyNotice}</p> : null}
       </section>
     </section>
   );

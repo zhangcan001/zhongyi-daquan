@@ -4,7 +4,6 @@ export type DetailField = {
   key: string;
   label: string;
   kind?: "text" | "number" | "textarea";
-  safetyNote?: string;
 };
 
 export const detailFields: Record<KnowledgeType, DetailField[]> = {
@@ -49,9 +48,9 @@ export const detailFields: Record<KnowledgeType, DetailField[]> = {
     { key: "acupoint_code", label: "穴位编号" },
     { key: "body_region", label: "部位" },
     { key: "location_text", label: "定位", kind: "textarea" },
-    { key: "needling_method", label: "针刺", kind: "textarea", safetyNote: "仅供专业学习参考，请勿自行操作。" },
-    { key: "moxibustion_method", label: "灸法", kind: "textarea", safetyNote: "仅供专业学习参考，请勿自行操作。" },
-    { key: "cupping_method", label: "火罐", kind: "textarea", safetyNote: "仅供专业学习参考，请勿自行操作。" },
+    { key: "needling_method", label: "针刺", kind: "textarea" },
+    { key: "moxibustion_method", label: "灸法", kind: "textarea" },
+    { key: "cupping_method", label: "火罐", kind: "textarea" },
     { key: "main_indications", label: "主治", kind: "textarea" },
     { key: "related_symptoms", label: "相关症状", kind: "textarea" },
     { key: "contraindications", label: "禁忌", kind: "textarea" },
@@ -105,11 +104,11 @@ export const detailFields: Record<KnowledgeType, DetailField[]> = {
   acupoint: [
     { key: "acupoint_code", label: "穴位编号" },
     { key: "meridianName", label: "所属经络" },
-    { key: "functions", label: "传统作用", kind: "textarea", safetyNote: "传统针灸学习资料，不作为治疗建议。" },
-    { key: "indications", label: "传统主治范围", kind: "textarea", safetyNote: "需结合专业辨证与定位，勿自行操作。" },
+    { key: "functions", label: "传统作用", kind: "textarea" },
+    { key: "indications", label: "传统主治范围", kind: "textarea" },
     { key: "standard_location", label: "标准定位", kind: "textarea" },
     { key: "locating_method", label: "定位方法", kind: "textarea" },
-    { key: "needling_summary", label: "针刺深度 / 角度安全说明", kind: "textarea", safetyNote: "不提供可照做的通用下针深度；具体深度须由合格专业人员判断。" },
+    { key: "needling_summary", label: "针刺深度 / 角度", kind: "textarea" },
     { key: "moxibustion_summary", label: "艾灸摘要", kind: "textarea" },
     { key: "contraindications", label: "禁忌", kind: "textarea" },
   ],

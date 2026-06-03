@@ -587,7 +587,7 @@ fn clean_herb_name(name: &str) -> String {
         .to_string()
 }
 
-fn build_answer_markdown(question: &str, cards: &[FormulaCard], mode: Option<&str>) -> String {
+fn build_answer_markdown(question: &str, cards: &[FormulaCard], _mode: Option<&str>) -> String {
     let mut lines = vec![
         "本回答基于本地知识库检索，展示的是本地资料原方信息和古籍/讲义原文记录。".to_string(),
         format!("问题：{question}"),
@@ -655,16 +655,8 @@ fn build_answer_markdown(question: &str, cards: &[FormulaCard], mode: Option<&st
                 ));
             }
         }
-        lines.push(String::new());
-        if mode == Some("extract_original_formula") {
-            lines.push(
-                "提示：以上仅为资料中的原方组成、原文剂量与比例，不等同于针对个人的处方执行指令。"
-                    .to_string(),
-            );
-        }
         lines.push("---".to_string());
     }
-    lines.push("提示：以上为本地资料中的原方信息和学习参考，不等同于针对个人的处方执行指令。实际用药、剂量换算、加减和疗程需由专业中医师结合面诊确认。".to_string());
     lines.join("\n")
 }
 
@@ -1026,7 +1018,7 @@ mod tests {
                     .as_deref()
                     .unwrap_or_default()
                     .contains("乌梅三百枚")));
-        assert!(response.message.contains("不等同于针对个人的处方执行指令"));
+        assert!(response.message.contains("乌梅丸"));
 
         let _ = fs::remove_dir_all(data_dir);
     }

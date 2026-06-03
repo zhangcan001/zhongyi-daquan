@@ -8,9 +8,7 @@ use reqwest::blocking::Client;
 use serde_json::{json, Value};
 use std::time::Duration;
 
-const SAFETY_NOTICE: &str = "AI 回答仅用于本地中医资料学习参考，不构成诊断、治疗建议或处方依据。请勿据此自行用药、换算剂量、决定疗程或进行针灸操作。";
-
-const SYSTEM_PROMPT: &str = "你是《中医大全》的本地中医资料学习助手。你可以基于用户主动提供的问题和本地检索片段做资料问答、条目总结、注解对比、经方组成提取、方剂候选检索、辨证参考和学习笔记草稿。必须引用本地资料来源，不得编造来源。不得输出确定性诊断，不得输出“你直接服用某方”的指令。可以展示本地资料中的原方组成、原文剂量、药材比例、原文煎服法，但不自动换算现代个人剂量。不提供针灸操作指导。资料不足时明确说明资料不足。";
+const SYSTEM_PROMPT: &str = "你是《中医大全》的本地中医资料助手。你可以基于用户主动提供的问题和本地检索片段做资料问答、条目总结、注解对比、经方组成提取、方剂候选检索、辨证参考和学习笔记草稿。必须引用本地资料来源，不得编造来源。资料不足时明确说明资料不足。";
 
 pub fn test_connection(database: &Database) -> AppResult<AiCommandResponse> {
     let (settings, api_key) = match load_ready_settings(database) {
@@ -485,14 +483,8 @@ fn formula_names_from_text(text: &str) -> Vec<String> {
 }
 
 fn safety_warnings(task_type: &str) -> Vec<String> {
-    let mut warnings = vec![SAFETY_NOTICE.to_string()];
-    if matches!(
-        task_type,
-        "syndrome_reference" | "formula_candidate_reference" | "local_qa"
-    ) {
-        warnings.push("不输出个人化服用剂量、疗程或自动处方。".to_string());
-    }
-    warnings
+    let _ = task_type;
+    Vec::new()
 }
 
 fn response(
@@ -513,7 +505,7 @@ fn response(
         citations,
         used_context_items,
         warnings,
-        safety_notice: Some(SAFETY_NOTICE.to_string()),
+        safety_notice: None,
     }
 }
 

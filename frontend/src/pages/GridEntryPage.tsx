@@ -294,7 +294,6 @@ export function GridEntryPage() {
         <span>dirty_rows：{dirtyRows.size}</span>
         <span>虚拟滚动结构：表格容器已固定高度，可替换为窗口化渲染。</span>
       </div>
-      <p className="safety-note">针灸相关字段仅供专业学习参考，请勿自行操作。</p>
       {message ? <p className="ai-message">{message}</p> : null}
     </section>
   );

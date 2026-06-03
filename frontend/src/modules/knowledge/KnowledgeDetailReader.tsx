@@ -62,7 +62,6 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
       .map((field) => ({
         label: field.label,
         value: stringValue(detail.detail?.[field.key]),
-        safetyNote: field.safetyNote,
       }))
       .filter((field) => field.value);
   }, [detail]);
@@ -251,7 +250,6 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
         {genericAiAnswer?.answer ? (
           <div className="ai-formula-result">
             <div className="reader-content">{genericAiAnswer.answer}</div>
-            {genericAiAnswer.safetyNotice ? <p className="safety-note">{genericAiAnswer.safetyNotice}</p> : null}
           </div>
         ) : null}
       </section>
@@ -282,7 +280,6 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
               <div key={field.label}>
                 <strong>{field.label}</strong>
                 <p>{highlight(field.value, query)}</p>
-                {field.safetyNote ? <small>{field.safetyNote}</small> : null}
               </div>
             ))}
           </div>
@@ -339,7 +336,6 @@ function FormulaAiResult({ answer }: { answer: FormulaAiAnswer }) {
     return (
       <div className="ai-formula-result">
         <p>本地资料中未检索到完整组成。</p>
-        <p className="safety-note">没有来源支撑的方剂组成不会编造。</p>
       </div>
     );
   }
@@ -349,9 +345,6 @@ function FormulaAiResult({ answer }: { answer: FormulaAiAnswer }) {
       {answer.formulaCards.map((card) => (
         <FormulaCardView key={`${card.itemId ?? card.formulaName}-${card.formulaName}`} card={card} />
       ))}
-      <p className="safety-note">
-        以上为本地资料中的原方信息和学习参考，不等同于针对个人的处方执行指令。实际用药、剂量换算、加减和疗程需由专业中医师结合面诊确认。
-      </p>
     </div>
   );
 }

@@ -4,9 +4,7 @@ import pathlib
 import sqlite3
 import time
 
-SAFETY = "仅供中医针灸知识学习与检索参考，不作为诊断、治疗或自行针刺操作依据；定位、配伍和操作须由合格专业人员执行。"
-NEEDLING_SAFETY = "针刺深度、方向和角度没有可脱离个体情况的统一数字；须由合格针灸专业人员依据标准定位、体型胖瘦、局部解剖、禁忌与教材规范判断。本库不提供可照做的下针深度。"
-SOURCE_NOTE = "参考 WHO Western Pacific Regional Office《Standard Acupuncture Nomenclature, 2nd ed》(1993) 所列十四经标准经穴编号/名称；作用范围按经络脏腑归属作传统学习归纳。"
+SOURCE_NOTE = "参考 WHO Western Pacific Regional Office《Standard Acupuncture Nomenclature, 2nd ed》(1993) 所列十四经标准经穴编号/名称；作用范围按经络脏腑归属归纳。"
 
 SCOPES = {
     "LU": ("宣肺理气、肃降肺气、调理咽喉与胸部气机。", "传统常用于肺系、咽喉、胸部及上肢内侧相关病证的学习归纳。"),
@@ -64,15 +62,14 @@ def enrich_item(item: dict) -> tuple[str, str]:
     item["summary"] = f"{item['name']}，属{meridian_name}，为该经第{number}穴，标准编号 {item['code']}。"
     item["content"] = (
         f"所属经络：{meridian_name}。{item['name']}为{meridian_name}经穴，标准编号 {item['code']}。"
-        f"传统作用学习参考：{functions}"
-        f"传统主治范围学习参考：{indications}"
-        f"{SAFETY}"
+        f"传统作用：{functions}"
+        f"传统主治范围：{indications}"
     )
     detail["meridian_name"] = meridian_name
     detail["functions"] = functions
     detail["indications"] = indications
-    detail["needling_summary"] = NEEDLING_SAFETY
-    detail["precautions"] = SAFETY
+    detail["needling_summary"] = ""
+    detail["precautions"] = ""
     return functions, indications
 
 
@@ -85,7 +82,6 @@ def build_meridian_seed() -> list[dict]:
             f"阴阳属性：{yin_yang or '未单列'}；手足属性：{hand_foot or '未单列'}。"
             f"{organ_text}"
             f"{'表里经：' + paired + '。' if paired else ''}"
-            f"{SAFETY}"
         )
         seed.append(
             {
@@ -106,8 +102,8 @@ def build_meridian_seed() -> list[dict]:
                     "organ_relation": organ,
                     "paired_meridian": paired,
                     "pathway_text": "",
-                    "main_indications": "按经络循行、所属脏腑与传统辨证体系作学习归纳。",
-                    "notes": SAFETY,
+                    "main_indications": "按经络循行、所属脏腑与传统辨证体系归纳。",
+                    "notes": "",
                 },
             }
         )

@@ -692,7 +692,6 @@ dd {
 .row-meta,
 .empty-text,
 .grid-footer,
-.safety-note,
 .form-grid small {
   color: #66736c;
 }
@@ -806,10 +805,6 @@ h3 {
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 12px;
-}
-
-.safety-note {
-  margin: 8px 0 0;
 }
 
 .stacked-field textarea {
@@ -1233,7 +1228,6 @@ dd,
 .row-meta,
 .empty-text,
 .grid-footer,
-.safety-note,
 .form-grid small,
 .ai-form-grid small,
 .task-message,

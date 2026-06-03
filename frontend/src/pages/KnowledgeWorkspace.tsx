@@ -370,7 +370,6 @@ export function KnowledgeWorkspace() {
                   onChange={(event) => updateDetail(field.key, event.target.value)}
                 />
               )}
-              {field.safetyNote ? <small>{field.safetyNote}</small> : null}
             </label>
           ))}
         </div>

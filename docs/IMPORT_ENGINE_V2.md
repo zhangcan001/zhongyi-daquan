@@ -10,9 +10,9 @@ Smart Import Center V1 在 Import Engine V2 之上增加导入计划编排：标
 | --- | --- | --- |
 | `knowledge_items_v1` | 顶层数组，元素包含 `type/name`，或包含 `content/source_note/detail`，或文件名为 `knowledge_items_import_*` | 直接适配为知识草稿，不要求人工映射 |
 | `classic_passages_v1` | 包含 `work_title/original_text/section_title`，或 `classic_id/page_title/original_text`，或文件名为 `classic_passages_*` | 转为 `syndrome` 类型原典条目 |
-| `search_terms_v1` | 包含 `term/term_type/weight`，或 `item_name/term` | 当前可识别并展示；确认导入知识主文件后会追加由名称、编号、分类、标签派生的包内搜索词 |
-| `standard_terms_v1` | 包含 `term_type/standard_name/aliases` | 当前仅识别并提示，后续由维护工具接入 |
-| `relation_suggestions_v1` | 包含 `source_name/target_name/relation_type`，或 `source_type/target_type` | 当前仅识别并提示，后续由关系工具接入 |
+| `search_terms_v1` | 包含 `term/term_type/weight`，或 `item_name/term`，也支持 `item_code/term` | 直接写入 `search_terms`，按 `item_id/item_code/item_name` 解析知识条目 |
+| `standard_terms_v1` | 包含 `term_type/standard_name/aliases` | 直接写入或更新 `standard_terms` |
+| `relation_suggestions_v1` | 包含 `source_name/target_name/relation_type`、`source_code/target_code/relation_type`、`source_item_id/target_item_id/relation_type`，或 `source_type/target_type` | 直接写入 `relation_suggestions`，保持 `pending` 待确认 |
 | `generic_csv` | 未命中特定结构的 CSV | 使用 MappingScorer 输出映射候选 |
 | `generic_json` | 未命中特定结构的 JSON | 使用 MappingScorer 输出映射候选 |
 | `unknown` | 无法解析或字段过少 | 提示用户检查文件 |
@@ -107,7 +107,7 @@ Smart Import manifest 可选声明 `import_intent`、`duplicate_policy`、`ai_as
 
 如果 ZIP 或文件夹只有普通 `manifest.json`，系统会把它当作包说明，再自动查找 `json/knowledge_items_import.json`、`json/knowledge_items_import_curated.json`、`json/classic_passages_curated.json` 等已知文件。
 
-v0.3 manifest 数据包建议命名为 `zhongyi_classics_curated_v0_3_manifest.zip`，或解压为同名文件夹后通过“导入数据包文件夹”入口选择。当前 v0.1 导入策略为：自动暂存 `primary: true` 的主知识文件，其他文件会显示在概览中，但不会混入同一导入批次。确认入库后会从主知识文件的 `name/code/category/tags` 追加包内搜索词；独立 `search_terms_curated.json` 的完整字段级入库后续由专门工具接入。
+v0.3 manifest 数据包建议命名为 `zhongyi_classics_curated_v0_3_manifest.zip`，或解压为同名文件夹后通过“导入数据包文件夹”入口选择。当前 v0.1 导入策略为：自动暂存 `primary: true` 的主文件，其他文件会显示在概览中，但不会混入同一导入批次。主文件可以是知识条目，也可以是 `search_terms_v1`、`standard_terms_v1` 或 `relation_suggestions_v1` 维护数据。确认知识主文件入库后仍会从 `name/code/category/tags` 追加包内搜索词。
 
 推荐的已解压文件夹结构：
 

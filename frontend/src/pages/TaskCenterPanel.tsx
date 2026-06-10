@@ -15,8 +15,9 @@ const jobTypeLabels: Record<string, string> = {
   rebuild_search_index: "重建搜索索引",
   backup: "备份",
   restore: "恢复",
-  ai_task: "AI 占位任务",
+  ai_task: "AI 助手任务",
   clear_database_content: "清空数据库内容",
+  data_integrity_check: "数据完整性检查",
 };
 
 const statusLabels: Record<string, string> = {
@@ -143,6 +144,13 @@ export function TaskCenterPanel() {
           disabled={busyAction !== null}
         >
           导出性能报告
+        </button>
+        <button
+          type="button"
+          onClick={() => runAction<MaintenanceReport>("integrity", "check_data_integrity")}
+          disabled={busyAction !== null}
+        >
+          检查数据完整性
         </button>
         <button
           className="danger-button"

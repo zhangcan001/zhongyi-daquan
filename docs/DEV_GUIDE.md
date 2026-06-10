@@ -28,7 +28,7 @@ npm --prefix frontend run dev
 - commands 只做参数接收和返回。
 - services 编排业务流程。
 - repositories 负责 SQLite 和文件系统访问。
-- 大数据导入、索引重建、备份恢复后续应进入 `background_jobs`。
+- 大数据导入编排、索引重建、备份恢复、数据库维护应记录到 `background_jobs`；耗时入口优先使用异步启动命令并由任务中心轮询。
 
 ## 线程 H 边界
 
@@ -60,6 +60,6 @@ npm --prefix frontend run dev
 .\scripts\generate_regression_data.ps1 local-data/database/custom-thread-h.db
 ```
 
-## AI 占位规则
+## AI 助手规则
 
-v0.1 AI 默认关闭。AI 命令应返回“当前版本未启用 AI 调用”或同义占位状态，不得访问网络，不得把 AI 输出直接写入正式知识库。
+AI 助手可在用户配置后调用外部模型和联网检索；联网失败时必须自动降级到本地知识库回答，并把外部来源与本地来源分开标注。AI 输出默认只作为草稿、建议或回答展示，不得绕过导入/确认流程直接写入正式知识库。

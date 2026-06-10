@@ -161,4 +161,22 @@ mod tests {
 
         let _ = fs::remove_dir_all(data_dir);
     }
+
+    #[test]
+    fn accepts_all_internal_maintenance_job_types() {
+        let data_dir = temp_data_dir("internal-types");
+        let database = Database::initialize(&data_dir).expect("database initializes");
+
+        for job_type in [
+            "rebuild_search_index",
+            "data_integrity_check",
+            "clear_database_content",
+        ] {
+            let job = create_internal_job(&database, job_type, None).expect("job type is allowed");
+            assert_eq!(job.job_type, job_type);
+            assert_eq!(job.status, "pending");
+        }
+
+        let _ = fs::remove_dir_all(data_dir);
+    }
 }

@@ -2,7 +2,7 @@
 
 ## 目标
 
-线程 H 提供基础自动化回归和大数据性能验证能力，覆盖数据库初始化、搜索、导入暂存、备份恢复、AI 占位和性能阈值。
+线程 H 提供基础自动化回归和大数据性能验证能力，覆盖数据库初始化、搜索、导入暂存、备份恢复、AI 研究助手和性能阈值。
 
 ## 自动化测试
 
@@ -18,7 +18,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
 - 搜索：`search_terms` 与 `knowledge_fts` 命中。
 - 导入流程：批次、暂存行、校验问题写入。
 - 备份恢复：复制数据库后仍可搜索。
-- AI 占位：命令返回禁用状态，不真实调用 AI。
+- AI 默认关闭：未启用或未配置 Key 时返回友好提示，不调用网络。
 - AI 方剂 RAG：
   - 用户问“桂枝汤组成是什么？”时，返回桂枝、芍药、甘草、生姜、大枣及来源。
   - 用户问“桂枝汤药材比例？”时，同单位剂量输出比例，不同单位另计。
@@ -34,6 +34,8 @@ cargo test --manifest-path src-tauri/Cargo.toml
   - RAG context 按 `max_context_chars` 截断。
   - 本地检索片段和来源会进入 prompt context。
   - API 错误不包含 API Key 明文。
+  - `run_ai_task` 会记录 `ai_tasks`，完成后 `get_ai_task_status` 可返回真实任务状态和回答摘要。
+  - running/pending 状态的 AI 任务可通过 `cancel_ai_task` 标记为 cancelled。
 - Import Engine V2：
   - `knowledge_items_v1` 检测。
   - `classic_passages_v1` 检测。

@@ -6,7 +6,7 @@ use crate::models::ai::{
 use crate::repositories::{ai_repository, knowledge_repository};
 use reqwest::blocking::Client;
 use serde_json::{json, Value};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const SYSTEM_PROMPT: &str = "你是《中医大全》的本地中医资料助手。你可以基于用户主动提供的问题和本地检索片段做资料问答、条目总结、注解对比、经方组成提取、方剂候选检索、辨证参考和学习笔记草稿。必须引用本地资料来源，不得编造来源。资料不足时明确说明资料不足。";
 const WEB_SYSTEM_PROMPT: &str = "你是《中医大全》的资料助手。你可以同时使用本地知识库片段和联网检索摘要回答。必须区分本地来源与网页来源，不得编造来源。网页资料只能作为外部参考；当本地资料和网页资料冲突时，要明确标出差异。资料不足时明确说明资料不足。";
@@ -69,59 +69,161 @@ pub fn run_task(database: &Database, request: AiTaskRequest) -> AppResult<AiComm
     let (settings, api_key) = load_ready_settings(database)?;
     let task_type = request.task_type.trim();
     let question = extract_question(&request);
-    let context = build_context(database, &settings, &question, request.related_item_id)?;
-    let mut warnings = Vec::new();
-    let web_sources = if settings.only_use_local_context {
-        Vec::new()
-    } else {
-        match web_search(&question, settings.timeout_seconds) {
-            Ok(sources) => sources,
-            Err(error) => {
-                warnings.push(format!(
-                    "联网检索失败，已自动降级为本地知识库回答：{error}"
-                ));
-                Vec::new()
-            }
-        }
-    };
-    let mut citations = context
-        .iter()
-        .map(|item| AiCitation {
-            title: item.source_title.clone(),
-            note: item.source_note.clone(),
-        })
-        .collect::<Vec<_>>();
-    citations.extend(web_sources.iter().map(|source| AiCitation {
-        title: Some(format!("网页：{}", source.title)),
-        note: Some(source.url.clone()),
-    }));
-    let user_prompt = build_user_prompt(task_type, &question, &context, &web_sources);
-    let system_prompt = if settings.only_use_local_context {
-        SYSTEM_PROMPT
-    } else {
-        WEB_SYSTEM_PROMPT
-    };
-    let answer = call_chat(&settings, &api_key, system_prompt, &user_prompt)?;
-    Ok(response(
-        true,
-        "completed",
-        if settings.only_use_local_context {
-            "AI 回答已生成。"
+    let task_id = ai_repository::create_task(
+        database,
+        task_type,
+        request.input_json.as_deref(),
+        request.related_batch_id,
+        request.related_row_id,
+        request.related_item_id,
+    )?;
+    let started_at = Instant::now();
+    let result = (|| -> AppResult<AiCommandResponse> {
+        let context = build_context(database, &settings, &question, request.related_item_id)?;
+        let mut warnings = Vec::new();
+        let web_sources = if settings.only_use_local_context {
+            Vec::new()
         } else {
-            "AI 回答已生成，已尝试联网检索。"
-        },
-        Some(answer.clone()),
-        citations,
-        context,
-        {
-            warnings.extend(task_warnings(
+            match web_search(&question, settings.timeout_seconds) {
+                Ok(sources) => sources,
+                Err(error) => {
+                    warnings.push(format!("联网检索失败，已自动降级为本地知识库回答：{error}"));
+                    Vec::new()
+                }
+            }
+        };
+        let mut citations = context
+            .iter()
+            .map(|item| AiCitation {
+                title: item.source_title.clone(),
+                note: item.source_note.clone(),
+            })
+            .collect::<Vec<_>>();
+        citations.extend(web_sources.iter().map(|source| AiCitation {
+            title: Some(format!("网页：{}", source.title)),
+            note: Some(source.url.clone()),
+        }));
+        let user_prompt = build_user_prompt(task_type, &question, &context, &web_sources);
+        let system_prompt = if settings.only_use_local_context {
+            SYSTEM_PROMPT
+        } else {
+            WEB_SYSTEM_PROMPT
+        };
+        let answer = call_chat(&settings, &api_key, system_prompt, &user_prompt)?;
+        warnings.extend(task_warnings(
+            task_type,
+            settings.only_use_local_context,
+            &web_sources,
+        ));
+        let mut response = response(
+            true,
+            "completed",
+            if settings.only_use_local_context {
+                "AI 回答已生成。"
+            } else {
+                "AI 回答已生成，已尝试联网检索。"
+            },
+            Some(answer.clone()),
+            citations.clone(),
+            context.clone(),
+            warnings.clone(),
+        );
+        response.task_id = Some(task_id);
+        let output_json = json!({
+            "answer": answer,
+            "citations": citations,
+            "usedContextItems": context,
+            "warnings": warnings,
+        })
+        .to_string();
+        ai_repository::complete_task(database, task_id, &output_json)?;
+        let response_summary = response
+            .answer
+            .as_deref()
+            .map(|answer| truncate(answer, 500));
+        ai_repository::insert_call_log(
+            database,
+            Some(settings.provider_type.as_str()),
+            settings.model_name.as_deref(),
+            task_type,
+            &truncate(&question, 300),
+            response_summary.as_deref(),
+            started_at.elapsed().as_millis() as i64,
+            "success",
+            None,
+        )?;
+        Ok(response)
+    })();
+
+    match result {
+        Ok(response) => Ok(response),
+        Err(error) => {
+            let message = error.to_string();
+            let _ = ai_repository::fail_task(database, task_id, &message);
+            let _ = ai_repository::insert_call_log(
+                database,
+                Some(settings.provider_type.as_str()),
+                settings.model_name.as_deref(),
                 task_type,
-                settings.only_use_local_context,
-                &web_sources,
-            ));
-            warnings
-        },
-    ))
+                &truncate(&question, 300),
+                None,
+                started_at.elapsed().as_millis() as i64,
+                "failed",
+                Some(&message),
+            );
+            Err(error)
+        }
+    }
+}
+
+pub fn get_task_status(database: &Database, task_id: i64) -> AppResult<AiCommandResponse> {
+    let task = ai_repository::get_task(database, task_id)?;
+    let output = task
+        .output_json
+        .as_deref()
+        .and_then(|text| serde_json::from_str::<Value>(text).ok());
+    let answer = output
+        .as_ref()
+        .and_then(|value| value.get("answer"))
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    Ok(AiCommandResponse {
+        enabled: true,
+        status: task.status.clone(),
+        task_id: Some(task_id),
+        message: task_status_message(&task.status, task.error_message.as_deref()),
+        answer,
+        citations: Vec::new(),
+        used_context_items: Vec::new(),
+        warnings: Vec::new(),
+        safety_notice: None,
+    })
+}
+
+pub fn cancel_task(database: &Database, task_id: i64) -> AppResult<AiCommandResponse> {
+    let task = ai_repository::cancel_task(database, task_id)?;
+    Ok(AiCommandResponse {
+        enabled: true,
+        status: task.status.clone(),
+        task_id: Some(task_id),
+        message: "AI 任务已取消。".to_string(),
+        answer: None,
+        citations: Vec::new(),
+        used_context_items: Vec::new(),
+        warnings: Vec::new(),
+        safety_notice: None,
+    })
+}
+
+fn task_status_message(status: &str, error_message: Option<&str>) -> String {
+    match status {
+        "completed" => "AI 任务已完成。".to_string(),
+        "failed" => format!("AI 任务失败：{}", error_message.unwrap_or("未知错误")),
+        "cancelled" => "AI 任务已取消。".to_string(),
+        "running" => "AI 任务运行中。".to_string(),
+        "pending" => "AI 任务等待中。".to_string(),
+        other => format!("AI 任务状态：{other}"),
+    }
 }
 
 fn load_ready_settings(database: &Database) -> AppResult<(AiProviderSettings, String)> {
@@ -572,10 +674,7 @@ fn http_client(timeout_seconds: i64) -> AppResult<Client> {
 }
 
 fn bing_search(query: &str, timeout_seconds: i64) -> AppResult<Vec<WebSearchResult>> {
-    let url = format!(
-        "https://www.bing.com/search?q={}",
-        percent_encode(query)
-    );
+    let url = format!("https://www.bing.com/search?q={}", percent_encode(query));
     let response = http_client(timeout_seconds)?
         .get(url)
         .send()
@@ -610,7 +709,10 @@ fn duckduckgo_lite_search(query: &str, timeout_seconds: i64) -> AppResult<Vec<We
     let html = response
         .text()
         .map_err(|_| AppError::Data("联网检索结果读取失败。".to_string()))?;
-    Ok(parse_duckduckgo_lite_results(&html).into_iter().take(5).collect())
+    Ok(parse_duckduckgo_lite_results(&html)
+        .into_iter()
+        .take(5)
+        .collect())
 }
 
 fn wikipedia_opensearch(query: &str, timeout_seconds: i64) -> AppResult<Vec<WebSearchResult>> {
@@ -697,14 +799,18 @@ fn parse_bing_results(html: &str) -> Vec<WebSearchResult> {
         let snippet = card
             .find("<p")
             .and_then(|p_offset| {
-                let start = card[p_offset..].find('>').map(|offset| p_offset + offset + 1)?;
+                let start = card[p_offset..]
+                    .find('>')
+                    .map(|offset| p_offset + offset + 1)?;
                 let end = card[start..].find("</p>").map(|offset| start + offset)?;
                 Some(html_unescape(&strip_tags(&card[start..end])))
             })
             .unwrap_or_default();
         if !title.trim().is_empty()
             && url.starts_with("http")
-            && !results.iter().any(|existing: &WebSearchResult| existing.url == url)
+            && !results
+                .iter()
+                .any(|existing: &WebSearchResult| existing.url == url)
         {
             results.push(WebSearchResult {
                 title: truncate(title.trim(), 120),
@@ -756,7 +862,9 @@ fn parse_duckduckgo_lite_results(html: &str) -> Vec<WebSearchResult> {
         let Some(title_end_offset) = html[title_start..].find("</a>") else {
             break;
         };
-        let title = html_unescape(&strip_tags(&html[title_start..title_start + title_end_offset]));
+        let title = html_unescape(&strip_tags(
+            &html[title_start..title_start + title_end_offset],
+        ));
         let next_cursor = title_start + title_end_offset;
         let snippet = html[next_cursor..]
             .find("result-snippet")
@@ -770,7 +878,9 @@ fn parse_duckduckgo_lite_results(html: &str) -> Vec<WebSearchResult> {
         let url = clean_duckduckgo_url(&href);
         if !title.trim().is_empty()
             && !url.trim().is_empty()
-            && !results.iter().any(|existing: &WebSearchResult| existing.url == url)
+            && !results
+                .iter()
+                .any(|existing: &WebSearchResult| existing.url == url)
         {
             results.push(WebSearchResult {
                 title: truncate(title.trim(), 120),
@@ -861,10 +971,9 @@ fn task_warnings(
     }
     if web_sources.is_empty() {
         vec!["联网检索未返回可用摘要，本次回答主要依赖本地资料。".to_string()]
-    } else if web_sources
-        .iter()
-        .all(|source| source.snippet.contains("暂未返回可解析内容") || source.snippet.contains("备用中文搜索入口"))
-    {
+    } else if web_sources.iter().all(|source| {
+        source.snippet.contains("暂未返回可解析内容") || source.snippet.contains("备用中文搜索入口")
+    }) {
         vec!["联网检索未返回可解析摘要，已提供在线搜索入口供核对。".to_string()]
     } else {
         vec!["已启用联网检索，网页资料会作为外部来源与本地资料分开引用。".to_string()]
@@ -961,6 +1070,41 @@ mod tests {
         let missing = test_connection(&database).expect("friendly missing settings response");
         assert!(!missing.enabled);
         assert!(missing.message.contains("AI 未启用") || missing.message.contains("API Key"));
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn ai_task_status_reads_real_task_table_and_cancel_updates_status() {
+        let data_dir = temp_data_dir("ai-task-status");
+        let database = Database::initialize(&data_dir).expect("database");
+        let completed_id = ai_repository::create_task(
+            &database,
+            "local_qa",
+            Some("{\"question\":\"桂枝汤\"}"),
+            None,
+            None,
+            None,
+        )
+        .expect("create task");
+        ai_repository::complete_task(
+            &database,
+            completed_id,
+            r#"{"answer":"桂枝汤资料回答","warnings":[]}"#,
+        )
+        .expect("complete task");
+
+        let status = get_task_status(&database, completed_id).expect("task status");
+        assert_eq!(status.status, "completed");
+        assert_eq!(status.task_id, Some(completed_id));
+        assert_eq!(status.answer.as_deref(), Some("桂枝汤资料回答"));
+
+        let running_id = ai_repository::create_task(&database, "local_qa", None, None, None, None)
+            .expect("create running task");
+        let cancelled = cancel_task(&database, running_id).expect("cancel task");
+        assert_eq!(cancelled.status, "cancelled");
+        let cancelled_status = get_task_status(&database, running_id).expect("cancelled status");
+        assert_eq!(cancelled_status.status, "cancelled");
+
         let _ = fs::remove_dir_all(data_dir);
     }
 

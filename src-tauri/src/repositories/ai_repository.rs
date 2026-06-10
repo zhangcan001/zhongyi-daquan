@@ -1,6 +1,7 @@
 use crate::db::connection::Database;
+use crate::errors::AppError;
 use crate::errors::AppResult;
-use crate::models::ai::{AiProviderSettings, SaveAiProviderSettingsRequest};
+use crate::models::ai::{AiProviderSettings, AiTask, SaveAiProviderSettingsRequest};
 use rusqlite::{params, OptionalExtension};
 
 pub fn ai_enabled(database: &Database) -> AppResult<bool> {
@@ -166,4 +167,147 @@ pub fn clear_api_key(database: &Database) -> AppResult<Option<AiProviderSettings
         Ok(())
     })?;
     get_provider_settings(database)
+}
+
+pub fn create_task(
+    database: &Database,
+    task_type: &str,
+    input_json: Option<&str>,
+    related_batch_id: Option<i64>,
+    related_row_id: Option<i64>,
+    related_item_id: Option<i64>,
+) -> AppResult<i64> {
+    database.with_connection(|connection| {
+        connection.execute(
+            "INSERT INTO ai_tasks
+             (task_type, status, input_json, related_batch_id, related_row_id, related_item_id, created_at, updated_at)
+             VALUES (?1, 'running', ?2, ?3, ?4, ?5, datetime('now'), datetime('now'))",
+            params![
+                task_type,
+                input_json,
+                related_batch_id,
+                related_row_id,
+                related_item_id
+            ],
+        )?;
+        Ok(connection.last_insert_rowid())
+    })
+}
+
+pub fn complete_task(database: &Database, task_id: i64, output_json: &str) -> AppResult<()> {
+    database.with_connection(|connection| {
+        connection.execute(
+            "UPDATE ai_tasks
+             SET status = 'completed', output_json = ?2, error_message = NULL, updated_at = datetime('now')
+             WHERE id = ?1",
+            params![task_id, output_json],
+        )?;
+        Ok(())
+    })
+}
+
+pub fn fail_task(database: &Database, task_id: i64, error_message: &str) -> AppResult<()> {
+    database.with_connection(|connection| {
+        connection.execute(
+            "UPDATE ai_tasks
+             SET status = 'failed', error_message = ?2, updated_at = datetime('now')
+             WHERE id = ?1",
+            params![task_id, error_message],
+        )?;
+        Ok(())
+    })
+}
+
+pub fn cancel_task(database: &Database, task_id: i64) -> AppResult<AiTask> {
+    database.with_connection(|connection| {
+        let changed = connection.execute(
+            "UPDATE ai_tasks
+             SET status = 'cancelled', updated_at = datetime('now')
+             WHERE id = ?1 AND status IN ('pending', 'running')",
+            params![task_id],
+        )?;
+        if changed == 0 {
+            let task = get_task_by_connection(connection, task_id)?;
+            if task.status != "cancelled" {
+                return Err(AppError::InvalidInput(
+                    "只能取消 pending 或 running 状态的 AI 任务".to_string(),
+                ));
+            }
+            return Ok(task);
+        }
+        get_task_by_connection(connection, task_id)
+    })
+}
+
+pub fn get_task(database: &Database, task_id: i64) -> AppResult<AiTask> {
+    database.with_connection(|connection| get_task_by_connection(connection, task_id))
+}
+
+pub fn insert_call_log(
+    database: &Database,
+    provider_type: Option<&str>,
+    model_name: Option<&str>,
+    task_type: &str,
+    request_summary: &str,
+    response_summary: Option<&str>,
+    duration_ms: i64,
+    status: &str,
+    error_message: Option<&str>,
+) -> AppResult<()> {
+    database.with_connection(|connection| {
+        connection.execute(
+            "INSERT INTO ai_call_logs
+             (provider_type, model_name, task_type, input_hash, prompt_version,
+              request_summary, response_summary, duration_ms, token_usage_json, status, error_message, created_at)
+             VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?7, NULL, ?8, ?9, datetime('now'))",
+            params![
+                provider_type,
+                model_name,
+                task_type,
+                stable_input_hash(request_summary),
+                request_summary,
+                response_summary,
+                duration_ms,
+                status,
+                error_message,
+            ],
+        )?;
+        Ok(())
+    })
+}
+
+fn get_task_by_connection(connection: &rusqlite::Connection, task_id: i64) -> AppResult<AiTask> {
+    connection
+        .query_row(
+            "SELECT id, task_type, status, input_json, output_json, error_message,
+                    related_batch_id, related_row_id, related_item_id, created_at, updated_at
+             FROM ai_tasks WHERE id = ?1",
+            params![task_id],
+            |row| {
+                Ok(AiTask {
+                    id: Some(row.get(0)?),
+                    task_type: row.get(1)?,
+                    status: row.get(2)?,
+                    input_json: row.get(3)?,
+                    output_json: row.get(4)?,
+                    error_message: row.get(5)?,
+                    related_batch_id: row.get(6)?,
+                    related_row_id: row.get(7)?,
+                    related_item_id: row.get(8)?,
+                    created_at: row.get(9)?,
+                    updated_at: row.get(10)?,
+                })
+            },
+        )
+        .optional()?
+        .ok_or_else(|| AppError::InvalidInput(format!("AI 任务不存在: {task_id}")))
+}
+
+fn stable_input_hash(value: &str) -> String {
+    let mut hash: u64 = 1469598103934665603;
+    for byte in value.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(1099511628211);
+    }
+    format!("{hash:016x}")
 }

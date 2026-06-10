@@ -324,6 +324,32 @@ mark {
   gap: 16px;
 }
 
+.review-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.review-list-heading h3 {
+  margin: 0;
+}
+
+.review-list-heading select {
+  min-width: 112px;
+}
+
+.compact-actions {
+  justify-content: flex-start;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.compact-actions button {
+  min-width: 78px;
+}
+
 .section-heading {
   display: flex;
   align-items: flex-start;
@@ -1426,6 +1452,7 @@ summary:focus-visible,
 .restore-row input,
 .filter-row input,
 .filter-row select,
+.review-list-heading select,
 .form-grid input,
 .form-grid select,
 .form-grid textarea,

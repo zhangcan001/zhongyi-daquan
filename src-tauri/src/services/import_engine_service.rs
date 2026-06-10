@@ -15,6 +15,9 @@ const DIRECT_TYPES: &[&str] = &[
     "knowledge_items_v1",
     "classic_passages_v1",
     "annotation_items_v1",
+    "search_terms_v1",
+    "standard_terms_v1",
+    "relation_suggestions_v1",
 ];
 
 pub fn detect_import_type(
@@ -86,25 +89,19 @@ pub fn prepare_import_rows(
     let detection = detect_import_type(file_name, source_format, rows);
     let suggestions = score_mapping(rows, target_type);
     let direct_import_ready = DIRECT_TYPES.contains(&detection.detected_type.as_str());
-    let mut warnings = Vec::new();
+    let warnings = Vec::new();
 
     let mapped_rows = if direct_import_ready && explicit_mapping.is_none() {
         match detection.detected_type.as_str() {
             "knowledge_items_v1" => rows.iter().map(adapt_knowledge_item).collect(),
             "classic_passages_v1" => rows.iter().map(adapt_classic_passage).collect(),
             "annotation_items_v1" => rows.iter().map(adapt_annotation_item).collect(),
+            "search_terms_v1" => rows.iter().map(adapt_search_term).collect(),
+            "standard_terms_v1" => rows.iter().map(adapt_standard_term).collect(),
+            "relation_suggestions_v1" => rows.iter().map(adapt_relation_suggestion).collect(),
             _ => Vec::new(),
         }
     } else {
-        if detection.detected_type == "search_terms_v1" {
-            warnings.push("search_terms_v1 已识别，但 v0.1 当前仍以知识条目导入为主，搜索词表批量入库将在后续版本接入。".to_string());
-        }
-        if detection.detected_type == "standard_terms_v1" {
-            warnings.push("standard_terms_v1 已识别，但 v0.1 当前不直接导入标准词表，请先转为知识条目或等待维护工具接入。".to_string());
-        }
-        if detection.detected_type == "relation_suggestions_v1" {
-            warnings.push("relation_suggestions_v1 已识别，但 v0.1 当前不直接导入关系建议表，请先导入知识条目后生成关系建议。".to_string());
-        }
         rows.iter()
             .map(|row| apply_scored_mapping(row, target_type, explicit_mapping, &suggestions))
             .collect()
@@ -277,6 +274,8 @@ fn detect_relation_suggestions(
     fields: &HashSet<String>,
 ) -> Option<(&'static str, f64, &'static str)> {
     if has_all(fields, &["sourcename", "targetname", "relationtype"])
+        || has_all(fields, &["sourcecode", "targetcode", "relationtype"])
+        || has_all(fields, &["sourceitemid", "targetitemid", "relationtype"])
         || has_all(fields, &["sourcetype", "targettype"])
     {
         Some((
@@ -439,6 +438,156 @@ fn adapt_annotation_item(raw: &Map<String, Value>) -> Map<String, Value> {
     output.insert("detail".to_string(), Value::Object(detail));
     preserve_private_fields(raw, &mut output);
     normalize_knowledge_item_defaults(&mut output);
+    output
+}
+
+fn adapt_search_term(raw: &Map<String, Value>) -> Map<String, Value> {
+    let mut output = Map::new();
+    copy_alias(
+        raw,
+        &mut output,
+        "item_id",
+        &["item_id", "itemId", "知识条目ID"],
+    );
+    copy_alias(
+        raw,
+        &mut output,
+        "item_code",
+        &["item_code", "itemCode", "code", "编号", "条目编号"],
+    );
+    copy_alias(
+        raw,
+        &mut output,
+        "item_name",
+        &["item_name", "itemName", "name", "名称", "条目名称"],
+    );
+    copy_alias(
+        raw,
+        &mut output,
+        "item_type",
+        &["item_type", "itemType", "type", "类型"],
+    );
+    copy_alias(
+        raw,
+        &mut output,
+        "term",
+        &["term", "keyword", "关键词", "搜索词"],
+    );
+    copy_alias(
+        raw,
+        &mut output,
+        "term_type",
+        &["term_type", "termType", "keyword_type", "类型", "词类型"],
+    );
+    copy_alias(raw, &mut output, "weight", &["weight", "score", "权重"]);
+    output
+        .entry("term_type".to_string())
+        .or_insert_with(|| Value::String("imported".to_string()));
+    output
+        .entry("weight".to_string())
+        .or_insert_with(|| Value::Number(80.into()));
+    output
+}
+
+fn adapt_standard_term(raw: &Map<String, Value>) -> Map<String, Value> {
+    let mut output = Map::new();
+    copy_alias(
+        raw,
+        &mut output,
+        "term_type",
+        &["term_type", "termType", "类型", "词表类型"],
+    );
+    copy_alias(
+        raw,
+        &mut output,
+        "standard_name",
+        &["standard_name", "standardName", "name", "标准名", "名称"],
+    );
+    copy_alias(
+        raw,
+        &mut output,
+        "aliases",
+        &["aliases", "alias", "别名", "异名"],
+    );
+    copy_alias(raw, &mut output, "code", &["code", "编号", "编码"]);
+    copy_alias(
+        raw,
+        &mut output,
+        "notes",
+        &["notes", "note", "备注", "说明"],
+    );
+    output
+}
+
+fn adapt_relation_suggestion(raw: &Map<String, Value>) -> Map<String, Value> {
+    let mut output = Map::new();
+    copy_alias(
+        raw,
+        &mut output,
+        "source_item_id",
+        &["source_item_id", "sourceItemId", "source_id", "来源ID"],
+    );
+    copy_alias(
+        raw,
+        &mut output,
+        "source_code",
+        &["source_code", "sourceCode", "来源编号"],
+    );
+    copy_alias(
+        raw,
+        &mut output,
+        "source_name",
+        &["source_name", "sourceName", "来源名称"],
+    );
+    copy_alias(
+        raw,
+        &mut output,
+        "source_type",
+        &["source_type", "sourceType", "来源类型"],
+    );
+    copy_alias(
+        raw,
+        &mut output,
+        "target_item_id",
+        &["target_item_id", "targetItemId", "target_id", "目标ID"],
+    );
+    copy_alias(
+        raw,
+        &mut output,
+        "target_code",
+        &["target_code", "targetCode", "目标编号"],
+    );
+    copy_alias(
+        raw,
+        &mut output,
+        "target_name",
+        &["target_name", "targetName", "目标名称"],
+    );
+    copy_alias(
+        raw,
+        &mut output,
+        "target_type",
+        &["target_type", "targetType", "目标类型"],
+    );
+    copy_alias(
+        raw,
+        &mut output,
+        "relation_type",
+        &["relation_type", "relationType", "关系类型"],
+    );
+    copy_alias(raw, &mut output, "confidence", &["confidence", "置信度"]);
+    copy_alias(
+        raw,
+        &mut output,
+        "reason",
+        &["reason", "note", "原因", "说明"],
+    );
+    output
+        .entry("relation_type".to_string())
+        .or_insert_with(|| Value::String("related_to".to_string()));
+    output
+        .entry("confidence".to_string())
+        .or_insert_with(|| Value::Number(serde_json::Number::from_f64(0.8).unwrap()));
     output
 }
 

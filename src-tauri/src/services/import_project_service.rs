@@ -311,6 +311,9 @@ pub fn undo_last_clean_step(database: &Database, batch_id: i64) -> AppResult<Cle
 pub fn confirm_import(database: &Database, batch_id: i64) -> AppResult<ConfirmImportResult> {
     let batch = import_repository::get_batch(database, batch_id)?;
     let rows = import_repository::list_all_rows(database, batch_id)?;
+    if is_maintenance_import_type(&batch.import_type) {
+        return confirm_maintenance_import(database, batch_id, &batch.import_type, &rows);
+    }
     let mut imported_count = 0;
     let mut skipped_count = 0;
     let mut imported_item_ids = Vec::new();
@@ -584,7 +587,9 @@ fn import_preparsed_rows(
         mapping.as_ref(),
     );
     let _ = (&engine.mapping_suggestions, &engine.warnings);
-    let target_type = if engine.direct_import_ready {
+    let target_type = if is_maintenance_import_type(&engine.detection.detected_type) {
+        engine.detection.detected_type.as_str()
+    } else if engine.direct_import_ready {
         "mixed"
     } else {
         &request.target_type
@@ -611,9 +616,15 @@ fn import_preparsed_rows(
         .zip(normalized_rows.iter())
         .enumerate()
     {
-        let effective_type = effective_target_type(target_type, normalized);
-        let mut issues = validation_service::validate_row(database, &effective_type, normalized)?;
-        issues.extend(existing_duplicate_warnings(database, normalized)?);
+        let issues = if is_maintenance_import_type(&engine.detection.detected_type) {
+            validate_maintenance_row(&engine.detection.detected_type, normalized)
+        } else {
+            let effective_type = effective_target_type(target_type, normalized);
+            let mut issues =
+                validation_service::validate_row(database, &effective_type, normalized)?;
+            issues.extend(existing_duplicate_warnings(database, normalized)?);
+            issues
+        };
         let (status, error_message, warning_message) =
             validation_service::status_from_issues(&issues);
 
@@ -639,6 +650,276 @@ fn import_preparsed_rows(
     // TODO: 线程 F 完成后，大文件在这里创建 background_jobs 并切到异步解析。
     import_repository::update_batch_counts(database, batch_id, "staged")?;
     import_repository::summary(database, batch_id)
+}
+
+fn confirm_maintenance_import(
+    database: &Database,
+    batch_id: i64,
+    import_type: &str,
+    rows: &[crate::models::data_pipeline::DataImportRow],
+) -> AppResult<ConfirmImportResult> {
+    let mut imported_count = 0_i64;
+    let mut skipped_count = 0_i64;
+    let mut affected_item_ids = Vec::new();
+
+    database.with_connection(|connection| {
+        let transaction = connection.unchecked_transaction()?;
+        for row in rows {
+            let row_id = row.id.unwrap_or_default();
+            if row.status == "error" {
+                skipped_count += 1;
+                continue;
+            }
+            let normalized = parse_optional_json(row.normalized_json.clone())?;
+            let object = normalized.as_object().cloned().unwrap_or_default();
+            let result = match import_type {
+                "standard_terms_v1" => {
+                    insert_standard_term_row(&transaction, &object).map(|_| None)
+                }
+                "search_terms_v1" => insert_search_term_row(&transaction, &object),
+                "relation_suggestions_v1" => insert_relation_suggestion_row(&transaction, &object),
+                _ => Err(AppError::InvalidInput(format!(
+                    "不支持的维护导入类型: {import_type}"
+                ))),
+            };
+
+            match result {
+                Ok(item_id) => {
+                    if let Some(item_id) = item_id {
+                        affected_item_ids.push(item_id);
+                    }
+                    transaction.execute(
+                        "UPDATE data_import_rows
+                         SET status = 'imported', error_message = NULL
+                         WHERE id = ?1",
+                        params![row_id],
+                    )?;
+                    imported_count += 1;
+                }
+                Err(AppError::InvalidInput(message)) | Err(AppError::Data(message)) => {
+                    transaction.execute(
+                        "UPDATE data_import_rows
+                         SET status = 'error', error_message = ?2
+                         WHERE id = ?1",
+                        params![row_id, message],
+                    )?;
+                    skipped_count += 1;
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        affected_item_ids.sort_unstable();
+        affected_item_ids.dedup();
+        transaction.execute(
+            "UPDATE data_import_batches
+             SET status = 'imported', confirmed_item_ids_json = ?2
+             WHERE id = ?1",
+            params![batch_id, serde_json::to_string(&affected_item_ids)?],
+        )?;
+        transaction.commit()?;
+        Ok(())
+    })?;
+
+    import_repository::update_batch_counts(database, batch_id, "imported")?;
+    if import_type == "search_terms_v1" {
+        set_search_terms_imported_count(database, batch_id, imported_count)?;
+    }
+    let report = import_quality_report(database, batch_id)?;
+    import_repository::set_quality_report(database, batch_id, &serde_json::to_string(&report)?)?;
+    Ok(ConfirmImportResult {
+        batch_id,
+        imported_count,
+        skipped_count,
+        summary: import_repository::summary(database, batch_id)?,
+    })
+}
+
+fn insert_standard_term_row(
+    transaction: &rusqlite::Transaction<'_>,
+    object: &Map<String, Value>,
+) -> AppResult<()> {
+    let term_type = required_text(object, "term_type")?;
+    let standard_name = required_text(object, "standard_name")?;
+    transaction.execute(
+        "UPDATE standard_terms
+         SET aliases = COALESCE(?3, aliases),
+             code = COALESCE(?4, code),
+             notes = COALESCE(?5, notes)
+         WHERE term_type = ?1 AND standard_name = ?2",
+        params![
+            term_type,
+            standard_name,
+            text(object, "aliases"),
+            text(object, "code"),
+            text(object, "notes")
+        ],
+    )?;
+    if transaction.changes() == 0 {
+        transaction.execute(
+            "INSERT INTO standard_terms(term_type, standard_name, aliases, code, notes)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                term_type,
+                standard_name,
+                text(object, "aliases"),
+                text(object, "code"),
+                text(object, "notes")
+            ],
+        )?;
+    }
+    Ok(())
+}
+
+fn insert_search_term_row(
+    transaction: &rusqlite::Transaction<'_>,
+    object: &Map<String, Value>,
+) -> AppResult<Option<i64>> {
+    let item_id = resolve_knowledge_item_id(
+        transaction,
+        text(object, "item_id"),
+        text(object, "item_code"),
+        text(object, "item_name"),
+        text(object, "item_type"),
+        "搜索词",
+    )?;
+    let term = required_text(object, "term")?;
+    let normalized = search_repository::normalize_for_search(&term);
+    if normalized.is_empty() {
+        return Err(AppError::InvalidInput("搜索词 term 不能为空".to_string()));
+    }
+    let term_type = text(object, "term_type").unwrap_or_else(|| "imported".to_string());
+    let weight = number_i64(object, "weight").unwrap_or(80).clamp(1, 500);
+    transaction.execute(
+        "INSERT INTO search_terms(item_id, term, term_type, weight)
+         SELECT ?1, ?2, ?3, ?4
+         WHERE NOT EXISTS (
+           SELECT 1 FROM search_terms
+           WHERE item_id = ?1 AND term = ?2 AND term_type = ?3
+         )",
+        params![item_id, normalized, term_type, weight],
+    )?;
+    Ok(Some(item_id))
+}
+
+fn insert_relation_suggestion_row(
+    transaction: &rusqlite::Transaction<'_>,
+    object: &Map<String, Value>,
+) -> AppResult<Option<i64>> {
+    let source_item_id = resolve_knowledge_item_id(
+        transaction,
+        text(object, "source_item_id"),
+        text(object, "source_code"),
+        text(object, "source_name"),
+        text(object, "source_type"),
+        "关系来源",
+    )?;
+    let target_item_id = resolve_knowledge_item_id(
+        transaction,
+        text(object, "target_item_id"),
+        text(object, "target_code"),
+        text(object, "target_name"),
+        text(object, "target_type"),
+        "关系目标",
+    )?;
+    if source_item_id == target_item_id {
+        return Err(AppError::InvalidInput(
+            "关系来源和目标不能是同一条目".to_string(),
+        ));
+    }
+    let relation_type = text(object, "relation_type").unwrap_or_else(|| "related_to".to_string());
+    let confidence = number_f64(object, "confidence")
+        .unwrap_or(0.8)
+        .clamp(0.0, 1.0);
+    let reason = text(object, "reason").unwrap_or_else(|| "维护导入".to_string());
+    transaction.execute(
+        "INSERT INTO relation_suggestions
+         (source_item_id, target_item_id, relation_type, confidence, reason, status, created_at)
+         SELECT ?1, ?2, ?3, ?4, ?5, 'pending', datetime('now')
+         WHERE NOT EXISTS (
+           SELECT 1 FROM relation_suggestions
+           WHERE source_item_id = ?1 AND target_item_id = ?2
+             AND relation_type = ?3 AND status = 'pending'
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM knowledge_relations
+           WHERE source_item_id = ?1 AND target_item_id = ?2 AND relation_type = ?3
+         )",
+        params![
+            source_item_id,
+            target_item_id,
+            relation_type,
+            confidence,
+            reason
+        ],
+    )?;
+    Ok(Some(source_item_id))
+}
+
+fn resolve_knowledge_item_id(
+    transaction: &rusqlite::Transaction<'_>,
+    raw_id: Option<String>,
+    code: Option<String>,
+    name: Option<String>,
+    item_type: Option<String>,
+    label: &str,
+) -> AppResult<i64> {
+    if let Some(raw_id) = raw_id {
+        let item_id = raw_id.parse::<i64>().map_err(|_| {
+            AppError::InvalidInput(format!("{label} item_id 不是有效数字: {raw_id}"))
+        })?;
+        let exists: Option<i64> = transaction
+            .query_row(
+                "SELECT id FROM knowledge_items WHERE id = ?1",
+                params![item_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        return exists
+            .ok_or_else(|| AppError::InvalidInput(format!("{label} item_id 不存在: {item_id}")));
+    }
+
+    let mut clauses = Vec::new();
+    let mut args = Vec::new();
+    if let Some(code) = code.filter(|value| !value.trim().is_empty()) {
+        clauses.push("code = ?".to_string());
+        args.push(code);
+    }
+    if let Some(name) = name.filter(|value| !value.trim().is_empty()) {
+        clauses.push("name = ?".to_string());
+        args.push(name);
+    }
+    if clauses.is_empty() {
+        return Err(AppError::InvalidInput(format!(
+            "{label} 缺少 item_id、item_code 或 item_name"
+        )));
+    }
+    let type_clause = if item_type.is_some() {
+        " AND type = ?"
+    } else {
+        ""
+    };
+    let sql = format!(
+        "SELECT id FROM knowledge_items WHERE ({}){} ORDER BY id DESC LIMIT 1",
+        clauses.join(" OR "),
+        type_clause
+    );
+    let mut statement = transaction.prepare(&sql)?;
+    let item_id = match (args.len(), item_type) {
+        (1, Some(kind)) => statement
+            .query_row(params![args[0], kind], |row| row.get(0))
+            .optional()?,
+        (2, Some(kind)) => statement
+            .query_row(params![args[0], args[1], kind], |row| row.get(0))
+            .optional()?,
+        (1, None) => statement
+            .query_row(params![args[0]], |row| row.get(0))
+            .optional()?,
+        (2, None) => statement
+            .query_row(params![args[0], args[1]], |row| row.get(0))
+            .optional()?,
+        _ => None,
+    };
+    item_id.ok_or_else(|| AppError::InvalidInput(format!("{label} 未匹配到知识条目")))
 }
 
 fn parse_json_rows(content: &str) -> AppResult<Vec<Map<String, Value>>> {
@@ -1076,7 +1357,15 @@ fn read_manifest_import_package_with_path<R: ImportPackageReader>(
 
         let mut record_count = None;
         let mut skip_reason = None;
-        if file.import_type == "search_terms_v1" {
+        if file.import_type == "search_terms_v1" && should_auto_stage_manifest_file(file) {
+            let rows = read_package_rows(reader, &file.path)?;
+            record_count = Some(rows.len() as i64);
+            primary_path = Some(file.path.clone());
+            primary_import_type = file.import_type.clone();
+            candidates.extend(rows);
+            primary_files.push(file.path.clone());
+            auto_stage_files.push(file.path.clone());
+        } else if file.import_type == "search_terms_v1" {
             let rows = read_package_rows(reader, &file.path)?;
             record_count = Some(rows.len() as i64);
             warnings.push(format!("已读取搜索词文件 {}：{} 条", file.path, rows.len()));
@@ -1091,7 +1380,7 @@ fn read_manifest_import_package_with_path<R: ImportPackageReader>(
             let rows = read_package_rows(reader, &file.path)?;
             record_count = Some(rows.len() as i64);
             primary_path = Some(file.path.clone());
-            primary_import_type = "zip_manifest".to_string();
+            primary_import_type = file.import_type.clone();
             candidates.extend(rows);
             primary_files.push(file.path.clone());
             auto_stage_files.push(file.path.clone());
@@ -1385,7 +1674,12 @@ fn detect_package_rows(path: &str, import_type: &str, rows: &[Map<String, Value>
 fn is_direct_package_import_type(import_type: &str) -> bool {
     matches!(
         import_type,
-        "knowledge_items_v1" | "classic_passages_v1" | "annotation_items_v1"
+        "knowledge_items_v1"
+            | "classic_passages_v1"
+            | "annotation_items_v1"
+            | "search_terms_v1"
+            | "standard_terms_v1"
+            | "relation_suggestions_v1"
     )
 }
 
@@ -2099,6 +2393,86 @@ fn lookup_meridian_id(
     Ok(value)
 }
 
+fn is_maintenance_import_type(import_type: &str) -> bool {
+    matches!(
+        import_type,
+        "search_terms_v1" | "standard_terms_v1" | "relation_suggestions_v1"
+    )
+}
+
+fn validate_maintenance_row(import_type: &str, row: &Map<String, Value>) -> Vec<StagingIssue> {
+    let mut issues = Vec::new();
+    match import_type {
+        "standard_terms_v1" => {
+            required_issue(&mut issues, row, "term_type", "term_type 不能为空");
+            required_issue(&mut issues, row, "standard_name", "standard_name 不能为空");
+        }
+        "search_terms_v1" => {
+            required_issue(&mut issues, row, "term", "term 不能为空");
+            if text(row, "item_id").is_none()
+                && text(row, "item_code").is_none()
+                && text(row, "item_name").is_none()
+            {
+                issues.push(staging_error(
+                    "required",
+                    Some("item_id"),
+                    "搜索词必须提供 item_id、item_code 或 item_name",
+                ));
+            }
+        }
+        "relation_suggestions_v1" => {
+            required_issue(&mut issues, row, "relation_type", "relation_type 不能为空");
+            if text(row, "source_item_id").is_none()
+                && text(row, "source_code").is_none()
+                && text(row, "source_name").is_none()
+            {
+                issues.push(staging_error(
+                    "required",
+                    Some("source_item_id"),
+                    "关系来源必须提供 source_item_id、source_code 或 source_name",
+                ));
+            }
+            if text(row, "target_item_id").is_none()
+                && text(row, "target_code").is_none()
+                && text(row, "target_name").is_none()
+            {
+                issues.push(staging_error(
+                    "required",
+                    Some("target_item_id"),
+                    "关系目标必须提供 target_item_id、target_code 或 target_name",
+                ));
+            }
+        }
+        _ => {}
+    }
+    issues
+}
+
+fn required_issue(
+    issues: &mut Vec<StagingIssue>,
+    row: &Map<String, Value>,
+    field: &'static str,
+    message: &str,
+) {
+    if text(row, field).is_none() {
+        issues.push(staging_error("required", Some(field), message));
+    }
+}
+
+fn staging_error(code: &str, field: Option<&str>, message: &str) -> StagingIssue {
+    StagingIssue {
+        severity: "error".to_string(),
+        issue_code: code.to_string(),
+        field_name: field.map(ToString::to_string),
+        message: message.to_string(),
+        suggestion: None,
+    }
+}
+
+fn required_text(object: &Map<String, Value>, field: &str) -> AppResult<String> {
+    text(object, field).ok_or_else(|| AppError::InvalidInput(format!("{field} 不能为空")))
+}
+
 fn text(object: &Map<String, Value>, field: &str) -> Option<String> {
     object.get(field).and_then(value_to_text)
 }
@@ -2116,6 +2490,24 @@ fn value_to_text(value: &Value) -> Option<String> {
                 .join(",");
             (!joined.is_empty()).then_some(joined)
         }
+        _ => None,
+    }
+}
+
+fn number_i64(object: &Map<String, Value>, field: &str) -> Option<i64> {
+    match object.get(field) {
+        Some(Value::Number(number)) => number
+            .as_i64()
+            .or_else(|| number.as_f64().map(|v| v as i64)),
+        Some(Value::String(text)) => text.trim().parse::<i64>().ok(),
+        _ => None,
+    }
+}
+
+fn number_f64(object: &Map<String, Value>, field: &str) -> Option<f64> {
+    match object.get(field) {
+        Some(Value::Number(number)) => number.as_f64(),
+        Some(Value::String(text)) => text.trim().parse::<f64>().ok(),
         _ => None,
     }
 }
@@ -2148,7 +2540,10 @@ fn sanitize_import_content(content: &str, item_name: &str) -> String {
             .find(|candidate| !candidate.trim().is_empty())
             .map(|candidate| compact_text(candidate))
             .unwrap_or_default();
-        let previous_key = output.last().map(|line| compact_text(line)).unwrap_or_default();
+        let previous_key = output
+            .last()
+            .map(|line| compact_text(line))
+            .unwrap_or_default();
 
         if line_key == previous_key {
             continue;
@@ -2156,13 +2551,16 @@ fn sanitize_import_content(content: &str, item_name: &str) -> String {
         if !item_key.is_empty()
             && index < 12
             && line_key == item_key
-            && output
-                .iter()
-                .any(|part| compact_text(part) == item_key || compact_text(part).starts_with(&item_key))
+            && output.iter().any(|part| {
+                compact_text(part) == item_key || compact_text(part).starts_with(&item_key)
+            })
         {
             continue;
         }
-        if line_key.chars().count() <= 6 && next_key.starts_with(&line_key) && next_key.len() > line_key.len() {
+        if line_key.chars().count() <= 6
+            && next_key.starts_with(&line_key)
+            && next_key.len() > line_key.len()
+        {
             continue;
         }
         if line_key.chars().count() <= 6 && seen_short.contains(&line_key) && next_key != line_key {
@@ -2187,12 +2585,17 @@ fn is_import_layout_noise(line: &str) -> bool {
     if text.is_empty() {
         return false;
     }
-    matches!(text.as_str(), "倪海厦注" | "倪海厦注《金匮》" | "倪海厦注金匮" | "倪注金匮" | "校排" | "呚")
-        || text.contains("勤求古訓博采眾方")
+    matches!(
+        text.as_str(),
+        "倪海厦注" | "倪海厦注《金匮》" | "倪海厦注金匮" | "倪注金匮" | "校排" | "呚"
+    ) || text.contains("勤求古訓博采眾方")
         || text.contains("勤求古训博采众方")
         || (text.contains("群龙无首") && text.contains("校排"))
         || (text.starts_with("【PDF页码") && text.ends_with('】'))
-        || (text.ends_with("校排") && text.chars().all(|ch| ch.is_ascii_digit() || matches!(ch, '.' | '。' | '．') || ch == '校' || ch == '排'))
+        || (text.ends_with("校排")
+            && text.chars().all(|ch| {
+                ch.is_ascii_digit() || matches!(ch, '.' | '。' | '．') || ch == '校' || ch == '排'
+            }))
 }
 
 fn compact_text(value: &str) -> String {
@@ -2604,6 +3007,260 @@ mod tests {
                 Ok(())
             })
             .expect("inspect csv mapping");
+
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn maintenance_imports_write_standard_terms_search_terms_and_relation_suggestions() {
+        let (data_dir, database) = temp_database("maintenance-imports");
+        let knowledge = r#"
+        [
+          {
+            "type": "herb",
+            "code": "HERB-HQ",
+            "name": "黄芪",
+            "content": "黄芪，味甘微温，补气固表。",
+            "source_note": "神农本草经",
+            "tags": ["中药", "补气"]
+          },
+          {
+            "type": "formula",
+            "code": "FORM-BZYQT",
+            "name": "补中益气汤",
+            "content": "补中益气汤，用于中气不足。",
+            "source_note": "方剂资料",
+            "tags": ["方剂", "补气"]
+          }
+        ]
+        "#;
+        let summary = import_json(
+            &database,
+            CreateImportRequest {
+                file_name: "knowledge_items_import.json".to_string(),
+                target_type: "mixed".to_string(),
+                content: knowledge.to_string(),
+                mapping: None,
+                template_id: None,
+            },
+        )
+        .expect("stage knowledge");
+        confirm_import(&database, summary.batch.id.unwrap()).expect("confirm knowledge");
+
+        let standard_terms = r#"
+        [
+          {
+            "term_type": "herb_name",
+            "standard_name": "黄芪",
+            "aliases": ["黄耆", "绵黄芪"],
+            "code": "HERB-HQ",
+            "notes": "维护导入"
+          }
+        ]
+        "#;
+        let standard_summary = import_json(
+            &database,
+            CreateImportRequest {
+                file_name: "standard_terms_import.json".to_string(),
+                target_type: "mixed".to_string(),
+                content: standard_terms.to_string(),
+                mapping: None,
+                template_id: None,
+            },
+        )
+        .expect("stage standard terms");
+        assert_eq!(standard_summary.batch.import_type, "standard_terms_v1");
+        let standard_result =
+            confirm_import(&database, standard_summary.batch.id.unwrap()).expect("confirm terms");
+        assert_eq!(standard_result.imported_count, 1);
+
+        let search_terms = r#"
+        [
+          {
+            "item_code": "FORM-BZYQT",
+            "term": "中气下陷",
+            "term_type": "keyword",
+            "weight": 150
+          }
+        ]
+        "#;
+        let search_summary = import_json(
+            &database,
+            CreateImportRequest {
+                file_name: "search_terms_import.json".to_string(),
+                target_type: "mixed".to_string(),
+                content: search_terms.to_string(),
+                mapping: None,
+                template_id: None,
+            },
+        )
+        .expect("stage search terms");
+        assert_eq!(search_summary.batch.import_type, "search_terms_v1");
+        let search_result =
+            confirm_import(&database, search_summary.batch.id.unwrap()).expect("confirm search");
+        assert_eq!(search_result.imported_count, 1);
+
+        let relation_suggestions = r#"
+        [
+          {
+            "source_code": "FORM-BZYQT",
+            "target_code": "HERB-HQ",
+            "relation_type": "contains",
+            "confidence": 0.92,
+            "reason": "方中包含黄芪"
+          }
+        ]
+        "#;
+        let relation_summary = import_json(
+            &database,
+            CreateImportRequest {
+                file_name: "relation_suggestions_import.json".to_string(),
+                target_type: "mixed".to_string(),
+                content: relation_suggestions.to_string(),
+                mapping: None,
+                template_id: None,
+            },
+        )
+        .expect("stage relation suggestions");
+        assert_eq!(
+            relation_summary.batch.import_type,
+            "relation_suggestions_v1"
+        );
+        let relation_result = confirm_import(&database, relation_summary.batch.id.unwrap())
+            .expect("confirm relation suggestions");
+        assert_eq!(relation_result.imported_count, 1);
+
+        database
+            .with_connection(|connection| {
+                let standard_count: i64 = connection.query_row(
+                    "SELECT COUNT(1) FROM standard_terms
+                     WHERE term_type = 'herb_name' AND standard_name = '黄芪'
+                       AND aliases LIKE '%黄耆%'",
+                    [],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(standard_count, 1);
+
+                let term_count: i64 = connection.query_row(
+                    "SELECT COUNT(1)
+                     FROM search_terms st
+                     JOIN knowledge_items ki ON ki.id = st.item_id
+                     WHERE ki.code = 'FORM-BZYQT' AND st.term = '中气下陷'
+                       AND st.term_type = 'keyword' AND st.weight = 150",
+                    [],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(term_count, 1);
+
+                let suggestion_count: i64 = connection.query_row(
+                    "SELECT COUNT(1)
+                     FROM relation_suggestions rs
+                     JOIN knowledge_items source ON source.id = rs.source_item_id
+                     JOIN knowledge_items target ON target.id = rs.target_item_id
+                     WHERE source.code = 'FORM-BZYQT' AND target.code = 'HERB-HQ'
+                       AND rs.relation_type = 'contains' AND rs.status = 'pending'",
+                    [],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(suggestion_count, 1);
+                Ok(())
+            })
+            .expect("inspect maintenance imports");
+
+        let response = search_index_service::search(
+            &database,
+            SearchRequest {
+                query: "中气下陷".to_string(),
+                item_type: Some("formula".to_string()),
+                page: Some(1),
+                page_size: Some(10),
+            },
+        )
+        .expect("search imported term");
+        assert_eq!(
+            response.results.first().map(|hit| hit.item_id).is_some(),
+            true
+        );
+
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn zip_manifest_can_stage_primary_maintenance_file() {
+        let (data_dir, database) = temp_database("maintenance-zip");
+        let mut buffer = std::io::Cursor::new(Vec::new());
+        {
+            let mut writer = zip::ZipWriter::new(&mut buffer);
+            let options = zip::write::SimpleFileOptions::default();
+            writer.start_file("import_manifest.json", options).unwrap();
+            writer
+                .write_all(
+                    r#"{
+                "package_name": "maintenance_terms",
+                "files": [
+                  {
+                    "path": "json/standard_terms_import.json",
+                    "type": "standard_terms_v1",
+                    "target": "standard_terms",
+                    "primary": true,
+                    "auto_stage": true
+                  }
+                ],
+                "import_order": ["standard_terms"]
+            }"#
+                    .as_bytes(),
+                )
+                .unwrap();
+            writer
+                .start_file("json/standard_terms_import.json", options)
+                .unwrap();
+            writer
+                .write_all(
+                    r#"[{
+                "term_type": "meridian",
+                "standard_name": "足太阴脾经",
+                "aliases": ["脾经", "SP"],
+                "code": "SP",
+                "notes": "ZIP 维护包导入"
+            }]"#
+                    .as_bytes(),
+                )
+                .unwrap();
+            writer.finish().unwrap();
+        }
+        let bytes = buffer.into_inner();
+
+        let preview = preview_zip("maintenance_terms.zip", &bytes).expect("preview zip");
+        assert_eq!(preview.detection.detected_type, "standard_terms_v1");
+        assert_eq!(preview.rows.len(), 1);
+
+        let summary = import_zip(
+            &database,
+            CreateImportRequest {
+                file_name: "maintenance_terms.zip".to_string(),
+                target_type: "mixed".to_string(),
+                content: String::new(),
+                mapping: None,
+                template_id: None,
+            },
+            &bytes,
+        )
+        .expect("import maintenance zip");
+        assert_eq!(summary.batch.import_type, "standard_terms_v1");
+        confirm_import(&database, summary.batch.id.unwrap()).expect("confirm maintenance zip");
+
+        database
+            .with_connection(|connection| {
+                let count: i64 = connection.query_row(
+                    "SELECT COUNT(1) FROM standard_terms
+                     WHERE term_type = 'meridian' AND standard_name = '足太阴脾经'",
+                    [],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(count, 1);
+                Ok(())
+            })
+            .expect("inspect imported term");
 
         let _ = fs::remove_dir_all(data_dir);
     }

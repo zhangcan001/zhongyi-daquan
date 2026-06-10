@@ -53,6 +53,7 @@ pub fn run() {
             commands::knowledge_commands::record_recent_view,
             commands::knowledge_commands::list_recent_views,
             commands::knowledge_commands::save_user_note,
+            commands::knowledge_commands::update_user_note,
             commands::knowledge_commands::delete_user_note,
             commands::knowledge_commands::get_dashboard_stats,
             commands::version_commands::list_knowledge_versions,

@@ -89,6 +89,15 @@ pub fn save_user_note(
 }
 
 #[tauri::command]
+pub fn update_user_note(
+    state: State<'_, AppState>,
+    note_id: i64,
+    note_text: String,
+) -> AppResult<UserNote> {
+    knowledge_service::update_user_note(&state.database, note_id, note_text)
+}
+
+#[tauri::command]
 pub fn delete_user_note(state: State<'_, AppState>, note_id: i64) -> AppResult<()> {
     knowledge_service::delete_user_note(&state.database, note_id)
 }

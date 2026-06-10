@@ -1096,6 +1096,30 @@ h3 {
   resize: vertical;
 }
 
+.note-editor.compact {
+  min-height: 78px;
+}
+
+.user-note-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.user-note-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(174, 187, 172, 0.35);
+  border-radius: 8px;
+  background: rgba(255, 253, 245, 0.72);
+  padding: 10px;
+}
+
+.user-note-meta {
+  color: #7a6b52;
+  font-size: 12px;
+}
+
 .import-actions button:disabled {
   color: #7c8780;
   background: #eef1ec;
@@ -2298,6 +2322,15 @@ h3 {
 
 .annotation-block {
   background: rgba(17, 25, 39, 0.76);
+}
+
+.user-note-card {
+  border-color: rgba(126, 199, 220, 0.18);
+  background: rgba(17, 25, 39, 0.76);
+}
+
+.user-note-meta {
+  color: var(--muted);
 }
 
 .status-pill,

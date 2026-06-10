@@ -7,6 +7,7 @@ import {
   runAiTask,
   saveUserNote,
   toggleFavorite,
+  updateUserNote,
 } from "./api";
 import { detailFields } from "./schema";
 import { herbNatureClass, herbNatureFromDetail, meridianElementClass, meridianElementFromDetail } from "./natureColor";
@@ -36,6 +37,7 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
   const [detail, setDetail] = useState<KnowledgeDetailResponse | null>(null);
   const [message, setMessage] = useState("");
   const [noteText, setNoteText] = useState("");
+  const [noteEdits, setNoteEdits] = useState<Record<number, string>>({});
   const [aiAnswer, setAiAnswer] = useState<FormulaAiAnswer | null>(null);
   const [genericAiAnswer, setGenericAiAnswer] = useState<AiCommandResponse | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
@@ -48,7 +50,8 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
     getKnowledgeDetail(itemId)
       .then((response) => {
         setDetail(response);
-        setNoteText(response.notes[0]?.noteText ?? "");
+        setNoteText("");
+        setNoteEdits(noteEditState(response.notes));
         setAiAnswer(null);
         setGenericAiAnswer(null);
         return recordRecentView(itemId);
@@ -111,8 +114,28 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
     if (!item.id) return;
     saveUserNote(item.id, noteText)
       .then((note) => {
-        setDetail((current) => current && { ...current, notes: [note] });
+        setDetail((current) => current && { ...current, notes: [note, ...current.notes] });
+        setNoteEdits((current) => ({ ...current, [note.id]: note.noteText }));
+        setNoteText("");
         setMessage("个人备注已保存");
+        onChanged?.();
+      })
+      .catch((error) => setMessage(String(error)));
+  }
+
+  function updateNote(note: UserNote) {
+    const nextText = noteEdits[note.id] ?? note.noteText;
+    updateUserNote(note.id, nextText)
+      .then((updated) => {
+        setDetail(
+          (current) =>
+            current && {
+              ...current,
+              notes: current.notes.map((item) => (item.id === updated.id ? updated : item)),
+            },
+        );
+        setNoteEdits((current) => ({ ...current, [updated.id]: updated.noteText }));
+        setMessage("个人备注已更新");
         onChanged?.();
       })
       .catch((error) => setMessage(String(error)));
@@ -121,8 +144,12 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
   function removeNote(note: UserNote) {
     deleteUserNote(note.id)
       .then(() => {
-        setDetail((current) => current && { ...current, notes: [] });
-        setNoteText("");
+        setDetail((current) => current && { ...current, notes: current.notes.filter((item) => item.id !== note.id) });
+        setNoteEdits((current) => {
+          const next = { ...current };
+          delete next[note.id];
+          return next;
+        });
         setMessage("个人备注已删除");
         onChanged?.();
       })
@@ -326,18 +353,41 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
 
       <section className="reader-section">
         <h3>个人备注</h3>
+        {notes.length ? (
+          <div className="user-note-list">
+            {notes.map((note) => (
+              <div className="user-note-card" key={note.id}>
+                <div className="user-note-meta">
+                  <span>更新于 {note.updatedAt}</span>
+                </div>
+                <textarea
+                  className="note-editor compact"
+                  value={noteEdits[note.id] ?? note.noteText}
+                  onChange={(event) => setNoteEdits((current) => ({ ...current, [note.id]: event.target.value }))}
+                />
+                <div className="detail-actions">
+                  <button type="button" onClick={() => updateNote(note)}>
+                    保存此条
+                  </button>
+                  <button type="button" onClick={() => removeNote(note)}>
+                    删除
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-text">暂无个人备注。</p>
+        )}
         <textarea
           className="note-editor"
           value={noteText}
           onChange={(event) => setNoteText(event.target.value)}
-          placeholder="记录自己的学习备注，不参与医疗建议。"
+          placeholder="新增一条学习备注"
         />
         <div className="detail-actions">
-          <button type="button" onClick={saveNote}>
-            {notes.length ? "保存备注" : "添加备注"}
-          </button>
-          <button type="button" disabled={!notes.length} onClick={() => notes[0] && removeNote(notes[0])}>
-            删除备注
+          <button type="button" onClick={saveNote} disabled={!noteText.trim()}>
+            添加备注
           </button>
         </div>
       </section>
@@ -418,6 +468,10 @@ function FormulaField({
 
 function annotationSource(annotation: KnowledgeAnnotation) {
   return [annotation.sourceTitle, annotation.sourceNote].filter(Boolean).join(" | ") || "未记录来源";
+}
+
+function noteEditState(notes: UserNote[]) {
+  return Object.fromEntries(notes.map((note) => [note.id, note.noteText]));
 }
 
 function stringValue(value: unknown) {

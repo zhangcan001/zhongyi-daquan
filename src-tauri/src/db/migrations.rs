@@ -73,6 +73,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "herb_classic_sections",
         sql: include_str!("../../migrations/013_herb_classic_sections.sql"),
     },
+    Migration {
+        version: 14,
+        name: "user_notes_multi_entry",
+        sql: include_str!("../../migrations/014_user_notes_multi_entry.sql"),
+    },
 ];
 
 pub fn run(connection: &Connection) -> AppResult<()> {
@@ -104,4 +109,57 @@ pub fn run(connection: &Connection) -> AppResult<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::run;
+    use rusqlite::Connection;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn user_notes_allow_multiple_notes_per_item_after_migrations() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        let data_dir = std::env::temp_dir().join(format!("zhongyi-migration-notes-{unique}"));
+        fs::create_dir_all(&data_dir).expect("create temp dir");
+        let database_path = data_dir.join("test.db");
+        let connection = Connection::open(&database_path).expect("open db");
+
+        run(&connection).expect("migrations run");
+        connection
+            .execute(
+                "INSERT INTO knowledge_items
+                 (type, name, data_status, completeness_status, created_at, updated_at)
+                 VALUES ('note', '笔记迁移测试', 'imported', 'partial', datetime('now'), datetime('now'))",
+                [],
+            )
+            .expect("insert item");
+        let item_id = connection.last_insert_rowid();
+
+        for text in ["第一条", "第二条"] {
+            connection
+                .execute(
+                    "INSERT INTO user_notes (item_id, note_text, created_at, updated_at)
+                     VALUES (?1, ?2, datetime('now'), datetime('now'))",
+                    rusqlite::params![item_id, text],
+                )
+                .expect("insert note");
+        }
+
+        let count: i64 = connection
+            .query_row(
+                "SELECT COUNT(1) FROM user_notes WHERE item_id = ?1",
+                [item_id],
+                |row| row.get(0),
+            )
+            .expect("count notes");
+        assert_eq!(count, 2);
+
+        drop(connection);
+        let _ = fs::remove_dir_all(data_dir);
+    }
 }

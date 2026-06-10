@@ -214,13 +214,33 @@ pub fn save_user_note(database: &Database, item_id: i64, note_text: String) -> A
         }
         connection.execute(
             "INSERT INTO user_notes (item_id, note_text, created_at, updated_at)
-             VALUES (?1, ?2, datetime('now'), datetime('now'))
-             ON CONFLICT(item_id) DO UPDATE SET
-               note_text = excluded.note_text,
-               updated_at = excluded.updated_at",
+             VALUES (?1, ?2, datetime('now'), datetime('now'))",
             params![item_id, note_text],
         )?;
-        load_note_for_item(connection, item_id)
+        load_note_by_id(connection, connection.last_insert_rowid())
+    })
+}
+
+pub fn update_user_note(
+    database: &Database,
+    note_id: i64,
+    note_text: String,
+) -> AppResult<UserNote> {
+    let note_text = note_text.trim().to_string();
+    if note_text.is_empty() {
+        return Err(AppError::InvalidInput("备注内容不能为空".to_string()));
+    }
+    database.with_connection(|connection| {
+        let changed = connection.execute(
+            "UPDATE user_notes
+             SET note_text = ?2, updated_at = datetime('now')
+             WHERE id = ?1",
+            params![note_id, note_text],
+        )?;
+        if changed == 0 {
+            return Err(AppError::InvalidInput(format!("个人备注不存在: {note_id}")));
+        }
+        load_note_by_id(connection, note_id)
     })
 }
 
@@ -470,13 +490,13 @@ fn load_recent_view(connection: &rusqlite::Connection, item_id: i64) -> AppResul
         .map_err(Into::into)
 }
 
-fn load_note_for_item(connection: &rusqlite::Connection, item_id: i64) -> AppResult<UserNote> {
+fn load_note_by_id(connection: &rusqlite::Connection, note_id: i64) -> AppResult<UserNote> {
     connection
         .query_row(
             "SELECT id, item_id, note_text, created_at, updated_at
              FROM user_notes
-             WHERE item_id = ?1",
-            params![item_id],
+             WHERE id = ?1",
+            params![note_id],
             map_note_row,
         )
         .map_err(Into::into)
@@ -583,13 +603,20 @@ mod tests {
         assert!(!unfavorited.item.is_favorite);
         assert!(list_favorites(&database).unwrap().is_empty());
 
-        let note = save_user_note(&database, item_id, "学习备注".to_string()).unwrap();
-        assert_eq!(
-            get(&database, item_id).unwrap().notes[0].note_text,
-            "学习备注"
-        );
-        delete_user_note(&database, note.id).unwrap();
-        assert!(get(&database, item_id).unwrap().notes.is_empty());
+        let first_note = save_user_note(&database, item_id, "第一条学习备注".to_string()).unwrap();
+        let second_note = save_user_note(&database, item_id, "第二条学习备注".to_string()).unwrap();
+        let notes = get(&database, item_id).unwrap().notes;
+        assert_eq!(notes.len(), 2);
+        assert!(notes.iter().any(|note| note.note_text == "第一条学习备注"));
+        assert!(notes.iter().any(|note| note.note_text == "第二条学习备注"));
+
+        let updated =
+            update_user_note(&database, first_note.id, "第一条已更新".to_string()).unwrap();
+        assert_eq!(updated.note_text, "第一条已更新");
+        delete_user_note(&database, second_note.id).unwrap();
+        let notes = get(&database, item_id).unwrap().notes;
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].note_text, "第一条已更新");
 
         let stats = dashboard_stats(&database).unwrap();
         assert_eq!(stats.knowledge_count, 1);

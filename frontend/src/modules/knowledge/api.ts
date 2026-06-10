@@ -75,6 +75,10 @@ export function saveUserNote(itemId: number, noteText: string) {
   return invoke<UserNote>("save_user_note", { itemId, noteText });
 }
 
+export function updateUserNote(noteId: number, noteText: string) {
+  return invoke<UserNote>("update_user_note", { noteId, noteText });
+}
+
 export function deleteUserNote(noteId: number) {
   return invoke<void>("delete_user_note", { noteId });
 }

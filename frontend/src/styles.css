@@ -608,6 +608,10 @@ dd {
   animation: loading-line-move 1s ease-in-out infinite;
 }
 
+.list-loading-line {
+  margin: -2px 0 8px;
+}
+
 @keyframes loading-line-move {
   from {
     transform: translateX(-110%);

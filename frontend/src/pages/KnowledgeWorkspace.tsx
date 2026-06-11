@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createKnowledgeItem,
   deleteKnowledgeItem,
@@ -34,11 +34,14 @@ export function KnowledgeWorkspace() {
   const [versions, setVersions] = useState(0);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const listRequestId = useRef(0);
 
   const selectedType = form.itemType;
   const pageCount = Math.max(1, Math.ceil(total / 50));
 
   const loadList = useCallback(() => {
+    const requestId = listRequestId.current + 1;
+    listRequestId.current = requestId;
     setLoading(true);
     listKnowledgeItems({
       itemType: typeFilter,
@@ -48,15 +51,24 @@ export function KnowledgeWorkspace() {
       pageSize: 50,
     })
       .then((response) => {
+        if (requestId !== listRequestId.current) return;
         setItems(response.items);
         setTotal(response.total);
       })
-      .catch((error) => setMessage(String(error)))
-      .finally(() => setLoading(false));
+      .catch((error) => {
+        if (requestId !== listRequestId.current) return;
+        setMessage(String(error));
+      })
+      .finally(() => {
+        if (requestId === listRequestId.current) {
+          setLoading(false);
+        }
+      });
   }, [page, query, statusFilter, typeFilter]);
 
   useEffect(() => {
-    loadList();
+    const timer = window.setTimeout(loadList, query.trim() ? 320 : 0);
+    return () => window.clearTimeout(timer);
   }, [loadList]);
 
   function startCreate(itemType: KnowledgeType = (typeFilter || "herb") as KnowledgeType) {
@@ -206,6 +218,8 @@ export function KnowledgeWorkspace() {
           />
         </div>
 
+        {loading ? <div className="loading-line list-loading-line" aria-live="polite" /> : null}
+
         <div className="knowledge-list" aria-busy={loading}>
           {items.map((item) => (
             <KnowledgeListRow
@@ -219,7 +233,7 @@ export function KnowledgeWorkspace() {
         </div>
 
         <div className="pager">
-          <button type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
+          <button type="button" disabled={loading || page <= 1} onClick={() => setPage((value) => value - 1)}>
             上一页
           </button>
           <span>
@@ -227,7 +241,7 @@ export function KnowledgeWorkspace() {
           </span>
           <button
             type="button"
-            disabled={page >= pageCount}
+            disabled={loading || page >= pageCount}
             onClick={() => setPage((value) => value + 1)}
           >
             下一页

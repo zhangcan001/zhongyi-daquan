@@ -44,6 +44,7 @@ export type KnowledgeInput = Omit<
 export type KnowledgeDetailResponse = {
   item: KnowledgeItem;
   detail: Record<string, string | number | null>;
+  relations: KnowledgeRelationView[];
   annotations: KnowledgeAnnotation[];
   notes: UserNote[];
   versions: Array<{
@@ -54,6 +55,20 @@ export type KnowledgeDetailResponse = {
     changeSummary?: string | null;
     changedAt: string;
   }>;
+};
+
+export type KnowledgeRelationView = {
+  id: number;
+  sourceItemId: number;
+  targetItemId: number;
+  relatedItemId: number;
+  relatedItemType: KnowledgeType;
+  relatedName: string;
+  relatedCode?: string | null;
+  relatedCategory?: string | null;
+  relationType: string;
+  direction: "outgoing" | "incoming" | string;
+  note?: string | null;
 };
 
 export type KnowledgeAnnotation = {

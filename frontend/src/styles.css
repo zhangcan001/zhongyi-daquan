@@ -2845,6 +2845,117 @@ body {
   background: rgba(126, 199, 220, 0.06);
 }
 
+.relation-graph {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.82fr) minmax(0, 1.4fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.relation-node {
+  min-width: 0;
+  border: 1px solid rgba(126, 199, 220, 0.18);
+  border-radius: 8px;
+  background: rgba(4, 9, 18, 0.5);
+  padding: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.relation-node.current {
+  background:
+    linear-gradient(135deg, rgba(99, 217, 239, 0.12), transparent 42%),
+    rgba(5, 12, 24, 0.72);
+}
+
+.relation-node span,
+.relation-edge-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.relation-node strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.relation-node small {
+  display: block;
+  margin-top: 4px;
+  color: #8fa9b7;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.relation-node p {
+  margin: 8px 0 0;
+  color: #bed0d9;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.relation-node dl {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.relation-node dl div {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.relation-node dt {
+  color: #8fa9b7;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.relation-node dd {
+  margin: 0;
+  color: #dceaf1;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.relation-links {
+  display: grid;
+  gap: 8px;
+}
+
+.relation-link {
+  display: grid;
+  grid-template-columns: minmax(74px, 108px) minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
+.relation-edge-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(216, 245, 106, 0.18);
+  border-radius: 8px;
+  background: rgba(216, 245, 106, 0.06);
+  color: #d8f56a;
+}
+
+.relation-empty {
+  margin: 0;
+  border: 1px dashed rgba(126, 199, 220, 0.22);
+  border-radius: 8px;
+  background: rgba(4, 9, 18, 0.28);
+  padding: 14px;
+  color: var(--muted);
+}
+
 @media (max-width: 760px) {
   .app-shell {
     width: 100%;
@@ -2874,5 +2985,14 @@ body {
 
   .executive-strip {
     display: grid;
+  }
+
+  .relation-graph,
+  .relation-link {
+    grid-template-columns: 1fr;
+  }
+
+  .relation-edge-label {
+    min-height: 34px;
   }
 }

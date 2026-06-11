@@ -4,7 +4,9 @@ use crate::models::knowledge::{
     DashboardStats, FavoriteItem, KnowledgeAnnotation, KnowledgeDetailResponse, KnowledgeInput,
     KnowledgeListRequest, KnowledgeListResponse, RecentView, UserNote,
 };
-use crate::repositories::{detail_repository, knowledge_repository, version_repository};
+use crate::repositories::{
+    detail_repository, knowledge_repository, relation_repository, version_repository,
+};
 use crate::services::search_index_service;
 use rusqlite::{params, OptionalExtension};
 use serde_json::json;
@@ -58,6 +60,7 @@ pub fn get(database: &Database, item_id: i64) -> AppResult<KnowledgeDetailRespon
     Ok(KnowledgeDetailResponse {
         item,
         detail,
+        relations: relation_repository::list_relations_for_item(database, item_id)?,
         annotations: list_annotations(database, item_id)?,
         notes: list_notes_for_item(database, item_id)?,
         versions,
@@ -585,7 +588,25 @@ mod tests {
             })
             .unwrap();
 
+        let meridian_id = seed_item(&database, "meridian", "手太阴肺经", Some("十二经脉"));
+        database
+            .with_connection(|connection| {
+                connection
+                    .execute(
+                        "INSERT INTO knowledge_relations
+                         (source_item_id, target_item_id, relation_type, note)
+                         VALUES (?1, ?2, 'belongs_to', '人参条目测试关联')",
+                        params![item_id, meridian_id],
+                    )
+                    .unwrap();
+                Ok(())
+            })
+            .unwrap();
+
         let detail = get(&database, item_id).unwrap();
+        assert_eq!(detail.relations.len(), 1);
+        assert_eq!(detail.relations[0].related_name, "手太阴肺经");
+        assert_eq!(detail.relations[0].direction, "outgoing");
         assert_eq!(detail.annotations.len(), 1);
         assert_eq!(
             detail.annotations[0].source_note.as_deref(),
@@ -619,7 +640,7 @@ mod tests {
         assert_eq!(notes[0].note_text, "第一条已更新");
 
         let stats = dashboard_stats(&database).unwrap();
-        assert_eq!(stats.knowledge_count, 1);
+        assert_eq!(stats.knowledge_count, 2);
         assert_eq!(stats.annotation_count, 1);
         assert_eq!(stats.recent_view_count, 1);
 

@@ -14,6 +14,23 @@ pub struct KnowledgeRelation {
 #[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct KnowledgeRelationView {
+    pub id: i64,
+    pub source_item_id: i64,
+    pub target_item_id: i64,
+    pub related_item_id: i64,
+    pub related_item_type: String,
+    pub related_name: String,
+    pub related_code: Option<String>,
+    pub related_category: Option<String>,
+    pub relation_type: String,
+    pub direction: String,
+    pub note: Option<String>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RelationSuggestion {
     pub id: Option<i64>,
     pub source_item_id: Option<i64>,

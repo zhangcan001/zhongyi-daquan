@@ -10,9 +10,15 @@ import {
   updateUserNote,
 } from "./api";
 import { detailFields } from "./schema";
-import { herbNatureClass, herbNatureFromDetail, meridianElementClass, meridianElementFromDetail } from "./natureColor";
+import {
+  herbNatureClass,
+  herbNatureFromDetail,
+  meridianElementClass,
+  meridianElementFromDetail,
+  meridianElementFromSearch,
+} from "./natureColor";
 import type { AiCommandResponse, FormulaAiAnswer, FormulaCard } from "../ai/types";
-import type { KnowledgeAnnotation, KnowledgeDetailResponse, KnowledgeType, UserNote } from "./types";
+import type { KnowledgeAnnotation, KnowledgeDetailResponse, KnowledgeRelationView, KnowledgeType, UserNote } from "./types";
 
 type Props = {
   itemId: number | null;
@@ -80,6 +86,7 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
   const item = detail.item;
   const annotations = detail.annotations ?? [];
   const notes = detail.notes ?? [];
+  const relations = detail.relations ?? [];
   const sourceLine = [item.sourcePackage, item.sourceNote].filter(Boolean).join(" | ");
   const nature = herbNatureFromDetail(detail.detail);
   const element = meridianElementFromDetail(item.itemType, item.name, item.category, detail.detail);
@@ -328,6 +335,13 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
         </section>
       ) : null}
 
+      {shouldShowRelationGraph(item.itemType, relations) ? (
+        <section className="reader-section">
+          <h3>关联图谱</h3>
+          <RelationGraph detail={detail} />
+        </section>
+      ) : null}
+
       <section className="reader-section">
         <h3>资料注解</h3>
         {annotations.length ? (
@@ -393,6 +407,83 @@ export function KnowledgeDetailReader({ itemId, query = "", onBack, onChanged }:
       </section>
       {message ? <p className="ai-message">{message}</p> : null}
     </article>
+  );
+}
+
+function RelationGraph({ detail }: { detail: KnowledgeDetailResponse }) {
+  const item = detail.item;
+  const relations = detail.relations ?? [];
+  const currentElement = meridianElementFromDetail(item.itemType, item.name, item.category, detail.detail);
+  const meridianName =
+    stringValue(detail.detail?.meridianName) ||
+    stringValue(detail.detail?.meridian) ||
+    relations.find((relation) => relation.relatedItemType === "meridian")?.relatedName ||
+    "";
+  const organLine = [
+    stringValue(detail.detail?.organRelation),
+    stringValue(detail.detail?.organ_relation),
+    stringValue(detail.detail?.pairedMeridian),
+    stringValue(detail.detail?.paired_meridian),
+  ]
+    .filter(Boolean)
+    .join(" / ");
+  const pointFacts = [
+    ["所属经络", meridianName],
+    ["连接脏腑", organLine],
+    ["定位", stringValue(detail.detail?.standardLocation) || stringValue(detail.detail?.standard_location)],
+    ["作用", stringValue(detail.detail?.functions) || stringValue(detail.detail?.mainIndications)],
+    ["主治", stringValue(detail.detail?.indications) || stringValue(detail.detail?.main_indications)],
+    ["下针", stringValue(detail.detail?.needlingSummary) || stringValue(detail.detail?.needling_summary)],
+  ].filter(([, value]) => value);
+
+  return (
+    <div className="relation-graph">
+      <div className="relation-node current">
+        <span>当前条目</span>
+        <strong className={herbNatureClass(herbNatureFromDetail(detail.detail)) ?? meridianElementClass(currentElement)}>
+          {item.name}
+        </strong>
+        <small>{[typeTitles[item.itemType] ?? item.itemType, item.category].filter(Boolean).join(" / ") || "未分类"}</small>
+        {pointFacts.length ? (
+          <dl>
+            {pointFacts.map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+      </div>
+      <div className="relation-links">
+        {relations.length ? (
+          relations.map((relation) => <RelationLink key={relation.id} relation={relation} />)
+        ) : (
+          <p className="relation-empty">暂无已确认关系，后续可由导入或关系建议生成。</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RelationLink({ relation }: { relation: KnowledgeRelationView }) {
+  const element = meridianElementFromSearch({
+    itemType: relation.relatedItemType,
+    name: relation.relatedName,
+    code: relation.relatedCode,
+    category: relation.relatedCategory,
+    summary: relation.note,
+  });
+  return (
+    <div className="relation-link">
+      <span className="relation-edge-label">{relationLabel(relation)}</span>
+      <div className="relation-node target">
+        <span>{typeTitles[relation.relatedItemType] ?? relation.relatedItemType}</span>
+        <strong className={meridianElementClass(element)}>{relation.relatedName}</strong>
+        <small>{[relation.relatedCode, relation.relatedCategory].filter(Boolean).join(" / ") || `#${relation.relatedItemId}`}</small>
+        {relation.note ? <p>{relation.note}</p> : null}
+      </div>
+    </div>
   );
 }
 
@@ -472,6 +563,25 @@ function annotationSource(annotation: KnowledgeAnnotation) {
 
 function noteEditState(notes: UserNote[]) {
   return Object.fromEntries(notes.map((note) => [note.id, note.noteText]));
+}
+
+function shouldShowRelationGraph(itemType: string, relations: KnowledgeRelationView[]) {
+  return relations.length > 0 || itemType === "acupoint" || itemType === "meridian" || itemType === "acupuncture";
+}
+
+function relationLabel(relation: KnowledgeRelationView) {
+  const outgoing = relation.direction === "outgoing";
+  const labels: Record<string, [string, string]> = {
+    belongs_to: ["所属", "包含"],
+    contains: ["包含", "属于"],
+    related_to: ["相关", "相关"],
+    similar_to: ["相似", "相似"],
+    references: ["引用", "被引用"],
+    treats: ["主治", "适用于"],
+    used_for: ["用于", "应用于"],
+  };
+  const fallback = relation.relationType.replace(/_/g, " ");
+  return (labels[relation.relationType]?.[outgoing ? 0 : 1] ?? fallback).trim();
 }
 
 function stringValue(value: unknown) {

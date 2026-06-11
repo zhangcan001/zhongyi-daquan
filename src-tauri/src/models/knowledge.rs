@@ -1,3 +1,4 @@
+use crate::models::relation::KnowledgeRelationView;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -175,6 +176,7 @@ pub struct KnowledgeInput {
 pub struct KnowledgeDetailResponse {
     pub item: KnowledgeItem,
     pub detail: Value,
+    pub relations: Vec<KnowledgeRelationView>,
     pub annotations: Vec<KnowledgeAnnotation>,
     pub notes: Vec<UserNote>,
     pub versions: Vec<KnowledgeVersion>,

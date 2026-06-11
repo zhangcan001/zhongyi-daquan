@@ -1,6 +1,6 @@
 use crate::db::connection::Database;
 use crate::errors::{AppError, AppResult};
-use crate::models::relation::RelationSuggestionDetail;
+use crate::models::relation::{KnowledgeRelationView, RelationSuggestionDetail};
 use rusqlite::{params, Connection, OptionalExtension};
 
 #[derive(Debug, Clone)]
@@ -56,6 +56,39 @@ pub fn load_targets(database: &Database, item_type: &str) -> AppResult<Vec<Relat
                 alias: row.get(4)?,
             })
         })?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    })
+}
+
+pub fn list_relations_for_item(
+    database: &Database,
+    item_id: i64,
+) -> AppResult<Vec<KnowledgeRelationView>> {
+    database.with_connection(|connection| {
+        let mut statement = connection.prepare(
+            "SELECT kr.id,
+                    kr.source_item_id,
+                    kr.target_item_id,
+                    related.id,
+                    related.type,
+                    related.name,
+                    related.code,
+                    related.category,
+                    kr.relation_type,
+                    CASE WHEN kr.source_item_id = ?1 THEN 'outgoing' ELSE 'incoming' END,
+                    kr.note
+             FROM knowledge_relations kr
+             JOIN knowledge_items related
+               ON related.id = CASE
+                 WHEN kr.source_item_id = ?1 THEN kr.target_item_id
+                 ELSE kr.source_item_id
+               END
+             WHERE kr.source_item_id = ?1 OR kr.target_item_id = ?1
+             ORDER BY kr.relation_type COLLATE NOCASE,
+                      related.type COLLATE NOCASE,
+                      related.name COLLATE NOCASE",
+        )?;
+        let rows = statement.query_map(params![item_id], map_relation_view)?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     })
 }
@@ -322,6 +355,22 @@ fn map_source_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RelationSource> {
         category: row.get(5)?,
         content: row.get(6)?,
         meridian_item_id: row.get(7)?,
+    })
+}
+
+fn map_relation_view(row: &rusqlite::Row<'_>) -> rusqlite::Result<KnowledgeRelationView> {
+    Ok(KnowledgeRelationView {
+        id: row.get(0)?,
+        source_item_id: row.get(1)?,
+        target_item_id: row.get(2)?,
+        related_item_id: row.get(3)?,
+        related_item_type: row.get(4)?,
+        related_name: row.get(5)?,
+        related_code: row.get(6)?,
+        related_category: row.get(7)?,
+        relation_type: row.get(8)?,
+        direction: row.get(9)?,
+        note: row.get(10)?,
     })
 }
 

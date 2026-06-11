@@ -48,13 +48,12 @@ pub fn restore_backup(
         )?;
         background_job_service::set_progress(database, active_job_id, 80.0)?;
 
-        // TODO: 当搜索线程提供异步搜索索引任务队列后，改为投递 rebuild_search_index 后台任务。
         let rebuild_note = match search_index_service::rebuild_search_index(database) {
             Ok(response) => format!(
-                "已调用 rebuild_search_index，占位重建 {} 条索引、{} 个搜索词。",
+                "已重建搜索索引：{} 条索引、{} 个搜索词。",
                 response.indexed_items, response.search_terms
             ),
-            Err(err) => format!("已预留 rebuild_search_index 调用点，本次调用失败: {err}"),
+            Err(err) => format!("恢复已完成，但搜索索引重建失败: {err}"),
         };
         background_job_service::set_progress(database, active_job_id, 90.0)?;
 
@@ -143,7 +142,7 @@ fn create_backup_with_note(
             includes_config: config_copied,
             notes: vec![
                 "SQLite 数据库通过 VACUUM INTO 生成一致性副本。".to_string(),
-                "恢复后会调用 rebuild_search_index；后续可替换为真正异步索引任务。".to_string(),
+                "恢复备份后会自动重建搜索索引，确保搜索结果与数据库一致。".to_string(),
             ],
         };
         let manifest_path = backup_dir.join("backup_manifest.json");
@@ -266,9 +265,7 @@ mod tests {
         )
         .expect("restore succeeds");
         assert!(restore.database_restored);
-        assert!(restore
-            .rebuild_search_index_note
-            .contains("rebuild_search_index"));
+        assert!(restore.rebuild_search_index_note.contains("已重建搜索索引"));
 
         database
             .with_connection(|connection| {

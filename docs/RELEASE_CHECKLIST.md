@@ -1,10 +1,10 @@
 # 发布检查清单
 
-## v0.1-alpha-package
+## v0.1.2-test
 
-基于：`v0.1-alpha`
+基于：`v0.1.2-test`
 
-源码包版本：`0.1.0`
+源码包版本：`0.1.2`
 
 内容：
 
@@ -53,12 +53,12 @@
 
 - [x] `npm run tauri:build`
 - [x] `src-tauri/target/release/zhongyi-daquan.exe`
-- [x] `src-tauri/target/release/bundle/nsis/中医大全_0.1.0_x64-setup.exe`
+- [x] `src-tauri/target/release/bundle/nsis/中医大全_0.1.2_x64-setup.exe`
 - [x] 安装包可启动
 - [x] 首次启动可创建本地数据目录
 - [x] 启动后首页正常
 - [ ] `src-tauri/target/release/bundle/msi/`
-- [ ] 正式发布图标资源，当前 `bundle.icon` 为空，发布前需补齐 `.ico` 与多尺寸图标。
+- [x] 正式发布图标资源，`src-tauri/icons/` 已补齐 `.ico` 与多尺寸 PNG，`bundle.icon` 已配置。
 
 ## 发布边界
 

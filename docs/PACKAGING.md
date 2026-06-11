@@ -23,9 +23,9 @@ npm run tauri:dev
 
 ## 生产打包
 
-## v0.1-alpha-package
+## v0.1.2-test
 
-`v0.1-alpha-package` 基于 `v0.1-alpha`，用于确认本地 Windows 打包链路、启动链路和发布文档完整性。
+`v0.1.2-test` 用于确认本地 Windows 打包链路、启动链路、图标资源和发布文档完整性。
 
 已验证的 Windows 安装包构建命令：
 
@@ -42,7 +42,7 @@ npm run tauri:build
 构建产物由 Tauri 写入 `src-tauri/target/release/`，其中：
 
 - 可执行文件：`src-tauri/target/release/zhongyi-daquan.exe`
-- NSIS 安装包：`src-tauri/target/release/bundle/nsis/中医大全_0.1.0_x64-setup.exe`
+- NSIS 安装包：`src-tauri/target/release/bundle/nsis/中医大全_0.1.2_x64-setup.exe`
 - MSI 安装包：`src-tauri/target/release/bundle/msi/`
 
 说明：
@@ -50,13 +50,13 @@ npm run tauri:build
 - `npm run tauri:build` 已在当前环境验证通过。
 - 默认脚本生成 NSIS 安装包，避免 `targets = all` 在本机缺少 WiX/MSI 工具链时卡住。
 - 如果需要完整 MSI 产物，先确保 WiX 资源已可用，再执行全量打包。
-- 当前 `src-tauri/tauri.conf.json` 的 `bundle.icon` 仍为空。TODO：正式发布前补齐 `.ico` 与对应尺寸图标资源；本次不临时生成占位图标。
+- `src-tauri/icons/` 已补齐正式应用图标资源，`bundle.icon` 使用 32px、128px、256px PNG 与 Windows `.ico`。
 
 ## 版本口径
 
-- 当前发布收口：`v0.1-alpha-package`。
-- 基础验收版本：`v0.1-alpha`。
-- Tauri/npm/Cargo 源码包版本：`0.1.0`。
+- 当前发布收口：`v0.1.2-test`。
+- 基础验收版本：`v0.1.2-test`。
+- Tauri/npm/Cargo 源码包版本：`0.1.2`。
 
 ## 数据与升级
 

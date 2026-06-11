@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub const AI_DISABLED_MESSAGE: &str = "当前版本未启用 AI 调用";
+pub const AI_DISABLED_MESSAGE: &str = "AI 未启用或尚未配置 API Key";
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]

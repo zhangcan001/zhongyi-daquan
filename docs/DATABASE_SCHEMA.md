@@ -12,8 +12,8 @@ PRAGMA cache_size = -64000;
 
 ## 迁移文件
 
-- `src-tauri/migrations/001_initial_core_schema.sql`：核心知识、导入、清洗、去重、关系、搜索、任务、备份审计和 AI 预留表。
-- `src-tauri/migrations/002_ai_reserved_schema.sql`：AI 预留表兼容迁移。
+- `src-tauri/migrations/001_initial_core_schema.sql`：核心知识、导入、清洗、去重、关系、搜索、任务、备份审计和 AI 相关表。
+- `src-tauri/migrations/002_ai_reserved_schema.sql`：AI 表兼容迁移。
 - `src-tauri/migrations/003_thread_d_search_performance.sql`：搜索性能相关 FTS、缓存和索引调整。
 
 ## 核心知识
@@ -51,11 +51,11 @@ PRAGMA cache_size = -64000;
 - `knowledge_list_view_cache`：列表分页缓存，避免大列表反复联表。
 - `performance_logs`：搜索、分页、重建索引等性能记录。
 
-## 后台、审计与 AI 预留
+## 后台、审计与 AI
 
 - `background_jobs`：后台任务。
 - `audit_logs`：审计日志。
-- `ai_provider_settings`、`ai_prompt_templates`、`ai_tasks`、`ai_drafts`、`ai_call_logs`：AI 预留表。v0.1 默认关闭，不真实调用模型。
+- `ai_provider_settings`、`ai_prompt_templates`、`ai_tasks`、`ai_drafts`、`ai_call_logs`：AI 设置、任务、草稿和调用日志。AI 默认关闭，用户配置 OpenAI-compatible API 后才发起请求。
 
 ## 关键索引
 

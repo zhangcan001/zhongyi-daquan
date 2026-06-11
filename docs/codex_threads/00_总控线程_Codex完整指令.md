@@ -19,7 +19,7 @@
 - 产品运行期默认不联网；开发过程允许联网安装依赖、查询资料和运行开发工具
 - 不登录
 - 不上传
-- v0.1 不真实调用 AI
+- AI 默认关闭，配置 OpenAI-compatible API 后才真实调用
 - 前端不得直接访问 SQLite
 - 前端通过 Tauri invoke 调用 Rust commands
 - commands 调用 services

@@ -113,7 +113,7 @@ AI 不参与 v0.1 主流程
 ```text
 “不联网”指后期产品运行期与 v0.1 主流程不接入互联网、不上传数据、不依赖服务器。
 开发过程允许联网安装依赖、查询构建资料、运行开发工具。
-AI 部分仅做接口预留；v0.1 不真实调用 AI。
+AI 默认关闭；配置 OpenAI-compatible API 后才真实调用，主流程不上传整库或原始资料。
 ```
 
 ## 2.2 v0.1 禁止开发
@@ -781,7 +781,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 ---
 
-## 5.11 AI 预留表
+## 5.11 AI 表
 
 ```sql
 CREATE TABLE IF NOT EXISTS ai_provider_settings (
@@ -1113,19 +1113,18 @@ relation_suggestions：1,000 条
 
 # 9. AI 接口预留要求
 
-## 9.1 v0.1 只做预留
+## 9.1 AI 当前状态
 
 ```text
 创建 AI 表
 创建 AI 设置页面
 创建 ai_commands.rs
-创建 AI 服务接口
-不真实调用模型
+创建 AI 服务接口与 OpenAI-compatible 调用路径
 默认关闭 AI
 没有 AI 配置时软件完整可用
 ```
 
-## 9.2 后期可接入
+## 9.2 可接入提供方
 
 ```text
 Ollama
@@ -1391,7 +1390,7 @@ codex/thread-ai-ready
 5. PromptTemplateService 接口
 6. AiDraftService 接口
 7. AiSafetyService 接口
-8. 占位命令返回“当前版本未启用 AI 调用”
+8. 禁用态返回“AI 未启用或尚未配置 API Key”
 ```
 
 验收：
@@ -1401,7 +1400,7 @@ AI 设置页面存在
 AI 默认关闭
 可以保存 provider_type、base_url、model_name
 无 AI 配置时软件完整可用
-AI 占位命令返回明确提示
+AI 禁用态返回明确提示
 ```
 
 ---
@@ -1527,7 +1526,7 @@ H 测试与文档
 35. AI 设置页面存在。
 36. AI 默认关闭。
 37. 没有 AI 配置时软件完整可用。
-38. AI 占位命令返回“当前版本未启用 AI 调用”。
+38. AI 禁用态返回“AI 未启用或尚未配置 API Key”。
 ```
 
 ---
@@ -1551,7 +1550,7 @@ H 测试与文档
 4. 不在线问诊。
 5. 不自动诊断。
 6. 不自动开方。
-7. v0.1 不真实调用 AI。
+7. AI 默认关闭；配置 OpenAI-compatible API 后才真实调用。
 8. 前端不得直接访问 SQLite。
 9. 前端通过 Tauri invoke 调用 Rust commands。
 10. commands 调用 services。
@@ -1561,7 +1560,7 @@ H 测试与文档
 14. 表格和暂存区必须使用虚拟滚动。
 15. 所有列表必须分页。
 16. 搜索必须使用 FTS5 + search_terms。
-17. AI 只做接口预留，默认关闭。
+17. AI 默认关闭，配置后走受控 OpenAI-compatible 调用。
 
 请先检查当前仓库结构，然后执行：
 1. 创建推荐目录结构。
@@ -1630,9 +1629,9 @@ H 测试与文档
 ## 线程 G 指令
 
 ```text
-你负责《中医大全》线程 G：AI 接口预留。
-只做 AI 表、AI 设置页、ai_commands、AI 服务接口和占位返回。
-v0.1 不真实调用任何 AI。
+你负责《中医大全》线程 G：AI 接口。
+维护 AI 表、AI 设置页、ai_commands、AI 服务接口、禁用态提示和 OpenAI-compatible 调用路径。
+AI 默认关闭，配置后才真实调用。
 AI 默认关闭，无配置时主功能完整可用。
 ```
 

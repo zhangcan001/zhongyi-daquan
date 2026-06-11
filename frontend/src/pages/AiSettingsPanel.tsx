@@ -7,7 +7,7 @@ import type {
   SaveAiProviderSettingsRequest,
 } from "../modules/ai/types";
 
-const disabledMessage = "当前版本未启用 AI 调用";
+const disabledMessage = "AI 未启用或尚未配置 API Key";
 
 const defaultSettings: SaveAiProviderSettingsRequest = {
   providerType: "disabled",
@@ -190,7 +190,7 @@ export function AiSettingsPanel() {
             <input
               value={form.providerName ?? ""}
               onChange={(event) => updateField("providerName", event.target.value)}
-              placeholder="本地占位名称"
+              placeholder="例如 OpenAI Compatible"
             />
           </label>
 
